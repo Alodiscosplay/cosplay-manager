@@ -25,13 +25,14 @@ export function OngletBudget({ costume }: { costume: Ligne }) {
   return (
     <section class="budget">
       <div class="tuiles-chiffres">
-        <div class="tuile-chiffre"><span class="chiffre">{euros(b.prevu)}</span><span class="legende">prévu (reste à acheter)</span></div>
-        <div class="tuile-chiffre"><span class="chiffre">{euros(b.commande)}</span><span class="legende">commandé</span></div>
-        <div class="tuile-chiffre"><span class="chiffre">{euros(b.recu)}</span><span class="legende">reçu</span></div>
-        <label class={`tuile-chiffre${depasse ? ' depasse' : ''}`}>
+        <label class="tuile-chiffre">
           <span class="chiffre saisie-euros"><Texte type="number" class="chiffre-saisie" valeur={costume.budget_prevu ?? ''} placeholder="—" onValider={v => maj('Costumes', costume.id, { budget_prevu: v })} /> €</span>
-          <span class="legende">budget visé{depasse ? ` · dépassé de ${euros(b.total - b.cible!)}` : ''}</span>
+          <span class="legende">budget visé</span>
         </label>
+        <div class="tuile-chiffre"><span class="chiffre">{euros(b.prevu)}</span><span class="legende">prévu</span></div>
+        <div class="tuile-chiffre"><span class="chiffre">{euros(b.recu + b.commande)}</span><span class="legende">actuel</span></div>
+        <div class="tuile-chiffre"><span class="chiffre">{euros(b.total)}</span><span class="legende">total</span></div>
+        <div class={`tuile-chiffre${depasse ? ' depasse' : ''}`}><span class="chiffre">{b.cible !== null ? euros(b.cible - b.total) : '—'}</span><span class="legende">reste</span></div>
       </div>
       {b.total > 0 && <BarreBudget b={b} />}
       {b.sansPrix > 0 && <p class="petit-texte">{b.sansPrix} fourniture{b.sansPrix > 1 ? 's' : ''} sans prix : le total est incomplet.</p>}
@@ -53,7 +54,7 @@ export function OngletBudget({ costume }: { costume: Ligne }) {
 }
 
 /**
- * Où en sont les dépenses : reçu, puis commandé, puis encore à acheter, sur l'échelle du budget visé
+ * Où en sont les dépenses : l'actuel (reçu + commandé), puis le prévu (encore à acheter), sur l'échelle du budget visé
  * (ou du total s'il le dépasse, ou s'il n'y a pas de budget visé).
  */
 function BarreBudget({ b }: { b: Budget }) {
@@ -62,19 +63,15 @@ function BarreBudget({ b }: { b: Budget }) {
   const depense = b.recu + b.commande;
   return (
     <div class="barre-budget">
-      <div class="barre-budget-piste" role="img" aria-label={`${euros(depense)} reçus ou commandés, ${euros(b.prevu)} encore à acheter${b.cible !== null ? `, sur ${euros(b.cible)} visés` : ''}`}>
-        <span class="seg recu" style={{ width: pct(b.recu) }} />
-        <span class="seg commande" style={{ width: pct(b.commande) }} />
+      <div class="barre-budget-piste" role="img" aria-label={`actuel ${euros(depense)}, prévu ${euros(b.prevu)}${b.cible !== null ? `, sur ${euros(b.cible)} visés` : ''}`}>
+        <span class="seg actuel" style={{ width: pct(depense) }} />
         <span class="seg prevu" style={{ width: pct(b.prevu) }} />
         {b.cible !== null && b.cible > 0 && <span class="repere-cible" style={{ left: pct(b.cible) }} />}
       </div>
       <p class="barre-budget-legende">
-        <span><i class="pastille recu" />reçu {euros(b.recu)}</span>
-        <span><i class="pastille commande" />commandé {euros(b.commande)}</span>
-        <span><i class="pastille prevu" />à acheter {euros(b.prevu)}</span>
-        {b.cible !== null && (b.total > b.cible
-          ? <strong class="erreur">{euros(b.total - b.cible)} au-dessus du budget</strong>
-          : <span>marge {euros(b.cible - b.total)}</span>)}
+        <span><i class="pastille actuel" />actuel</span>
+        <span><i class="pastille prevu" />prévu</span>
+        {b.cible !== null && <span><i class="pastille cible" />budget visé</span>}
       </p>
     </div>
   );

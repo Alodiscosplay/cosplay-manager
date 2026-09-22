@@ -403,7 +403,7 @@ dialog.feuille::backdrop { background: rgb(20 12 28 / 45%); }
 .tuile-chiffre .chiffre { font-size: 1.35rem; font-weight: 700; font-variant-numeric: tabular-nums; }
 .tuile-chiffre .legende { font-size: .8rem; color: var(--doux); }
 .tuile-chiffre.depasse { border-color: var(--rouge); }
-.tuile-chiffre.depasse .legende { color: var(--rouge); }
+.tuile-chiffre.depasse .legende, .tuile-chiffre.depasse .chiffre { color: var(--rouge); }
 .budget { display: flex; flex-direction: column; gap: 14px; }
 .saisie-euros { display: flex; align-items: baseline; gap: 4px; }
 .tuile-chiffre input.chiffre-saisie { font: inherit; min-height: 0; border-radius: 0; box-shadow: none; width: auto; field-sizing: content; min-width: 2ch; max-width: 100%; border: 0; border-bottom: 1px dashed var(--bord); background: none; color: inherit; padding: 0; -moz-appearance: textfield; }
@@ -414,8 +414,8 @@ dialog.feuille::backdrop { background: rgb(20 12 28 / 45%); }
 .barre-budget-piste { position: relative; display: flex; height: 18px; background: var(--surface-2); border-radius: 99px; overflow: visible; }
 .barre-budget-piste .seg { height: 100%; }
 .barre-budget-piste .seg:first-child { border-radius: 99px 0 0 99px; }
-.seg.recu, .pastille.recu { background: var(--vert); }
-.seg.commande, .pastille.commande { background: var(--accent); }
+.seg.actuel, .pastille.actuel { background: var(--accent); }
+.pastille.cible { width: 3px; background: var(--encre); }
 .seg.prevu, .pastille.prevu { background: repeating-linear-gradient(45deg, color-mix(in srgb, var(--accent) 35%, var(--surface)) 0 6px, color-mix(in srgb, var(--accent) 18%, var(--surface)) 6px 12px); }
 .repere-cible { position: absolute; top: -4px; bottom: -4px; width: 2px; margin-left: -1px; background: var(--encre); border-radius: 2px; }
 .barre-budget-legende { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 0; font-size: .85rem; color: var(--doux); }
