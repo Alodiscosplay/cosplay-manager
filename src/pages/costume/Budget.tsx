@@ -1,4 +1,7 @@
+import { useEffect, useRef, useState } from 'preact/hooks';
+import type { ComponentChildren } from 'preact';
 import { donnees } from '../../store/store';
+import { Icone } from '../../composants/Icone';
 import { budgetCostume, euros, type Budget } from '../../logique/budget';
 import { type Ligne } from '../../modele/schema';
 import { maj } from '../Costume';
@@ -12,14 +15,15 @@ export function OngletBudget({ costume }: { costume: Ligne }) {
   return (
     <section class="budget">
       <div class="tuiles-chiffres">
-        <label class="tuile-chiffre">
+        <TuileBudget nom="budget visé" aide="Le montant que tu te fixes pour ce costume. Clique sur le chiffre pour le modifier.">
           <span class="chiffre saisie-euros"><Texte type="number" class="chiffre-saisie" valeur={costume.budget_prevu ?? ''} placeholder="—" onValider={v => maj('Costumes', costume.id, { budget_prevu: v })} /> €</span>
-          <span class="legende">budget visé</span>
-        </label>
-        <div class="tuile-chiffre"><span class="chiffre">{euros(b.prevu)}</span><span class="legende">budget futur dépensé</span></div>
-        <div class="tuile-chiffre"><span class="chiffre">{euros(b.recu + b.commande)}</span><span class="legende">budget actuel dépensé</span></div>
-        <div class="tuile-chiffre"><span class="chiffre">{euros(b.total)}</span><span class="legende">budget réel</span></div>
-        <div class={`tuile-chiffre${depasse ? ' depasse' : ''}`}><span class="chiffre">{b.cible !== null ? euros(b.cible - b.total) : '—'}</span><span class="legende">budget restant</span></div>
+        </TuileBudget>
+        <TuileBudget nom="budget futur dépensé" aide="Les fournitures encore « à acheter »." chiffre={b.prevu} />
+        <TuileBudget nom="budget actuel dépensé" aide="Les fournitures « commandé » et « reçu »." chiffre={b.recu + b.commande} />
+        <TuileBudget nom="budget réel" aide="Budget futur dépensé + budget actuel dépensé : le coût de toutes les fournitures du costume. Ne sont pas comptés : les fournitures « déjà là », celles sans prix, et les frais de port." chiffre={b.total} />
+        <TuileBudget nom="budget restant" aide="Budget visé − budget réel. Il passe en rouge quand le budget visé est dépassé." depasse={depasse}>
+          <span class="chiffre">{b.cible !== null ? euros(b.cible - b.total) : '—'}</span>
+        </TuileBudget>
       </div>
       {b.total > 0 && <BarreBudget b={b} />}
       {b.sansPrix > 0 && <p class="petit-texte">{b.sansPrix} fourniture{b.sansPrix > 1 ? 's' : ''} sans prix : le total est incomplet.</p>}
@@ -47,6 +51,33 @@ function BarreBudget({ b }: { b: Budget }) {
         <span><i class="pastille prevu" />budget futur dépensé</span>
         {b.cible !== null && <span><i class="pastille cible" />budget visé</span>}
       </p>
+    </div>
+  );
+}
+
+/** Un encadré du budget, avec son explication derrière l'icône info. */
+function TuileBudget({ nom, aide, chiffre, depasse, children }: { nom: string; aide: string; chiffre?: number; depasse?: boolean; children?: ComponentChildren }) {
+  const [ouvert, setOuvert] = useState(false);
+  const zone = useRef<HTMLDivElement>(null);
+  // Un clic ailleurs ou Échap referme l'explication.
+  useEffect(() => {
+    if (!ouvert) return;
+    const clic = (e: MouseEvent) => { if (!zone.current?.contains(e.target as Node)) setOuvert(false); };
+    const touche = (e: KeyboardEvent) => { if (e.key === 'Escape') setOuvert(false); };
+    document.addEventListener('mousedown', clic);
+    document.addEventListener('keydown', touche);
+    return () => { document.removeEventListener('mousedown', clic); document.removeEventListener('keydown', touche); };
+  }, [ouvert]);
+  return (
+    <div ref={zone} class={`tuile-chiffre${depasse ? ' depasse' : ''}`}>
+      {children ?? <span class="chiffre">{euros(chiffre ?? 0)}</span>}
+      <span class="legende">
+        {nom}
+        <button class={`bouton-info${ouvert ? ' actif' : ''}`} aria-expanded={ouvert} aria-label={`Ce que compte le ${nom}`} onClick={() => setOuvert(!ouvert)}>
+          <Icone nom="info" taille={14} />
+        </button>
+      </span>
+      {ouvert && <span class="aide-tuile" role="note">{aide}</span>}
     </div>
   );
 }

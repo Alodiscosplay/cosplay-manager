@@ -33,6 +33,7 @@ const TRACES: Record<string, string> = {
   euro: 'M18 7a7 7 0 1 0 0 10M4 10h10M4 14h10',
   tableau: 'M3 3h18v18H3zM3 9h18M9 21V9',
   vers: 'M5 12h14M12 5l7 7-7 7',
+  info: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM12 16v-4M12 8h.01',
   boite: 'M21 16V8l-9-5-9 5v8l9 5zM3.3 7L12 12l8.7-5M12 22V12',
 };
 
