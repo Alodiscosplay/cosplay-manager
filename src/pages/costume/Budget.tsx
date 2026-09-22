@@ -16,10 +16,10 @@ export function OngletBudget({ costume }: { costume: Ligne }) {
           <span class="chiffre saisie-euros"><Texte type="number" class="chiffre-saisie" valeur={costume.budget_prevu ?? ''} placeholder="—" onValider={v => maj('Costumes', costume.id, { budget_prevu: v })} /> €</span>
           <span class="legende">budget visé</span>
         </label>
-        <div class="tuile-chiffre"><span class="chiffre">{euros(b.prevu)}</span><span class="legende">prévu</span></div>
-        <div class="tuile-chiffre"><span class="chiffre">{euros(b.recu + b.commande)}</span><span class="legende">actuel dépensé</span></div>
-        <div class="tuile-chiffre"><span class="chiffre">{euros(b.total)}</span><span class="legende">total</span></div>
-        <div class={`tuile-chiffre${depasse ? ' depasse' : ''}`}><span class="chiffre">{b.cible !== null ? euros(b.cible - b.total) : '—'}</span><span class="legende">reste</span></div>
+        <div class="tuile-chiffre"><span class="chiffre">{euros(b.prevu)}</span><span class="legende">budget prévu</span></div>
+        <div class="tuile-chiffre"><span class="chiffre">{euros(b.recu + b.commande)}</span><span class="legende">budget actuel dépensé</span></div>
+        <div class="tuile-chiffre"><span class="chiffre">{euros(b.total)}</span><span class="legende">budget total</span></div>
+        <div class={`tuile-chiffre${depasse ? ' depasse' : ''}`}><span class="chiffre">{b.cible !== null ? euros(b.cible - b.total) : '—'}</span><span class="legende">budget restant</span></div>
       </div>
       {b.total > 0 && <BarreBudget b={b} />}
       {b.sansPrix > 0 && <p class="petit-texte">{b.sansPrix} fourniture{b.sansPrix > 1 ? 's' : ''} sans prix : le total est incomplet.</p>}
@@ -43,8 +43,8 @@ function BarreBudget({ b }: { b: Budget }) {
         {b.cible !== null && b.cible > 0 && <span class="repere-cible" style={{ left: pct(b.cible) }} />}
       </div>
       <p class="barre-budget-legende">
-        <span><i class="pastille actuel" />actuel dépensé</span>
-        <span><i class="pastille prevu" />prévu</span>
+        <span><i class="pastille actuel" />budget actuel dépensé</span>
+        <span><i class="pastille prevu" />budget prévu</span>
         {b.cible !== null && <span><i class="pastille cible" />budget visé</span>}
       </p>
     </div>
