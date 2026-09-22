@@ -19,17 +19,17 @@ export function OngletBudget({ costume }: { costume: Ligne }) {
     }, 0) })),
   ].filter(x => x.total > 0);
   const max = Math.max(1, ...parPiece.map(x => x.total));
-  const depasse = b.cible !== null && b.prevu > b.cible;
+  const depasse = b.cible !== null && b.total > b.cible;
 
   return (
     <section class="budget">
       <div class="tuiles-chiffres">
-        <div class="tuile-chiffre"><span class="chiffre">{euros(b.prevu)}</span><span class="legende">prévu (toutes fournitures)</span></div>
+        <div class="tuile-chiffre"><span class="chiffre">{euros(b.prevu)}</span><span class="legende">prévu (reste à acheter)</span></div>
         <div class="tuile-chiffre"><span class="chiffre">{euros(b.commande)}</span><span class="legende">commandé</span></div>
         <div class="tuile-chiffre"><span class="chiffre">{euros(b.recu)}</span><span class="legende">reçu</span></div>
         <div class={`tuile-chiffre${depasse ? ' depasse' : ''}`}>
           <span class="chiffre">{b.cible !== null ? euros(b.cible) : '—'}</span>
-          <span class="legende">budget visé{depasse ? ` · dépassé de ${euros(b.prevu - b.cible!)}` : ''}</span>
+          <span class="legende">budget visé{depasse ? ` · dépassé de ${euros(b.total - b.cible!)}` : ''}</span>
         </div>
       </div>
       <Champ label="Budget visé (€)"><Texte type="number" valeur={costume.budget_prevu ?? ''} onValider={v => maj('Costumes', costume.id, { budget_prevu: v })} /></Champ>

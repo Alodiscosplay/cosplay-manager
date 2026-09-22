@@ -105,7 +105,7 @@ export async function genererWip(d: Donnees, costumeId: string, opts: OptionsWip
   ];
   if (bool(c.suivi_budget)) {
     const b = budgetCostume(d, costumeId);
-    lignes.push(`Budget : ${euros(b.prevu)}${b.cible !== null ? ` pour ${euros(b.cible)} prévus` : ''}${b.sansPrix ? ' (hors fournitures sans prix)' : ''}`);
+    lignes.push(`Budget : ${euros(b.total)}${b.cible !== null ? ` pour ${euros(b.cible)} prévus` : ''}${b.sansPrix ? ' (hors fournitures sans prix)' : ''}`);
   }
   fin.addText(lignes.map(t => ({ text: t, options: { bullet: true, breakLine: true } })), { x: 0.8, y: 1.9, w: L - 1.6, h: 3, fontSize: 20, color: ENCRE, valign: 'top', paraSpaceAfter: 10 });
 

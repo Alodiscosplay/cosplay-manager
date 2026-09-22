@@ -77,7 +77,7 @@ export function changementsArchivage(d: Donnees, costumeId: string, vignetteData
   const resume = {
     pct: a.pct === null ? null : Math.round(a.pct), etapes: a.nb, pieces: lignes.Pieces?.length ?? 0, photos: lignes.Photos?.length ?? 0,
     debut: faites[0] ?? '', fin: faites[faites.length - 1] ?? '',
-    budget: bool(c.suivi_budget) ? Math.round(b.prevu * 100) / 100 : null,
+    budget: bool(c.suivi_budget) ? Math.round(b.total * 100) / 100 : null,
   };
   const changements: Changement[] = [];
   for (const t of ['Pieces', 'Pistes', 'Etapes', 'Fournitures', 'Photos', 'Taches'] as NomTable[]) {
@@ -186,6 +186,6 @@ ${photos.some(p => !p.piece_id) ? `<h2>Photos générales</h2><div class="photos
     const m = montant(f);
     return `<tr><td>${f.lien ? `<a href="${echap(f.lien)}">${echap(f.libelle)}</a>` : echap(f.libelle)}</td><td>${echap([f.quantite, f.unite].filter(Boolean).join(' '))}</td><td>${echap(ligne(d, 'Fournisseurs', f.fournisseur_id)?.nom ?? '')}</td><td>${m !== null ? euros(m) : ''}</td><td>${echap(f.statut)}</td></tr>`;
   }).join('')}</table>` : '<p>Aucune.</p>'}
-${bool(c.suivi_budget) ? `<h2>Budget</h2><p>Total des fournitures : <strong>${euros(b.prevu)}</strong>${b.cible !== null ? ` pour un budget visé de ${euros(b.cible)}` : ''}${b.sansPrix ? ` (${b.sansPrix} sans prix)` : ''}.</p>` : ''}
+${bool(c.suivi_budget) ? `<h2>Budget</h2><p>Total des fournitures : <strong>${euros(b.total)}</strong>${b.cible !== null ? ` pour un budget visé de ${euros(b.cible)}` : ''}${b.sansPrix ? ` (${b.sansPrix} sans prix)` : ''}.</p>` : ''}
 </body></html>`;
 }

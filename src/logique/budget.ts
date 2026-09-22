@@ -19,7 +19,8 @@ export function montant(f: Ligne): number | null {
 }
 
 export interface Budget {
-  prevu: number;   // toutes les fournitures (hors « déjà là »)
+  total: number;   // toutes les fournitures (hors « déjà là »)
+  prevu: number;   // encore à acheter : ce qui reste à débourser
   commande: number; // commandées, pas encore reçues
   recu: number;
   cible: number | null;
@@ -27,14 +28,15 @@ export interface Budget {
 }
 
 export function budgetCostume(d: Donnees, costumeId: string): Budget {
-  const b: Budget = { prevu: 0, commande: 0, recu: 0, cible: null, sansPrix: 0 };
+  const b: Budget = { total: 0, prevu: 0, commande: 0, recu: 0, cible: null, sansPrix: 0 };
   const c = ligne(d, 'Costumes', costumeId);
   if (c && (c.budget_prevu ?? '').trim()) b.cible = num(c.budget_prevu);
   for (const f of fournituresDe(d, costumeId)) {
     if (f.statut === 'déjà là') continue;
     const m = montant(f);
     if (m === null) { b.sansPrix++; continue; }
-    b.prevu += m;
+    b.total += m;
+    if ((f.statut || 'à acheter') === 'à acheter') b.prevu += m;
     if (f.statut === 'commandé') b.commande += m;
     if (f.statut === 'reçu') b.recu += m;
   }
