@@ -9,8 +9,11 @@ function classeur(taches: string[][]): Classeur {
   c.Taches = { sheetId: 1, nbLignesGrille: 1000, nbColonnesGrille: 26, entetes: entetes('Taches'), valeurs: [entetes('Taches'), ...taches] };
   return c;
 }
-// en-têtes Taches : id, titre, costume_id, date, fait, fait_le, ordre, maj, supprime
-const tache = (id: string, titre: string, maj: string) => [id, titre, '', '', '', '', '1', maj, ''];
+// Une ligne de l'onglet Taches, rangée d'après ses en-têtes (robuste à l'ajout d'une colonne).
+const tache = (id: string, titre: string, maj: string) => {
+  const v: Record<string, string> = { id, titre, ordre: '1', maj };
+  return entetes('Taches').map(h => v[h] ?? '');
+};
 
 describe('fusion local ↔ Sheet', () => {
   it('le Sheet fait foi pour une ligne sans modification locale', () => {
