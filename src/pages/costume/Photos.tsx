@@ -14,18 +14,23 @@ export function OngletPhotos({ costume }: { costume: Ligne }) {
   const photos = photosDe(d, costume.id);
   const [ouverte, setOuverte] = useState<string | null>(null);
   const [envoi, setEnvoi] = useState(0);
-  const [filtre, setFiltre] = useState('');
+  const [filtre, setFiltre] = useState(''); // '' = toutes, '__divers' = à trier, sinon id de pièce
+  const [ajout, setAjout] = useState(false);
   const pieces = piecesDe(d, costume.id);
-  const visibles = filtre ? photos.filter(p => p.piece_id === filtre) : photos;
+  const aTrier = (p: Ligne) => !p.piece_id || !pieces.some(x => x.id === p.piece_id);
+  const nbATrier = photos.filter(aTrier).length;
+  const visibles = filtre === '__divers' ? photos.filter(aTrier) : filtre ? photos.filter(p => p.piece_id === filtre) : photos;
 
-  const ajouter = async (fichiers: FileList | null) => {
+  /** Ajoute les photos avec le rattachement choisi avant de les sélectionner (pièce vide = divers, à trier). */
+  const ajouter = async (fichiers: FileList | null, rattachement: { piece_id: string; piste_id: string }) => {
     if (!fichiers?.length) return;
+    setAjout(false);
     setEnvoi(fichiers.length);
     const ch = [];
     for (const f of Array.from(fichiers)) {
       const id = await ajouterImage(f);
       const date = f.lastModified ? new Date(f.lastModified).toISOString().slice(0, 10) : jour.value;
-      ch.push({ table: 'Photos' as const, id: nouvelId(), champs: { costume_id: costume.id, piece_id: filtre, drive_id: id, date, dans_wip: OUI } });
+      ch.push({ table: 'Photos' as const, id: nouvelId(), champs: { costume_id: costume.id, ...rattachement, drive_id: id, date, dans_wip: OUI } });
     }
     faire(ch);
     setEnvoi(0);
@@ -34,12 +39,12 @@ export function OngletPhotos({ costume }: { costume: Ligne }) {
   return (
     <section>
       <div class="barre-outils">
-        <label class="bouton principal">
+        <button class="bouton principal" disabled={!!envoi} onClick={() => setAjout(true)}>
           <Icone nom="photo" />{envoi ? `Ajout de ${envoi} photo${envoi > 1 ? 's' : ''}…` : 'Ajouter des photos'}
-          <input type="file" accept="image/*" multiple class="cache" onChange={e => ajouter((e.target as HTMLInputElement).files)} />
-        </label>
+        </button>
         {pieces.length > 0 && (
-          <Selection label="Filtrer par pièce" valeur={filtre} options={[['', 'Toutes les pièces'], ...pieces.map(p => [p.id, p.nom] as [string, string])]} onChange={setFiltre} />
+          <Selection label="Filtrer par pièce" valeur={filtre} onChange={setFiltre}
+            options={[['', 'Toutes les photos'], ...pieces.map(p => [p.id, p.nom] as [string, string]), ['__divers', `Divers (à trier)${nbATrier ? ` · ${nbATrier}` : ''}`]]} />
         )}
         <span class="petit-texte">{photos.filter(p => bool(p.dans_wip)).length} dans le dossier WIP</span>
       </div>
@@ -50,12 +55,15 @@ export function OngletPhotos({ costume }: { costume: Ligne }) {
             <PhotoImg id={p.drive_id} alt={p.legende || 'Photo'} />
             <span class="tuile-legende">
               {bool(p.dans_wip) && <Puce ton="accent">WIP</Puce>}
+              {aTrier(p) && <Puce ton="orange">à trier</Puce>}
               <span>{p.legende || ligne(d, 'Pieces', p.piece_id)?.nom || ''}</span>
               <span class="petit-texte">{jourCourt(p.date)}</span>
             </span>
           </button>
         ))}
       </div>
+      {ajout && <AjoutPhotos costume={costume} pieceParDefaut={filtre && filtre !== '__divers' ? filtre : ''}
+        onFichiers={ajouter} onFermer={() => setAjout(false)} />}
       {ouverte && <EditeurPhoto id={ouverte} costume={costume} onFermer={() => setOuverte(null)} />}
     </section>
   );
@@ -81,7 +89,7 @@ function EditeurPhoto({ id, costume, onFermer }: { id: string; costume: Ligne; o
       <div class="deux-colonnes">
         <Champ label="Date"><ChoixDate label="date" valeur={p.date ?? ''} onChange={v => m({ date: v })} /></Champ>
         <Champ label="Pièce">
-          <Selection label="Pièce" valeur={p.piece_id ?? ''} options={[['', '— Général'], ...pieces.map(x => [x.id, x.nom] as [string, string])]} onChange={v => m({ piece_id: v, piste_id: '', etape_id: '' })} />
+          <Selection label="Pièce" valeur={p.piece_id ?? ''} options={[['', 'Divers (à trier)'], ...pieces.map(x => [x.id, x.nom] as [string, string])]} onChange={v => m({ piece_id: v, piste_id: '', etape_id: '' })} />
         </Champ>
       </div>
       {pistes.length > 0 && (
@@ -103,6 +111,39 @@ function EditeurPhoto({ id, costume, onFermer }: { id: string; costume: Ligne; o
         <span>Dans le dossier WIP</span>
       </label>
       <button class="bouton" onClick={() => { maj('Costumes', costume.id, { image_ref: p.drive_id }); onFermer(); }}>Utiliser comme image de référence</button>
+    </Feuille>
+  );
+}
+
+/** Avant de choisir les fichiers : à quelle pièce (et éventuellement quelle étape) rattacher les photos. */
+function AjoutPhotos({ costume, pieceParDefaut, onFichiers, onFermer }: {
+  costume: Ligne; pieceParDefaut: string; onFichiers: (f: FileList | null, r: { piece_id: string; piste_id: string }) => void; onFermer: () => void;
+}) {
+  const d = donnees.value;
+  const [pieceId, setPieceId] = useState(pieceParDefaut);
+  const [pisteId, setPisteId] = useState('');
+  const pieces = piecesDe(d, costume.id);
+  const pistes = pieceId ? pistesDe(d, pieceId) : [];
+  return (
+    <Feuille titre="Ajouter des photos" onFermer={onFermer} pied={<>
+      <button class="bouton" onClick={onFermer}>Annuler</button>
+      <label class="bouton principal">
+        <Icone nom="photo" />Choisir les photos
+        <input type="file" accept="image/*" multiple class="cache"
+          onChange={e => onFichiers((e.target as HTMLInputElement).files, { piece_id: pieceId, piste_id: pisteId })} />
+      </label>
+    </>}>
+      <Champ label="Pièce">
+        <Selection label="Pièce" valeur={pieceId} onChange={v => { setPieceId(v); setPisteId(''); }}
+          options={[['', 'Divers (à trier)'], ...pieces.map(p => [p.id, p.nom] as [string, string])]} />
+      </Champ>
+      {pistes.length > 0 && (
+        <Champ label="Étape (facultatif)">
+          <Selection label="Étape" valeur={pisteId} onChange={setPisteId}
+            options={[['', '—'], ...pistes.map(p => [p.id, p.nom || 'Étape principale'] as [string, string])]} />
+        </Champ>
+      )}
+      {!pieceId && <p class="petit-texte">Les photos « divers » restent à trier : ouvre-les une par une pour leur donner une pièce.</p>}
     </Feuille>
   );
 }
