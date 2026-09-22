@@ -4,7 +4,7 @@ import { lireJourSaisi, jourSaisi } from '../src/logique/dates';
 import { avancement, avancementPiece, formatPct } from '../src/logique/avancement';
 import { aFaire, etapeDisponible, creeraitBoucle, texteAttente, champsStatutPiece } from '../src/logique/disponibilite';
 import { activationsDuJour } from '../src/logique/activation';
-import { repartirSuite, repartirPiece, repartirCostume, retard } from '../src/logique/planning';
+import { repartirSuite, repartirPiece, repartirCostume, retard, finPlanifiable } from '../src/logique/planning';
 import { quantiteNombre, budgetCostume, totalCommande, regrouperParNom, texteQuantites } from '../src/logique/budget';
 import { analyserListe, versTexte, modeleVersTexte, texteVersModele } from '../src/logique/collerListe';
 import { cocherEtape, creerCommandes, changerStatutCommande, appliquerListe, insererModele, deplacerEtape, creerCostume } from '../src/store/operations';
@@ -213,6 +213,14 @@ describe('Répartir', () => {
     expect(r[ids['Robe//b']]).toBe('2026-11-21');
     expect(r[ids['Perruque//c']]).toBe('2026-11-21');
   });
+  it('laisse une semaine entre la dernière sous-étape et la deadline', () => {
+    expect(finPlanifiable('2026-11-21', '2026-09-22')).toBe('2026-11-14');
+    expect(finPlanifiable('2026-09-25', '2026-09-22')).toBe('2026-09-22'); // deadline trop proche : pas avant aujourd'hui
+    const { d, ids } = construire({ pieces: [{ nom: 'Robe', champs: { deadline: '2026-10-31' }, pistes: [{ nom: '', etapes: [['a', 1], ['b', 1]] }] }] });
+    const r = repartirCostume(d, ids.costume, '2026-10-01', '2026-11-14');
+    expect(r[ids['Robe//b']]).toBe('2026-10-24'); // deadline propre de la pièce, moins 7 jours
+  });
+
   it('retard : une étape prévue hier et non cochée', () => {
     const { d, ids } = construire({ pieces: [{ nom: 'Jupe', pistes: [{ nom: '', etapes: ['a', 'b'] }] }] });
     d.Etapes[ids['Jupe//a']].date_prevue = '2026-09-30';

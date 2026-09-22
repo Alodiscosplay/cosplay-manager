@@ -5,8 +5,8 @@ import { piecesDe, pistesDe, etapesDePiste, etapesDePiece, ligne, tous, idsAtten
 import { cleNom } from '../../logique/budget';
 import { creeraitBoucle, statutStockePiece, champsStatutPiece } from '../../logique/disponibilite';
 import { analyserListe, compter, versTexte } from '../../logique/collerListe';
-import { repartirPiece, repartirCostume, deadlinePiece, deadlineCostume } from '../../logique/planning';
-import { jourCourt } from '../../logique/dates';
+import { repartirPiece, repartirCostume, deadlinePiece, deadlineCostume, finPlanifiable, MARGE_DEADLINE } from '../../logique/planning';
+import { jourCourt, ajouterJours } from '../../logique/dates';
 import { DUREES, NOMS_DUREES, STATUTS_PIECE, bool, liste, txtListe, type Duree, type Ligne, type NomTable } from '../../modele/schema';
 import { supprimer, appliquerListe, insererModele, ajouterModeleDansPiste, deplacerEtape, cocherEtape, appliquerRepartition, nouvelId } from '../../store/operations';
 import { Feuille, Champ, Texte, ChoixDate, Selection, Confirmer } from '../../composants/base';
@@ -92,7 +92,7 @@ export function EditeurPiece({ id, onFermer }: { id: string; onFermer: () => voi
       <ChoixAttentes table="Pieces" l={p} candidats={autres} aide="La pièce entière attend que ces pièces soient finies." />
       <button class="bouton" onClick={() => setRattacher(true)}><Icone nom="achats" taille={16} />Fournitures de la pièce</button>
       {rattacher && <RattacherFournitures pieceId={id} onFermer={() => setRattacher(false)} />}
-      {dl && <button class="bouton" onClick={() => setRepartir(true)}>Répartir les sous-étapes jusqu'au {jourCourt(dl)}</button>}
+      {dl && <button class="bouton" onClick={() => setRepartir(true)}>Répartir les sous-étapes avant le {jourCourt(dl)}</button>}
       {repartir && <Repartir pieceId={id} onFermer={() => setRepartir(false)} />}
       <EffacerDatesPrevues pieceId={id} />
     </Feuille>
@@ -305,7 +305,9 @@ function EnregistrerModele({ pisteId, onFermer }: { pisteId: string; onFermer: (
 export function Repartir({ pieceId, costumeId, onFermer }: { pieceId?: string; costumeId?: string; onFermer: () => void }) {
   const d = donnees.value;
   const cible = pieceId ? d.Pieces[pieceId] : d.Costumes[costumeId!];
-  const fin = pieceId ? deadlinePiece(d, cible) : deadlineCostume(d, cible);
+  const deadline = pieceId ? deadlinePiece(d, cible) : deadlineCostume(d, cible);
+  const fin = finPlanifiable(deadline, jour.value); // une semaine de marge avant la deadline
+  const serre = ajouterJours(deadline, -MARGE_DEADLINE) < jour.value;
   const r = pieceId ? repartirPiece(d, pieceId, jour.value, fin) : repartirCostume(d, costumeId!, jour.value, fin);
   const n = Object.keys(r).length;
   const deja = (pieceId ? etapesDePiece(d, pieceId) : piecesDe(d, costumeId!).flatMap(p => etapesDePiece(d, p.id)))
@@ -315,6 +317,9 @@ export function Repartir({ pieceId, costumeId, onFermer }: { pieceId?: string; c
       onOui={() => { faire(appliquerRepartition(r), 'Sous-étapes planifiées'); onFermer(); }}
       texte={<>
         <p>Les sous-étapes restantes de <strong>{cible.nom}</strong> reçoivent une date prévue entre aujourd'hui et le <strong>{jourCourt(fin)}</strong>, proportionnellement à leur durée, dans l'ordre de chaque étape. Les étapes avancent en parallèle ; une étape qui en attend d'autres vient après.</p>
+        <p>{serre
+          ? <>La deadline du {jourCourt(deadline)} est à moins d'une semaine : tout est planifié dès maintenant, sans marge.</>
+          : <>Une semaine de marge est gardée avant la deadline du {jourCourt(deadline)}.</>}</p>
         {deja > 0 && <p>{deja} sous-étape{deja > 1 ? 's avaient' : ' avait'} déjà une date prévue : elle{deja > 1 ? 's seront remplacées' : ' sera remplacée'}.</p>}
         <p class="petit-texte">Tu pourras ensuite corriger chaque date à la main. « Annuler » dans le bandeau revient en arrière.</p>
       </>} />

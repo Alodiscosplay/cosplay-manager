@@ -39,7 +39,7 @@ export function OngletPlanning({ costume }: { costume: Ligne }) {
   return (
     <section>
       <div class="barre-outils">
-        {dl && <button class="bouton" onClick={() => setRepartir(true)}>Répartir jusqu'au {jourCourt(dl)}</button>}
+        {dl && <button class="bouton" onClick={() => setRepartir(true)}>Répartir avant le {jourCourt(dl)}</button>}
         <EffacerDatesPrevues costumeId={costume.id} />
         <span class="petit-texte">Chaque case : sous-étapes prévues cette semaine (faites / prévues). ⚑ deadline · ▶ début</span>
       </div>

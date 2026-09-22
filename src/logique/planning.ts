@@ -35,6 +35,15 @@ export function deadlineEtape(d: Donnees, e: Ligne): Jour | '' {
 
 export type Repartition = Record<string, Jour>; // id d'étape → date prévue
 
+/** Marge laissée avant une deadline quand on répartit : la dernière sous-étape tombe au plus tard une semaine avant. */
+export const MARGE_DEADLINE = 7;
+
+/** Dernier jour planifiable pour une deadline : une semaine avant, mais jamais avant `depuis`. */
+export function finPlanifiable(deadline: Jour, depuis: Jour, marge = MARGE_DEADLINE): Jour {
+  const fin = ajouterJours(deadline, -marge);
+  return fin < depuis ? depuis : fin;
+}
+
 /** Place des étapes (dans l'ordre) entre deux dates, proportionnellement à leur poids. */
 export function repartirSuite(etapes: Ligne[], depuis: Jour, jusqua: Jour, res: Repartition = {}): Repartition {
   const aFaire = etapes.filter(e => !bool(e.fait));
@@ -86,7 +95,8 @@ export function repartirCostume(d: Donnees, costumeId: string, depuis: Jour, jus
   const libres: Ligne[] = [];
   for (const p of pieces) {
     const propre = lireJour(p.deadline);
-    if (propre || lireJour(p.debut)) repartirPiece(d, p.id, depuis, propre || jusqua, res);
+    // `jusqua` a déjà sa marge ; une deadline propre à la pièce reçoit la sienne.
+    if (propre || lireJour(p.debut)) repartirPiece(d, p.id, depuis, propre ? finPlanifiable(propre, depuis) : jusqua, res);
     else libres.push(p);
   }
   const reste = (p: Ligne) => etapesDePiece(d, p.id).filter(e => !bool(e.fait)).reduce((s, e) => s + poids(e), 0);
