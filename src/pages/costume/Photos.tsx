@@ -1,6 +1,6 @@
 import { useState } from 'preact/hooks';
 import { donnees, faire, jour } from '../../store/store';
-import { photosDe, piecesDe, etapesDePiece, ligne } from '../../logique/acces';
+import { photosDe, piecesDe, pistesDe, etapesDePiste, ligne } from '../../logique/acces';
 import { jourCourt } from '../../logique/dates';
 import { bool, txtBool, OUI, type Ligne } from '../../modele/schema';
 import { nouvelId, supprimer } from '../../store/operations';
@@ -67,7 +67,10 @@ function EditeurPhoto({ id, costume, onFermer }: { id: string; costume: Ligne; o
   if (!p) return null;
   const m = (champs: Record<string, string>) => maj('Photos', id, champs);
   const pieces = piecesDe(d, costume.id);
-  const etapes = p.piece_id ? etapesDePiece(d, p.piece_id) : [];
+  const pistes = p.piece_id ? pistesDe(d, p.piece_id) : [];
+  // Étape choisie : la sienne, ou celle de la sous-étape (photos rattachées avant l'ajout du choix d'étape).
+  const pisteId = p.piste_id || ligne(d, 'Etapes', p.etape_id)?.piste_id || '';
+  const sousEtapes = pisteId ? etapesDePiste(d, pisteId) : [];
   return (
     <Feuille titre="Photo" large onFermer={onFermer} pied={<>
       <button class="bouton danger" onClick={() => { faire(supprimer('Photos', id), 'Photo supprimée'); onFermer(); }}>Supprimer</button>
@@ -78,13 +81,22 @@ function EditeurPhoto({ id, costume, onFermer }: { id: string; costume: Ligne; o
       <div class="deux-colonnes">
         <Champ label="Date"><ChoixDate label="date" valeur={p.date ?? ''} onChange={v => m({ date: v })} /></Champ>
         <Champ label="Pièce">
-          <Selection label="Pièce" valeur={p.piece_id ?? ''} options={[['', '— Général'], ...pieces.map(x => [x.id, x.nom] as [string, string])]} onChange={v => m({ piece_id: v, etape_id: '' })} />
+          <Selection label="Pièce" valeur={p.piece_id ?? ''} options={[['', '— Général'], ...pieces.map(x => [x.id, x.nom] as [string, string])]} onChange={v => m({ piece_id: v, piste_id: '', etape_id: '' })} />
         </Champ>
       </div>
-      {etapes.length > 0 && (
-        <Champ label="Sous-étape (facultatif)">
-          <Selection label="Sous-étape" valeur={p.etape_id ?? ''} options={[['', '—'], ...etapes.map(e => [e.id, e.titre] as [string, string])]} onChange={v => m({ etape_id: v })} />
-        </Champ>
+      {pistes.length > 0 && (
+        <div class="deux-colonnes">
+          <Champ label="Étape (facultatif)">
+            <Selection label="Étape" valeur={pisteId} options={[['', '—'], ...pistes.map(x => [x.id, x.nom || 'Étape principale'] as [string, string])]}
+              onChange={v => m({ piste_id: v, etape_id: '' })} />
+          </Champ>
+          {pisteId && sousEtapes.length > 0 && (
+            <Champ label="Sous-étape (facultatif)">
+              <Selection label="Sous-étape" valeur={p.etape_id ?? ''} options={[['', '— toute l\'étape'], ...sousEtapes.map(e => [e.id, e.titre] as [string, string])]}
+                onChange={v => m({ piste_id: pisteId, etape_id: v })} />
+            </Champ>
+          )}
+        </div>
       )}
       <label class="interrupteur">
         <input type="checkbox" checked={bool(p.dans_wip)} onChange={e => m({ dans_wip: txtBool((e.target as HTMLInputElement).checked) })} />

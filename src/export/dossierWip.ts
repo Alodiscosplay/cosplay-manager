@@ -127,7 +127,10 @@ function legende(d: Donnees, p: Ligne, piece: Ligne | undefined, detaille: boole
   const date = lireJour(p.date);
   const morceaux = [[date ? jourCourt(date, '') : '', p.legende].filter(Boolean).join(' — ')];
   const etape = ligne(d, 'Etapes', p.etape_id);
-  if (etape) morceaux.push(`Sous-étape : ${etape.titre}`);
+  const piste = ligne(d, 'Pistes', p.piste_id || etape?.piste_id);
+  const nomEtape = piste ? piste.nom || 'Étape principale' : '';
+  if (etape) morceaux.push(`${nomEtape} › ${etape.titre}`);
+  else if (piste) morceaux.push(`Étape : ${nomEtape}`);
   else if (piece && date) {
     const proches = etapesDePiece(d, piece.id).filter(e => bool(e.fait) && lireJour(e.fait_le) && Math.abs(ecartJours(lireJour(e.fait_le), date)) <= 3);
     if (proches.length) morceaux.push(`Sous-étapes : ${proches.slice(0, detaille ? 5 : 2).map(e => e.titre).join(', ')}`);

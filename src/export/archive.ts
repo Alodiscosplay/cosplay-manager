@@ -109,7 +109,7 @@ export async function lireArchive(fichier: Blob, d: Donnees): Promise<{ changeme
     if (d.Evenements[ev.id]) nouveaux.set(ev.id, ev.id);
     else changements.push({ table: 'Evenements', id: nid(ev.id), champs: sansTechnique(ev) });
   }
-  const refs: Record<string, string[]> = { Costumes: ['attend_costume_id', 'evenement_id'], Pieces: ['costume_id'], Pistes: ['piece_id'], Etapes: ['piste_id', 'piece_id'], Fournitures: ['costume_id', 'piece_id'], Photos: ['costume_id', 'piece_id', 'etape_id'], Taches: ['costume_id'] };
+  const refs: Record<string, string[]> = { Costumes: ['attend_costume_id', 'evenement_id'], Pieces: ['costume_id'], Pistes: ['piece_id'], Etapes: ['piste_id', 'piece_id'], Fournitures: ['costume_id', 'piece_id'], Photos: ['costume_id', 'piece_id', 'piste_id', 'etape_id'], Taches: ['costume_id'] };
   // Premier passage : réserver tous les identifiants (les références peuvent pointer « en avant »).
   for (const t of Object.keys(refs)) for (const l of contenu.lignes[t as NomTable] ?? []) nid(l.id);
   for (const [t, champsRef] of Object.entries(refs) as [NomTable, string[]][]) {
