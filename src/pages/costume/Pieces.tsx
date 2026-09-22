@@ -141,10 +141,11 @@ function CartePiece({ piece, ouvrir }: { piece: Ligne; ouvrir: (o: Ouvert) => vo
           <Pct a={a} />
           {/* Le bouton montre l'état ACTUEL de la pièce ; un clic le fait basculer. */}
           {sp !== 'terminée' && (
-            <button class={`bascule-etat${sp === 'en cours' ? ' actif' : ''}`} aria-pressed={sp === 'en cours'}
+            <button class={`bascule-etat${sp === 'en cours' ? ' actif' : ' pause'}`} aria-pressed={sp === 'en cours'}
+              aria-label={sp === 'en cours' ? 'Pièce en cours, cliquer pour la mettre en pause' : 'Pièce en pause, cliquer pour la reprendre'}
               title={sp === 'en cours' ? 'Pièce en cours — cliquer pour la mettre en pause' : 'Pièce en pause — cliquer pour la reprendre'}
               onClick={() => statut(sp === 'en cours' ? 'en pause' : 'en cours')}>
-              <Icone nom={sp === 'en cours' ? 'lecture' : 'pause'} taille={14} />{sp === 'en cours' ? 'En cours' : 'En pause'}
+              {sp === 'en cours' ? <><Icone nom="lecture" taille={14} />En cours</> : <Icone nom="pause" taille={16} />}
             </button>
           )}
           <Menu label={`Actions pour ${piece.nom}`} actions={[

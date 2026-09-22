@@ -243,6 +243,7 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
 .piste-nom { border: 0; background: none; padding: 6px 0; font-weight: 600; cursor: pointer; color: var(--accent); text-align: left; }
 .piste-compte { font-size: .8rem; color: var(--doux); flex: 1; }
 .bascule-etat { display: inline-flex; align-items: center; gap: 5px; min-height: 34px; padding: 4px 12px; border-radius: 99px; border: 1px solid var(--bord); background: var(--surface-2); color: var(--doux); font-size: .85rem; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.bascule-etat.pause { width: 36px; padding: 0; justify-content: center; }
 .bascule-etat.actif { background: var(--accent-fond); border-color: var(--accent); color: var(--accent); }
 .bascule-ordre { border: 1px solid var(--bord); background: transparent; color: var(--doux); border-radius: 99px; padding: 2px 10px; font-size: .78rem; cursor: pointer; white-space: nowrap; }
 .bascule-ordre.libre { border-color: var(--accent); color: var(--accent); background: var(--accent-fond); }
@@ -327,6 +328,13 @@ dialog.feuille::backdrop { background: rgb(20 12 28 / 45%); }
 .fourniture { display: flex; align-items: center; gap: 8px; padding: 4px 10px; min-height: 52px; }
 .fourniture + .fourniture { border-top: 1px solid var(--bord); }
 .fourniture .selection { margin: 0 4px; }
+.groupe-nom + .groupe-nom, .groupe-nom + .fourniture, .fourniture + .groupe-nom { border-top: 1px solid var(--bord); }
+.entete-groupe { background: var(--surface-2); }
+.entete-groupe .fourniture-texte { cursor: default; }
+.total-quantite { color: var(--accent); font-weight: 600; }
+.details-groupe { list-style: none; margin: 0; padding: 0 0 0 28px; }
+.fourniture.detail { min-height: 44px; }
+.fourniture.detail .fourniture-libelle { font-size: .92rem; color: var(--doux); }
 .fourniture-texte { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; border: 0; background: none; text-align: left; cursor: pointer; padding: 6px 0; }
 .fourniture-libelle { overflow-wrap: anywhere; }
 .fourniture.statut-reçu .fourniture-libelle, .fourniture.statut-déjà-là .fourniture-libelle { color: var(--doux); }

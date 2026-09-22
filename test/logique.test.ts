@@ -4,7 +4,7 @@ import { avancement, avancementPiece, formatPct } from '../src/logique/avancemen
 import { aFaire, etapeDisponible, creeraitBoucle, texteAttente, champsStatutPiece } from '../src/logique/disponibilite';
 import { activationsDuJour } from '../src/logique/activation';
 import { repartirSuite, repartirPiece, repartirCostume, retard } from '../src/logique/planning';
-import { quantiteNombre, budgetCostume, totalCommande } from '../src/logique/budget';
+import { quantiteNombre, budgetCostume, totalCommande, regrouperParNom, texteQuantites } from '../src/logique/budget';
 import { analyserListe, versTexte } from '../src/logique/collerListe';
 import { cocherEtape, creerCommandes, changerStatutCommande, appliquerListe, insererModele, deplacerEtape, creerCostume } from '../src/store/operations';
 import { etapesDePiste, pistesDe, piecesDe, etapesDePiece, piecesDeFourniture } from '../src/logique/acces';
@@ -219,6 +219,17 @@ describe('achats et budget', () => {
     d.Fournitures.g = { id: 'g', maj: '', supprime: '', costume_id: ids.costume, libelle: 'Zip', piece_id: ids.Jupon };
     expect(piecesDeFourniture(d, d.Fournitures.f).map(p => p.nom)).toEqual(['Robe', 'Corset']);
     expect(piecesDeFourniture(d, d.Fournitures.g).map(p => p.nom)).toEqual(['Jupon']);
+  });
+
+  it('regroupe les fournitures de même nom (majuscules et espaces ignorés), triées par ordre alphabétique', () => {
+    const f = (id: string, libelle: string, quantite: string, unite: string, costume = 'A') =>
+      ({ id, maj: '', supprime: '', costume_id: costume, libelle, quantite, unite });
+    const g = regrouperParNom([
+      f('1', 'Satin blanc', '3', 'm'), f('2', 'Biais', '4', 'm'), f('3', '  satin   Blanc ', '5', 'm', 'B'), f('4', 'Satin blanc', '2', 'coupons'),
+    ]);
+    expect(g.map(x => x.libelle)).toEqual(['Biais', 'Satin blanc']);
+    expect(g[1].lignes.map(l => l.id)).toEqual(['1', '3', '4']);
+    expect(texteQuantites(g[1].quantites)).toBe('8 m + 2 coupons');
   });
 
   it('lit les quantités écrites à la main', () => {

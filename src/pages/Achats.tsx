@@ -1,11 +1,11 @@
 import { useState } from 'preact/hooks';
 import { donnees, jour, faire } from '../store/store';
 import { costumes, tous, ligne } from '../logique/acces';
-import { regrouperAchats, lignesCommande, totalCommande, euros, montant } from '../logique/budget';
+import { regrouperAchats, regrouperParNom, lignesCommande, totalCommande, euros, montant } from '../logique/budget';
 import { jourCourt } from '../logique/dates';
 import { STATUTS_FOURNITURE, STATUTS_COMMANDE, num, type Ligne } from '../modele/schema';
 import { creerCommandes, changerStatutCommande, supprimer, retirerDeCommande, nouvelId } from '../store/operations';
-import { LigneFourniture, EditeurFourniture } from '../composants/Fournitures';
+import { GroupeFourniture, EditeurFourniture } from '../composants/Fournitures';
 import { Feuille, Champ, Texte, Selection, Puce, Vide, Menu } from '../composants/base';
 import { Icone } from '../composants/Icone';
 import { IndicateurSync } from '../app';
@@ -39,7 +39,7 @@ function ListeCourses() {
   const [ouvert, setOuvert] = useState<string | 'nouveau' | null>(null);
   const groupes = regrouperAchats(d, { costumeId: costume || undefined, statuts: statut ? [statut] : undefined });
   const nb = groupes.reduce((s, g) => s + g.lignes.length, 0);
-  const choisir = (id: string, v: boolean) => { const s = new Set(selection); if (v) s.add(id); else s.delete(id); setSelection(s); };
+  const choisirPlusieurs = (ids: string[], v: boolean) => { const s = new Set(selection); for (const id of ids) { if (v) s.add(id); else s.delete(id); } setSelection(s); };
   const selectionnables = (g: Ligne[]) => g.filter(f => !f.commande_id || !ligne(d, 'Commandes', f.commande_id));
 
   const commander = () => {
@@ -82,11 +82,9 @@ function ListeCourses() {
               {g.fournisseur?.franco && g.total > 0 && num(g.fournisseur.franco) > g.total && <span class="petit-texte">franco à {euros(num(g.fournisseur.franco))}</span>}
             </h2>
             <ul class="liste-fournitures">
-              {g.lignes.map(f => {
-                const enCommande = !!f.commande_id && !!ligne(d, 'Commandes', f.commande_id);
-                return <LigneFourniture f={f} afficherCostume={!costume} selectionnee={selection.has(f.id)}
-                  onSelection={enCommande ? undefined : v => choisir(f.id, v)} onOuvrir={() => setOuvert(f.id)} />;
-              })}
+              {regrouperParNom(g.lignes).map(gn => (
+                <GroupeFourniture g={gn} afficherCostume={!costume} selection={selection} onSelection={choisirPlusieurs} onOuvrir={setOuvert} />
+              ))}
             </ul>
           </div>
         );

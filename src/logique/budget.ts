@@ -64,7 +64,7 @@ export function regrouperAchats(d: Donnees, filtre: { costumeId?: string; statut
     if (filtre.costumeId && f.costume_id !== filtre.costumeId) continue;
     if (filtre.statuts && !filtre.statuts.includes(f.statut || 'à acheter')) continue;
     const c = ligne(d, 'Costumes', f.costume_id);
-    if (c?.statut === 'archivé') continue;
+    if (c?.statut === 'archivé' || (f.costume_id && !c)) continue; // costume archivé ou supprimé
     const four = vivant(d.Fournisseurs[f.fournisseur_id]) ? d.Fournisseurs[f.fournisseur_id] : null;
     const cle = four?.id ?? '';
     if (!groupes.has(cle)) groupes.set(cle, { fournisseur: four, lignes: [], total: 0 });
@@ -78,4 +78,37 @@ export function regrouperAchats(d: Donnees, filtre: { costumeId?: string; statut
 
 export function euros(n: number): string {
   return n.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
+}
+
+// ---------- Regroupement par nom ----------
+// Chaque fourniture est saisie pour UNE pièce d'UN costume ; les lignes qui portent le même nom
+// (majuscules et espaces en trop ignorés) sont regroupées pour voir le besoin total.
+
+export function cleNom(libelle: string | undefined): string {
+  return (libelle ?? '').normalize('NFC').trim().replace(/\s+/g, ' ').toLocaleLowerCase('fr');
+}
+
+export interface Quantite { unite: string; total: number }
+export interface GroupeNom { cle: string; libelle: string; lignes: Ligne[]; quantites: Quantite[]; montant: number; sansPrix: number }
+
+/** Groupes triés par ordre alphabétique : deux noms presque identiques se retrouvent côte à côte. */
+export function regrouperParNom(lignes: Ligne[]): GroupeNom[] {
+  const groupes = new Map<string, GroupeNom>();
+  for (const f of lignes) {
+    const cle = cleNom(f.libelle);
+    if (!groupes.has(cle)) groupes.set(cle, { cle, libelle: (f.libelle ?? '').trim(), lignes: [], quantites: [], montant: 0, sansPrix: 0 });
+    const g = groupes.get(cle)!;
+    g.lignes.push(f);
+    const unite = (f.unite ?? '').trim();
+    const q = g.quantites.find(x => x.unite.toLocaleLowerCase('fr') === unite.toLocaleLowerCase('fr'));
+    if (q) q.total += quantiteNombre(f.quantite); else g.quantites.push({ unite, total: quantiteNombre(f.quantite) });
+    const m = montant(f);
+    if (m === null) g.sansPrix++; else g.montant += m;
+  }
+  return [...groupes.values()].sort((a, b) => a.cle.localeCompare(b.cle, 'fr'));
+}
+
+/** « 8 m », « 8 m + 2 sachets », « 3 ». */
+export function texteQuantites(q: Quantite[]): string {
+  return q.map(x => `${Math.round(x.total * 100) / 100}`.replace('.', ',') + (x.unite ? ` ${x.unite}` : '')).join(' + ');
 }

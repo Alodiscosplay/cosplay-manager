@@ -1,21 +1,26 @@
+// Onglet « Fournitures » d'un costume : une ligne par besoin (une pièce, une quantité), et l'affichage
+// regroupe par nom, par ordre alphabétique, avec la quantité par pièce et le total.
 import { useState } from 'preact/hooks';
 import { donnees } from '../../store/store';
 import { fournituresDe, piecesDe, piecesDeFourniture } from '../../logique/acces';
-import { montant, euros } from '../../logique/budget';
+import { montant, euros, regrouperParNom } from '../../logique/budget';
 import { bool, type Ligne } from '../../modele/schema';
-import { LigneFourniture, EditeurFourniture } from '../../composants/Fournitures';
-import { Vide } from '../../composants/base';
+import { GroupeFourniture, EditeurFourniture } from '../../composants/Fournitures';
+import { Selection, Vide } from '../../composants/base';
 import { Icone } from '../../composants/Icone';
 
 export function OngletFournitures({ costume }: { costume: Ligne }) {
   const d = donnees.value;
   const [ouvert, setOuvert] = useState<string | 'nouveau' | null>(null);
-  const liste = fournituresDe(d, costume.id);
+  const [piece, setPiece] = useState(''); // '' = toutes, '__general' = sans pièce, sinon id
   const pieces = piecesDe(d, costume.id);
-  const groupes: [string, Ligne[]][] = [
-    ['', liste.filter(f => !piecesDeFourniture(d, f).length)],
-    ...pieces.map(p => [p.id, liste.filter(f => piecesDeFourniture(d, f).some(x => x.id === p.id))] as [string, Ligne[]]),
-  ];
+  const toutes = fournituresDe(d, costume.id);
+  const liste = toutes.filter(f => {
+    if (!piece) return true;
+    const ps = piecesDeFourniture(d, f);
+    return piece === '__general' ? !ps.length : ps.some(p => p.id === piece);
+  });
+  const groupes = regrouperParNom(liste);
   const aAcheter = liste.filter(f => (f.statut || 'à acheter') === 'à acheter').length;
   const total = liste.reduce((s, f) => s + (f.statut === 'déjà là' ? 0 : montant(f) ?? 0), 0);
 
@@ -23,17 +28,22 @@ export function OngletFournitures({ costume }: { costume: Ligne }) {
     <section>
       <div class="barre-outils">
         <button class="bouton principal" onClick={() => setOuvert('nouveau')}><Icone nom="plus" />Fourniture</button>
+        {pieces.length > 0 && (
+          <Selection label="Filtrer par pièce" valeur={piece} onChange={setPiece}
+            options={[['', 'Toutes les pièces'], ['__general', 'Général'], ...pieces.map(p => [p.id, p.nom] as [string, string])]} />
+        )}
         <a class="bouton" href="#/achats">Liste d'achats commune</a>
         <span class="petit-texte">{aAcheter} à acheter{bool(costume.suivi_budget) && total ? ` · ${euros(total)} au total` : ''}</span>
       </div>
-      {!liste.length && <Vide icone="achats" titre="Aucune fourniture"><p>Les fournitures rejoignent la liste d'achats commune à tous tes costumes.</p></Vide>}
-      {groupes.filter(([, l]) => l.length).map(([pieceId, l]) => (
-        <div class="groupe">
-          <h3 class="groupe-titre">{pieceId ? pieces.find(p => p.id === pieceId)?.nom : 'Général'}</h3>
-          <ul class="liste-fournitures">{l.map(f => <LigneFourniture f={f} pieceCourante={pieceId || undefined} onOuvrir={() => setOuvert(f.id)} />)}</ul>
-        </div>
-      ))}
-      {ouvert && <EditeurFourniture id={ouvert === 'nouveau' ? undefined : ouvert} costumeId={costume.id} onFermer={() => setOuvert(null)} />}
+      {!toutes.length && <Vide icone="achats" titre="Aucune fourniture"><p>Les fournitures rejoignent la liste d'achats commune à tous tes costumes.</p></Vide>}
+      {toutes.length > 0 && !liste.length && <p class="petit-texte">Aucune fourniture pour cette pièce.</p>}
+      {groupes.length > 0 && (
+        <ul class="liste-fournitures">
+          {groupes.map(g => <GroupeFourniture g={g} onOuvrir={setOuvert} />)}
+        </ul>
+      )}
+      {ouvert && <EditeurFourniture id={ouvert === 'nouveau' ? undefined : ouvert} costumeId={costume.id}
+        pieceId={piece && piece !== '__general' ? piece : undefined} onFermer={() => setOuvert(null)} />}
     </section>
   );
 }
