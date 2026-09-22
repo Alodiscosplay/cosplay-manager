@@ -139,9 +139,14 @@ function CartePiece({ piece, ouvrir }: { piece: Ligne; ouvrir: (o: Ouvert) => vo
         </button>
         <div class="piece-droite">
           <Pct a={a} />
-          {sp === 'en cours'
-            ? <button class="bouton-icone" title="Mettre en pause" aria-label="Mettre la pièce en pause" onClick={() => statut('en pause')}><Icone nom="pause" taille={18} /></button>
-            : sp !== 'terminée' && <button class="bouton petit" title="Travailler sur cette pièce" onClick={() => statut('en cours')}><Icone nom="lecture" taille={14} />En cours</button>}
+          {/* Le bouton montre l'état ACTUEL de la pièce ; un clic le fait basculer. */}
+          {sp !== 'terminée' && (
+            <button class={`bascule-etat${sp === 'en cours' ? ' actif' : ''}`} aria-pressed={sp === 'en cours'}
+              title={sp === 'en cours' ? 'Pièce en cours — cliquer pour la mettre en pause' : 'Pièce en pause — cliquer pour la reprendre'}
+              onClick={() => statut(sp === 'en cours' ? 'en pause' : 'en cours')}>
+              <Icone nom={sp === 'en cours' ? 'lecture' : 'pause'} taille={14} />{sp === 'en cours' ? 'En cours' : 'En pause'}
+            </button>
+          )}
           <Menu label={`Actions pour ${piece.nom}`} actions={[
             { texte: 'Modifier la pièce', icone: 'crayon', faire: () => ouvrir({ type: 'piece', id: piece.id }) },
             { texte: 'Ajouter une étape depuis un modèle', icone: 'calques', faire: () => ouvrir({ type: 'modele', id: piece.id }) },
@@ -152,7 +157,7 @@ function CartePiece({ piece, ouvrir }: { piece: Ligne; ouvrir: (o: Ouvert) => vo
       <div class="piece-resume">
         <Barre a={a} fine />
         <div class="puces">
-          <Puce ton={sp === 'en cours' ? 'accent' : sp === 'terminée' ? 'vert' : 'gris'}>{sp}</Puce>
+          {sp === 'terminée' && <Puce ton="vert">terminée</Puce>}
           {debutFutur && <Puce ton="gris"><Icone nom="horloge" taille={12} />reprend le {jourCourt(debutFutur)}</Puce>}
           {dl && <Puce ton={dl < j && a.pct !== 100 ? 'rouge' : 'gris'}><Icone nom="drapeau" taille={12} />{jourCourt(dl)} · {relatif(dl, j)}</Puce>}
           {piece.patron
