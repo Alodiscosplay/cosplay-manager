@@ -332,7 +332,13 @@ dialog.feuille::backdrop { background: rgb(20 12 28 / 45%); }
 .fourniture .selection { margin: 0 4px; }
 .groupe-nom + .groupe-nom, .groupe-nom + .fourniture, .fourniture + .groupe-nom { border-top: 1px solid var(--bord); }
 .entete-groupe { background: var(--surface-2); }
-.entete-groupe .fourniture-texte { cursor: default; }
+.choix-statut { width: auto !important; min-height: 32px !important; padding: 2px 8px !important; border-radius: 99px !important; font-size: .78rem; font-weight: 600; border: 1px solid transparent !important; flex: none; cursor: pointer; }
+.choix-statut.orange { background: var(--orange-fond) !important; color: var(--orange); }
+.choix-statut.accent { background: var(--accent-fond) !important; color: var(--accent); }
+.choix-statut.vert { background: var(--vert-fond) !important; color: var(--vert); }
+.choix-statut.gris { background: var(--surface-2) !important; color: var(--doux); }
+.choix-statut option { background: var(--surface); color: var(--encre); }
+.entete-groupe .fourniture-texte { cursor: pointer; }
 .total-quantite { color: var(--accent); font-weight: 600; }
 .details-groupe { list-style: none; margin: 0; padding: 0 0 0 28px; }
 .fourniture.detail { min-height: 44px; }

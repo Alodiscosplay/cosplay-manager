@@ -6,12 +6,35 @@ import { costumes, piecesDe, piecesDeFourniture, tous, ligne } from '../logique/
 import { montant, euros, texteQuantites, cleNom, type GroupeNom } from '../logique/budget';
 import { STATUTS_FOURNITURE, liste, type Ligne } from '../modele/schema';
 import { nouvelId, supprimer, retirerDeCommande } from '../store/operations';
-import { Feuille, Champ, Selection, Puce } from './base';
+import { Feuille, Champ, Selection } from './base';
 import { Icone } from './Icone';
 
 const TON_STATUT: Record<string, 'gris' | 'accent' | 'vert' | 'orange'> = { 'à acheter': 'orange', 'commandé': 'accent', 'reçu': 'vert', 'déjà là': 'gris' };
 
 const enCommande = (d: typeof donnees.value, f: Ligne) => !!f.commande_id && !!ligne(d, 'Commandes', f.commande_id);
+
+/** Statut en liste déroulante, coloré comme une puce : un clic suffit pour passer une fourniture en « reçu ». */
+function ChoixStatut({ valeur, onChange, label }: { valeur: string; onChange: (v: string) => void; label: string }) {
+  return (
+    <select class={`choix-statut ${TON_STATUT[valeur] ?? 'gris'}`} value={valeur} aria-label={label}
+      onClick={e => e.stopPropagation()} onChange={e => { const v = (e.target as HTMLSelectElement).value; if (v !== 'mixte') onChange(v); }}>
+      {valeur === 'mixte' && <option value="mixte" disabled>mixte</option>}
+      {STATUTS_FOURNITURE.map(st => <option value={st}>{st}</option>)}
+    </select>
+  );
+}
+
+// Annulable : dans la liste « à acheter », une ligne passée en « reçu » disparaît aussitôt.
+const changerStatut = (ids: string[], statut: string) =>
+  faire(ids.map(id => ({ table: 'Fournitures' as const, id, champs: { statut } })), `Passé en « ${statut} »`);
+
+// Groupes dépliés (les groupes sont repliés par défaut, pour garder la liste courte). Préférence de l'appareil.
+const CLE_DEPLIES = 'cosplay-planner.fournitures-depliees';
+function lireDeplies(): Record<string, boolean> { try { return JSON.parse(localStorage.getItem(CLE_DEPLIES) ?? '{}'); } catch { return {}; } }
+function memoriserDeplie(cle: string, v: boolean): void {
+  const r = lireDeplies(); if (v) r[cle] = true; else delete r[cle];
+  try { localStorage.setItem(CLE_DEPLIES, JSON.stringify(r)); } catch { /* stockage indisponible */ }
+}
 
 /**
  * Une fourniture. `detail` : affichée sous son groupe de même nom, la ligne a pour titre
@@ -44,7 +67,7 @@ export function LigneFourniture({ f, afficherCostume, selectionnee, onSelection,
       </button>
       {m !== null && <span class="montant">{euros(m)}</span>}
       {f.lien && <a class="bouton-icone petit" href={f.lien} target="_blank" rel="noopener noreferrer" aria-label={`Ouvrir le lien de ${f.libelle}`}><Icone nom="lien" taille={16} /></a>}
-      <Puce ton={TON_STATUT[statut] ?? 'gris'}>{statut}</Puce>
+      <ChoixStatut valeur={statut} label={`Statut de ${f.libelle}${detail ? ` (${titre})` : ''}`} onChange={v => changerStatut([f.id], v)} />
     </li>
   );
 }
@@ -57,6 +80,7 @@ export function GroupeFourniture({ g, afficherCostume, selection, onSelection, o
   g: GroupeNom; afficherCostume?: boolean; selection?: Set<string>; onSelection?: (ids: string[], v: boolean) => void; onOuvrir: (id: string) => void;
 }) {
   const d = donnees.value;
+  const [deplie, setDeplie] = useState(() => !!lireDeplies()[g.cle]);
   const selectionnables = g.lignes.filter(f => !enCommande(d, f));
   if (g.lignes.length === 1) {
     const f = g.lignes[0];
@@ -68,23 +92,26 @@ export function GroupeFourniture({ g, afficherCostume, selection, onSelection, o
   return (
     <li class="groupe-nom">
       <div class="fourniture entete-groupe">
+        <button class="bouton-icone petit" aria-expanded={deplie} aria-label={`${deplie ? 'Replier' : 'Déplier'} « ${g.libelle} »`}
+          onClick={() => { memoriserDeplie(g.cle, !deplie); setDeplie(!deplie); }}><Icone nom={deplie ? 'bas' : 'chevron'} taille={16} /></button>
         {onSelection && selectionnables.length > 0 && (
           <input type="checkbox" class="selection" checked={tout} aria-label={`Sélectionner tout « ${g.libelle} »`}
             onChange={e => onSelection(selectionnables.map(f => f.id), (e.target as HTMLInputElement).checked)} />
         )}
-        <div class="fourniture-texte">
+        <div class="fourniture-texte" onClick={() => { memoriserDeplie(g.cle, !deplie); setDeplie(!deplie); }}>
           <span class="fourniture-libelle">{g.libelle}</span>
           <span class="etape-meta"><span class="total-quantite">Total : {texteQuantites(g.quantites)}</span><span>{g.lignes.length} besoins</span></span>
         </div>
         {g.montant > 0 && <span class="montant">{euros(g.montant)}</span>}
-        {statuts.length === 1 ? <Puce ton={TON_STATUT[statuts[0]] ?? 'gris'}>{statuts[0]}</Puce> : <Puce ton="gris">mixte</Puce>}
+        <ChoixStatut valeur={statuts.length === 1 ? statuts[0] : 'mixte'} label={`Statut de tout « ${g.libelle} »`}
+          onChange={v => changerStatut(g.lignes.map(f => f.id), v)} />
       </div>
-      <ul class="details-groupe">
+      {deplie && <ul class="details-groupe">
         {g.lignes.map(f => (
           <LigneFourniture f={f} detail afficherCostume={afficherCostume} onOuvrir={() => onOuvrir(f.id)}
             selectionnee={selection?.has(f.id)} onSelection={onSelection && !enCommande(d, f) ? v => onSelection([f.id], v) : undefined} />
         ))}
-      </ul>
+      </ul>}
     </li>
   );
 }
