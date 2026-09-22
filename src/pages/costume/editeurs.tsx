@@ -1,7 +1,8 @@
 // Feuilles d'édition : étape, pièce, piste, attentes, « Coller une liste », modèles, Répartir.
 import { useState } from 'preact/hooks';
 import { donnees, faire, jour } from '../../store/store';
-import { piecesDe, pistesDe, etapesDePiste, etapesDePiece, ligne, tous, idsAttendus, nomAttendu, ordreSuivant } from '../../logique/acces';
+import { piecesDe, pistesDe, etapesDePiste, etapesDePiece, ligne, tous, idsAttendus, nomAttendu, ordreSuivant, fournituresDe, piecesDeFourniture } from '../../logique/acces';
+import { cleNom } from '../../logique/budget';
 import { creeraitBoucle, statutStockePiece, champsStatutPiece } from '../../logique/disponibilite';
 import { analyserListe, compter, versTexte } from '../../logique/collerListe';
 import { repartirPiece, repartirCostume, deadlinePiece, deadlineCostume } from '../../logique/planning';
@@ -66,6 +67,7 @@ export function EditeurPiece({ id, onFermer }: { id: string; onFermer: () => voi
   const d = donnees.value;
   const p = d.Pieces[id];
   const [repartir, setRepartir] = useState(false);
+  const [rattacher, setRattacher] = useState(false);
   if (!p) return null;
   const m = (champs: Record<string, string>) => maj('Pieces', id, champs);
   const autres = piecesDe(d, p.costume_id).filter(x => x.id !== id).map(x => ({ id: x.id, nom: x.nom }));
@@ -88,6 +90,8 @@ export function EditeurPiece({ id, onFermer }: { id: string; onFermer: () => voi
       <Champ label="Patron (facultatif)"><Texte valeur={p.patron ?? ''} onValider={v => m({ patron: v })} /></Champ>
       <Champ label="Notes"><Texte multiligne valeur={p.notes ?? ''} onValider={v => m({ notes: v })} /></Champ>
       <ChoixAttentes table="Pieces" l={p} candidats={autres} aide="La pièce entière attend que ces pièces soient finies." />
+      <button class="bouton" onClick={() => setRattacher(true)}><Icone nom="achats" taille={16} />Fournitures de la pièce</button>
+      {rattacher && <RattacherFournitures pieceId={id} onFermer={() => setRattacher(false)} />}
       {dl && <button class="bouton" onClick={() => setRepartir(true)}>Répartir les sous-étapes jusqu'au {jourCourt(dl)}</button>}
       {repartir && <Repartir pieceId={id} onFermer={() => setRepartir(false)} />}
     </Feuille>
@@ -180,6 +184,46 @@ export function ChoixAttentes({ table, l, candidats, aide }: { table: NomTable; 
 
 export function texteAttendus(d: typeof donnees.value, l: Ligne): string {
   return idsAttendus(l).map(id => nomAttendu(d, id)).join(', ');
+}
+
+// ---------- Rattacher des fournitures à une pièce ----------
+
+/**
+ * Fournitures du costume rattachées à aucune pièce (achetées ou saisies avant de créer la pièce),
+ * plus celles déjà rattachées à cette pièce. Cocher = rattacher, décocher = remettre « hors pièces ».
+ */
+export function RattacherFournitures({ pieceId, onFermer, apresCreation }: { pieceId: string; onFermer: () => void; apresCreation?: boolean }) {
+  const d = donnees.value;
+  const piece = d.Pieces[pieceId];
+  if (!piece) return null;
+  const candidates = fournituresDe(d, piece.costume_id).filter(f => {
+    const ids = piecesDeFourniture(d, f).map(p => p.id);
+    return ids.length === 0 || ids.includes(pieceId);
+  }).sort((a, b) => cleNom(a.libelle).localeCompare(cleNom(b.libelle), 'fr'));
+  const basculer = (f: Ligne, coche: boolean) => {
+    const autres = liste(f.piece_id).filter(x => x !== pieceId);
+    maj('Fournitures', f.id, { piece_id: txtListe(coche ? [...autres, pieceId] : autres) });
+  };
+  return (
+    <Feuille titre={`Fournitures de « ${piece.nom} »`} onFermer={onFermer} pied={
+      <button class="bouton principal" onClick={onFermer}>{apresCreation ? 'Terminé' : 'Fermer'}</button>}>
+      {apresCreation && <p class="petit-texte">Des fournitures de ce costume ne sont rattachées à aucune pièce. Coche celles qui concernent « {piece.nom} », ou ferme pour le faire plus tard.</p>}
+      {!candidates.length && <p class="petit-texte">Aucune fourniture hors pièces dans ce costume.</p>}
+      <div class="attentes">
+        {candidates.map(f => (
+          <label class="case-ligne">
+            <input type="checkbox" checked={liste(f.piece_id).includes(pieceId)} onChange={e => basculer(f, (e.target as HTMLInputElement).checked)} />
+            <span>{f.libelle}<span class="petit-texte">{[f.quantite, f.unite].filter(Boolean).length ? ` · ${[f.quantite, f.unite].filter(Boolean).join(' ')}` : ''} · {f.statut || 'à acheter'}</span></span>
+          </label>
+        ))}
+      </div>
+    </Feuille>
+  );
+}
+
+/** Nombre de fournitures du costume rattachées à aucune pièce. */
+export function nbFournituresHorsPieces(d: typeof donnees.value, costumeId: string): number {
+  return fournituresDe(d, costumeId).filter(f => !piecesDeFourniture(d, f).length).length;
 }
 
 // ---------- Coller une liste ----------

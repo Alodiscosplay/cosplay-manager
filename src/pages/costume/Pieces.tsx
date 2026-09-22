@@ -11,10 +11,10 @@ import { DUREES, NOMS_DUREES, bool, txtBool, type Duree, type Ligne } from '../.
 import { creerPiece, creerPiste, creerEtape, cocherEtape, deplacerEtape, reordonner } from '../../store/operations';
 import { Barre, Pct, Puce, Case, Menu, Vide } from '../../composants/base';
 import { Icone } from '../../composants/Icone';
-import { EditeurEtape, EditeurPiece, EditeurPiste, CollerListe, ChoixModele, Repartir } from './editeurs';
+import { EditeurEtape, EditeurPiece, EditeurPiste, CollerListe, ChoixModele, Repartir, RattacherFournitures, nbFournituresHorsPieces } from './editeurs';
 import { maj } from '../Costume';
 
-type Ouvert = { type: 'etape' | 'piece' | 'piste' | 'coller' | 'modele' | 'repartir'; id?: string } | null;
+type Ouvert = { type: 'etape' | 'piece' | 'piste' | 'coller' | 'modele' | 'repartir' | 'fournitures' | 'fournitures-creation'; id?: string } | null;
 
 export function OngletPieces({ costume }: { costume: Ligne }) {
   const d = donnees.value;
@@ -41,7 +41,10 @@ export function OngletPieces({ costume }: { costume: Ligne }) {
 
   const ajouterPiece = () => {
     if (!nouvelle.trim()) return;
-    faire(creerPiece(d, costume.id, nouvelle.trim(), pieces.length ? 'en pause' : 'en cours'));
+    const ch = creerPiece(d, costume.id, nouvelle.trim(), pieces.length ? 'en pause' : 'en cours');
+    faire(ch);
+    // Fournitures déjà saisies (ou reçues) avant la pièce : proposer de les rattacher tout de suite.
+    if (nbFournituresHorsPieces(donnees.value, costume.id)) setOuvert({ type: 'fournitures-creation', id: ch[0].id });
     setNouvelle('');
   };
 
@@ -72,6 +75,9 @@ export function OngletPieces({ costume }: { costume: Ligne }) {
       {ouvert?.type === 'coller' && <CollerListe costumeId={costume.id} pieceId={ouvert.id} onFermer={() => setOuvert(null)} />}
       {ouvert?.type === 'modele' && <ChoixModele pieceId={ouvert.id!} onFermer={() => setOuvert(null)} />}
       {ouvert?.type === 'repartir' && <Repartir costumeId={costume.id} onFermer={() => setOuvert(null)} />}
+      {(ouvert?.type === 'fournitures' || ouvert?.type === 'fournitures-creation') && (
+        <RattacherFournitures pieceId={ouvert.id!} apresCreation={ouvert.type === 'fournitures-creation'} onFermer={() => setOuvert(null)} />
+      )}
     </section>
   );
 }
@@ -150,6 +156,7 @@ function CartePiece({ piece, ouvrir }: { piece: Ligne; ouvrir: (o: Ouvert) => vo
           )}
           <Menu label={`Actions pour ${piece.nom}`} actions={[
             { texte: 'Modifier la pièce', icone: 'crayon', faire: () => ouvrir({ type: 'piece', id: piece.id }) },
+            { texte: 'Fournitures de la pièce', icone: 'achats', faire: () => ouvrir({ type: 'fournitures', id: piece.id }) },
             { texte: 'Ajouter une étape depuis un modèle', icone: 'calques', faire: () => ouvrir({ type: 'modele', id: piece.id }) },
             { texte: 'Coller des sous-étapes', icone: 'coller', faire: () => ouvrir({ type: 'coller', id: piece.id }) },
           ]} />
