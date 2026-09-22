@@ -5,7 +5,7 @@ import { avancement, avancementPiece, formatPct } from '../src/logique/avancemen
 import { aFaire, etapeDisponible, creeraitBoucle, texteAttente, champsStatutPiece } from '../src/logique/disponibilite';
 import { activationsDuJour } from '../src/logique/activation';
 import { repartirSuite, repartirPiece, repartirCostume, retard, finPlanifiable } from '../src/logique/planning';
-import { quantiteNombre, budgetCostume, totalCommande, regrouperParNom, texteQuantites } from '../src/logique/budget';
+import { quantiteNombre, regrouperAchats, budgetCostume, totalCommande, regrouperParNom, texteQuantites } from '../src/logique/budget';
 import { analyserListe, versTexte, modeleVersTexte, texteVersModele } from '../src/logique/collerListe';
 import { cocherEtape, creerCommandes, changerStatutCommande, appliquerListe, insererModele, deplacerEtape, creerCostume } from '../src/store/operations';
 import { etapesDePiste, pistesDe, piecesDe, etapesDePiece, piecesDeFourniture } from '../src/logique/acces';
@@ -283,6 +283,19 @@ describe('achats et budget', () => {
     d = appliquer(d, changerStatutCommande(d, cmd, 'reçue', '2026-10-05'));
     expect([d.Fournitures.x.statut, d.Fournitures.y.statut]).toEqual(['reçu', 'reçu']);
     expect(budgetCostume(d, 'A')).toMatchObject({ prevu: 3, engage: 3, recu: 3 });
+  });
+
+  it('la liste de courses se groupe par fournisseur ou par costume (dans l’ordre des costumes, « sans » en dernier)', () => {
+    const d = vide();
+    d.Costumes.A = { id: 'A', maj: '', supprime: '', nom: 'Bridget', statut: 'en cours', ordre: '2' };
+    d.Costumes.B = { id: 'B', maj: '', supprime: '', nom: 'Furina', statut: 'en cours', ordre: '1' };
+    d.Fournisseurs.F = { id: 'F', maj: '', supprime: '', nom: 'Mercerie' };
+    const f = (id: string, costume_id: string, fournisseur_id: string) => ({ id, maj: '', supprime: '', costume_id, libelle: id, fournisseur_id, statut: 'à acheter' });
+    d.Fournitures.x = f('x', 'A', 'F'); d.Fournitures.y = f('y', 'B', ''); d.Fournitures.z = f('z', '', 'F'); d.Fournitures.w = f('w', 'A', '');
+    expect(regrouperAchats(d).map(g => [g.fournisseur?.nom ?? '—', g.lignes.map(l => l.id).sort().join('')]))
+      .toEqual([['Mercerie', 'xz'], ['—', 'wy']]);
+    expect(regrouperAchats(d, {}, 'costume').map(g => [g.costume?.nom ?? '—', g.lignes.map(l => l.id).sort().join('')]))
+      .toEqual([['Furina', 'y'], ['Bridget', 'wx'], ['—', 'z']]);
   });
 });
 

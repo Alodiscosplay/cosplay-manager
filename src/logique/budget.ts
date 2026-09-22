@@ -1,6 +1,6 @@
 // Budget et liste d'achats. Les prix sont facultatifs partout.
 import { type Donnees, type Ligne, num, vivant } from '../modele/schema';
-import { fournituresDe, tous, ligne } from './acces';
+import { costumes, fournituresDe, tous, ligne } from './acces';
 
 /** Lit une quantité telle qu'on l'écrit vraiment : « 1,5 », « 1m20 » (= 1,20), « 4 paires ». Vide = 1. */
 export function quantiteNombre(q: string | undefined): number {
@@ -55,10 +55,14 @@ export function totalCommande(d: Donnees, commandeId: string): { articles: numbe
   return { articles, port, total: articles + port, sansPrix };
 }
 
-export interface GroupeAchats { fournisseur: Ligne | null; lignes: Ligne[]; total: number }
+export type GroupementAchats = 'fournisseur' | 'costume';
+export interface GroupeAchats { cle: string; fournisseur: Ligne | null; costume: Ligne | null; lignes: Ligne[]; total: number }
 
-/** La liste de courses commune, groupée par fournisseur (« Sans fournisseur » en dernier). */
-export function regrouperAchats(d: Donnees, filtre: { costumeId?: string; statuts?: string[] } = {}): GroupeAchats[] {
+/**
+ * La liste de courses commune, groupée par fournisseur (« Sans fournisseur » en dernier) ou par costume
+ * (dans l'ordre des costumes, « Sans costume » en dernier).
+ */
+export function regrouperAchats(d: Donnees, filtre: { costumeId?: string; statuts?: string[] } = {}, par: GroupementAchats = 'fournisseur'): GroupeAchats[] {
   const groupes = new Map<string, GroupeAchats>();
   for (const f of tous(d, 'Fournitures')) {
     if (filtre.costumeId && f.costume_id !== filtre.costumeId) continue;
@@ -66,13 +70,18 @@ export function regrouperAchats(d: Donnees, filtre: { costumeId?: string; statut
     const c = ligne(d, 'Costumes', f.costume_id);
     if (c?.statut === 'archivé' || (f.costume_id && !c)) continue; // costume archivé ou supprimé
     const four = vivant(d.Fournisseurs[f.fournisseur_id]) ? d.Fournisseurs[f.fournisseur_id] : null;
-    const cle = four?.id ?? '';
-    if (!groupes.has(cle)) groupes.set(cle, { fournisseur: four, lignes: [], total: 0 });
+    const cle = (par === 'costume' ? c?.id : four?.id) ?? '';
+    if (!groupes.has(cle)) groupes.set(cle, { cle, fournisseur: par === 'fournisseur' ? four : null, costume: par === 'costume' ? c ?? null : null, lignes: [], total: 0 });
     const g = groupes.get(cle)!;
     g.lignes.push(f);
     g.total += montant(f) ?? 0;
   }
-  return [...groupes.values()].sort((a, b) =>
+  const liste = [...groupes.values()];
+  if (par === 'costume') {
+    const rang = new Map(costumes(d).map((c, i) => [c.id, i]));
+    return liste.sort((a, b) => (a.costume ? rang.get(a.costume.id) ?? 0 : Infinity) - (b.costume ? rang.get(b.costume.id) ?? 0 : Infinity));
+  }
+  return liste.sort((a, b) =>
     a.fournisseur && b.fournisseur ? a.fournisseur.nom.localeCompare(b.fournisseur.nom) : a.fournisseur ? -1 : 1);
 }
 

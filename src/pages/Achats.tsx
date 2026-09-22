@@ -1,7 +1,7 @@
 import { useState } from 'preact/hooks';
 import { donnees, jour, faire } from '../store/store';
 import { costumes, tous, ligne } from '../logique/acces';
-import { regrouperAchats, regrouperParNom, lignesCommande, totalCommande, euros, montant } from '../logique/budget';
+import { regrouperAchats, type GroupementAchats, regrouperParNom, lignesCommande, totalCommande, euros, montant } from '../logique/budget';
 import { jourCourt } from '../logique/dates';
 import { STATUTS_FOURNITURE, STATUTS_COMMANDE, num, type Ligne } from '../modele/schema';
 import { creerCommandes, changerStatutCommande, supprimer, retirerDeCommande, nouvelId } from '../store/operations';
@@ -9,6 +9,9 @@ import { GroupeFourniture, EditeurFourniture } from '../composants/Fournitures';
 import { Feuille, Champ, Texte, Selection, Puce, Vide, Menu } from '../composants/base';
 import { Icone } from '../composants/Icone';
 import { IndicateurSync } from '../app';
+import { lienCostume } from '../routeur';
+
+const CLE_GROUPEMENT = 'cosplay-planner.groupement-achats';
 
 export function PageAchats({ onglet = 'liste' }: { onglet?: string }) {
   const d = donnees.value;
@@ -37,7 +40,9 @@ function ListeCourses() {
   const [statut, setStatut] = useState('à acheter');
   const [selection, setSelection] = useState<Set<string>>(new Set());
   const [ouvert, setOuvert] = useState<string | 'nouveau' | null>(null);
-  const groupes = regrouperAchats(d, { costumeId: costume || undefined, statuts: statut ? [statut] : undefined });
+  const [par, setParEtat] = useState<GroupementAchats>(() => { try { return localStorage.getItem(CLE_GROUPEMENT) === 'costume' ? 'costume' : 'fournisseur'; } catch { return 'fournisseur'; } });
+  const setPar = (v: GroupementAchats) => { setParEtat(v); try { localStorage.setItem(CLE_GROUPEMENT, v); } catch { /* ignoré */ } };
+  const groupes = regrouperAchats(d, { costumeId: costume || undefined, statuts: statut ? [statut] : undefined }, par);
   const nb = groupes.reduce((s, g) => s + g.lignes.length, 0);
   const choisirPlusieurs = (ids: string[], v: boolean) => { const s = new Set(selection); for (const id of ids) { if (v) s.add(id); else s.delete(id); } setSelection(s); };
   const selectionnables = (g: Ligne[]) => g.filter(f => !f.commande_id || !ligne(d, 'Commandes', f.commande_id));
@@ -54,6 +59,7 @@ function ListeCourses() {
     <section class="contenu-onglet">
       <div class="barre-outils">
         <button class="bouton principal" onClick={() => setOuvert('nouveau')}><Icone nom="plus" />Fourniture</button>
+        <Selection label="Tri" valeur={par} options={[['fournisseur', 'Tri par fournisseur'], ['costume', 'Tri par costume']]} onChange={v => setPar(v as GroupementAchats)} />
         <Selection label="Costume" valeur={costume} options={[['', 'Tous les costumes'], ...costumes(d).filter(c => c.statut !== 'archivé').map(c => [c.id, c.nom] as [string, string])]} onChange={setCostume} />
         <Selection label="Statut" valeur={statut} options={[['', 'Tous les statuts'], ...STATUTS_FOURNITURE.map(s => [s, s] as [string, string])]} onChange={setStatut} />
       </div>
@@ -69,21 +75,22 @@ function ListeCourses() {
       {groupes.map(g => {
         const libres = selectionnables(g.lignes);
         const tout = libres.length > 0 && libres.every(f => selection.has(f.id));
+        const nomGroupe = par === 'costume' ? g.costume?.nom ?? 'Sans costume' : g.fournisseur?.nom ?? 'Sans fournisseur';
         return (
-          <div class="groupe">
+          <div class="groupe" key={g.cle}>
             <h2 class="groupe-titre">
               {libres.length > 0 && (
-                <input type="checkbox" class="selection" checked={tout} aria-label={`Tout sélectionner chez ${g.fournisseur?.nom ?? 'sans fournisseur'}`}
+                <input type="checkbox" class="selection" checked={tout} aria-label={`Tout sélectionner : ${nomGroupe}`}
                   onChange={e => { const s = new Set(selection); for (const f of libres) { if ((e.target as HTMLInputElement).checked) s.add(f.id); else s.delete(f.id); } setSelection(s); }} />
               )}
-              {g.fournisseur ? g.fournisseur.nom : 'Sans fournisseur'}
+              {g.costume ? <a href={lienCostume(g.costume.id)}>{g.costume.nom}</a> : nomGroupe}
               {g.fournisseur?.url && <a class="bouton-icone petit" href={g.fournisseur.url} target="_blank" rel="noopener noreferrer" aria-label={`Site de ${g.fournisseur.nom}`}><Icone nom="lien" taille={16} /></a>}
               {g.total > 0 && <span class="compteur">{euros(g.total)}</span>}
               {g.fournisseur?.franco && g.total > 0 && num(g.fournisseur.franco) > g.total && <span class="petit-texte">franco à {euros(num(g.fournisseur.franco))}</span>}
             </h2>
             <ul class="liste-fournitures">
               {regrouperParNom(g.lignes).map(gn => (
-                <GroupeFourniture g={gn} afficherCostume={!costume} selection={selection} onSelection={choisirPlusieurs} onOuvrir={setOuvert} />
+                <GroupeFourniture key={gn.cle} g={gn} afficherCostume={!costume && par === 'fournisseur'} afficherFournisseur={par === 'costume'} selection={selection} onSelection={choisirPlusieurs} onOuvrir={setOuvert} />
               ))}
             </ul>
           </div>

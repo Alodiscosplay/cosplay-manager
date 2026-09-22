@@ -40,12 +40,13 @@ function memoriserDeplie(cle: string, v: boolean): void {
  * Une fourniture. `detail` : affichée sous son groupe de même nom, la ligne a pour titre
  * « costume · pièce » (le nom est déjà dans l'en-tête du groupe).
  */
-export function LigneFourniture({ f, afficherCostume, selectionnee, onSelection, onOuvrir, detail }: {
-  f: Ligne; afficherCostume?: boolean; selectionnee?: boolean; onSelection?: (v: boolean) => void; onOuvrir: () => void; detail?: boolean;
+export function LigneFourniture({ f, afficherCostume, afficherFournisseur, selectionnee, onSelection, onOuvrir, detail }: {
+  f: Ligne; afficherCostume?: boolean; afficherFournisseur?: boolean; selectionnee?: boolean; onSelection?: (v: boolean) => void; onOuvrir: () => void; detail?: boolean;
 }) {
   const d = donnees.value;
   const m = montant(f);
   const c = ligne(d, 'Costumes', f.costume_id);
+  const four = afficherFournisseur ? ligne(d, 'Fournisseurs', f.fournisseur_id) : undefined;
   const pieces = piecesDeFourniture(d, f).map(p => p.nom).join(', ');
   const statut = f.statut || 'à acheter';
   const quantite = [f.quantite, f.unite].filter(Boolean).join(' ');
@@ -62,6 +63,7 @@ export function LigneFourniture({ f, afficherCostume, selectionnee, onSelection,
           {quantite && <span>{quantite}</span>}
           {!detail && afficherCostume && c && <span class="costume-nom">{c.nom}</span>}
           {!detail && pieces && <span>{pieces}</span>}
+          {four && <span class="fournisseur-nom">{four.nom}</span>}
           {enCommande(d, f) && <span><Icone nom="boite" taille={12} />en commande</span>}
         </span>
       </button>
@@ -76,15 +78,15 @@ export function LigneFourniture({ f, afficherCostume, selectionnee, onSelection,
  * Toutes les lignes qui portent le même nom : l'en-tête donne le total, le détail la quantité
  * par costume et par pièce. Une seule ligne : affichée telle quelle.
  */
-export function GroupeFourniture({ g, afficherCostume, selection, onSelection, onOuvrir }: {
-  g: GroupeNom; afficherCostume?: boolean; selection?: Set<string>; onSelection?: (ids: string[], v: boolean) => void; onOuvrir: (id: string) => void;
+export function GroupeFourniture({ g, afficherCostume, afficherFournisseur, selection, onSelection, onOuvrir }: {
+  g: GroupeNom; afficherCostume?: boolean; afficherFournisseur?: boolean; selection?: Set<string>; onSelection?: (ids: string[], v: boolean) => void; onOuvrir: (id: string) => void;
 }) {
   const d = donnees.value;
   const [deplie, setDeplie] = useState(() => !!lireDeplies()[g.cle]);
   const selectionnables = g.lignes.filter(f => !enCommande(d, f));
   if (g.lignes.length === 1) {
     const f = g.lignes[0];
-    return <LigneFourniture f={f} afficherCostume={afficherCostume} onOuvrir={() => onOuvrir(f.id)}
+    return <LigneFourniture f={f} afficherCostume={afficherCostume} afficherFournisseur={afficherFournisseur} onOuvrir={() => onOuvrir(f.id)}
       selectionnee={selection?.has(f.id)} onSelection={onSelection && selectionnables.length ? v => onSelection([f.id], v) : undefined} />;
   }
   const statuts = [...new Set(g.lignes.map(f => f.statut || 'à acheter'))];
@@ -108,7 +110,7 @@ export function GroupeFourniture({ g, afficherCostume, selection, onSelection, o
       </div>
       {deplie && <ul class="details-groupe">
         {g.lignes.map(f => (
-          <LigneFourniture f={f} detail afficherCostume={afficherCostume} onOuvrir={() => onOuvrir(f.id)}
+          <LigneFourniture f={f} detail afficherCostume={afficherCostume} afficherFournisseur={afficherFournisseur} onOuvrir={() => onOuvrir(f.id)}
             selectionnee={selection?.has(f.id)} onSelection={onSelection && !enCommande(d, f) ? v => onSelection([f.id], v) : undefined} />
         ))}
       </ul>}
