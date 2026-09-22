@@ -2,14 +2,15 @@
 import { useState } from 'preact/hooks';
 import { donnees, faire, jour } from '../../store/store';
 import { piecesDe, pistesDe, etapesDePiste, etapesDePiece, ligne, tous, idsAttendus, nomAttendu, ordreSuivant } from '../../logique/acces';
-import { creeraitBoucle } from '../../logique/disponibilite';
+import { creeraitBoucle, statutStockePiece, champsStatutPiece } from '../../logique/disponibilite';
 import { analyserListe, compter, versTexte } from '../../logique/collerListe';
 import { repartirPiece, repartirCostume, deadlinePiece, deadlineCostume } from '../../logique/planning';
 import { jourCourt } from '../../logique/dates';
 import { DUREES, NOMS_DUREES, STATUTS_PIECE, bool, txtBool, liste, txtListe, type Duree, type Ligne, type NomTable } from '../../modele/schema';
-import { supprimer, appliquerListe, insererModele, deplacerEtape, cocherEtape, appliquerRepartition, nouvelId } from '../../store/operations';
+import { supprimer, appliquerListe, insererModele, ajouterModeleDansPiste, deplacerEtape, cocherEtape, appliquerRepartition, nouvelId } from '../../store/operations';
 import { Feuille, Champ, Texte, ChoixDate, Selection, Confirmer } from '../../composants/base';
 import { maj } from '../Costume';
+import { Icone } from '../../composants/Icone';
 
 // ---------- Étape ----------
 
@@ -53,8 +54,8 @@ export function EditeurEtape({ id, onFermer }: { id: string; onFermer: () => voi
             onChange={v => faire(deplacerEtape(d, id, v, etapesDePiste(d, v).length))} />
         </Champ>
       )}
-      <ChoixAttentes table="Etapes" l={e} candidats={candidatsAttente(d, piece, e.piste_id)}
-        aide="Cas particulier : cette étape attend aussi la fin d'autres pistes ou pièces." />
+      <ChoixAttentes table="Etapes" l={e} candidats={[...etapesCandidates(d, e), ...candidatsAttente(d, piece, e.piste_id)]}
+        aide="ex. « Couper le satin » attend « Vérifier le patron de la jupe ». Une étape peut aussi attendre la fin d'une piste ou d'une pièce." />
     </Feuille>
   );
 }
@@ -76,10 +77,10 @@ export function EditeurPiece({ id, onFermer }: { id: string; onFermer: () => voi
     </>}>
       <Champ label="Nom"><Texte valeur={p.nom} onValider={v => v && m({ nom: v })} /></Champ>
       <Champ label="Statut" aide="Seules les pièces « en cours » alimentent « À faire ».">
-        <Selection label="Statut" valeur={p.statut || 'à venir'} options={STATUTS_PIECE} onChange={v => m({ statut: v })} />
+        <Selection label="Statut" valeur={statutStockePiece(p)} options={STATUTS_PIECE} onChange={v => m(champsStatutPiece(p, v, jour.value))} />
       </Champ>
       <div class="deux-colonnes">
-        <Champ label="Début (facultatif)" aide="Le jour venu, la pièce passe en cours toute seule.">
+        <Champ label="Début (facultatif)" aide="Une pièce en pause passe en cours toute seule ce jour-là.">
           <ChoixDate label="date de début" valeur={p.debut ?? ''} onChange={v => m({ debut: v })} />
         </Champ>
         <Champ label="Deadline (facultative)"><ChoixDate label="deadline" valeur={p.deadline ?? ''} onChange={v => m({ deadline: v })} /></Champ>
@@ -99,6 +100,7 @@ export function EditeurPiste({ id, onFermer }: { id: string; onFermer: () => voi
   const d = donnees.value;
   const p = d.Pistes[id];
   const [modele, setModele] = useState(false);
+  const [ajoutModele, setAjoutModele] = useState(false);
   if (!p) return null;
   const piece = d.Pieces[p.piece_id];
   const m = (champs: Record<string, string>) => maj('Pistes', id, champs);
@@ -107,8 +109,13 @@ export function EditeurPiste({ id, onFermer }: { id: string; onFermer: () => voi
       <button class="bouton danger" onClick={() => { faire(supprimer('Pistes', id), 'Piste supprimée'); onFermer(); }}>Supprimer</button>
       <button class="bouton principal" onClick={onFermer}>Terminé</button>
     </>}>
-      <p class="petit-texte">Les étapes d'une piste se suivent ; les pistes d'une même pièce avancent en parallèle.</p>
+      <p class="petit-texte">Les pistes d'une même pièce avancent en parallèle.</p>
       <Champ label="Nom"><Texte valeur={p.nom ?? ''} placeholder="ex. Bijoux" onValider={v => m({ nom: v })} /></Champ>
+      <fieldset class="choix-segments colonne">
+        <legend>Ordre des étapes</legend>
+        <label><input type="radio" name="ordre-piste" checked={!bool(p.libre)} onChange={() => m({ libre: '' })} /><span><strong>Dans l'ordre</strong> — chaque étape attend la précédente (couper avant de coudre)</span></label>
+        <label><input type="radio" name="ordre-piste" checked={bool(p.libre)} onChange={() => m({ libre: 'oui' })} /><span><strong>Libre</strong> — toutes les étapes sont faisables en même temps (vérifier deux patrons différents)</span></label>
+      </fieldset>
       <label class="interrupteur">
         <input type="checkbox" checked={bool(p.active)} onChange={e => m({ active: txtBool((e.target as HTMLInputElement).checked) })} />
         <span>Active : sa prochaine étape remonte dans « À faire »</span>
@@ -118,10 +125,21 @@ export function EditeurPiste({ id, onFermer }: { id: string; onFermer: () => voi
         <Champ label="Deadline (facultative)"><ChoixDate label="deadline" valeur={p.deadline ?? ''} onChange={v => m({ deadline: v })} /></Champ>
       </div>
       <ChoixAttentes table="Pistes" l={p} candidats={candidatsAttente(d, piece, id)} aide="ex. « Montage » attend « Tissu » et « Bijoux »." />
-      <button class="bouton" onClick={() => setModele(true)}>Enregistrer comme modèle</button>
+      <div class="ligne-actions">
+        <button class="bouton" onClick={() => setAjoutModele(true)}><Icone nom="calques" taille={16} />Ajouter les étapes d'un modèle</button>
+        <button class="bouton" onClick={() => setModele(true)}>Enregistrer comme modèle</button>
+      </div>
       {modele && <EnregistrerModele pisteId={id} onFermer={() => setModele(false)} />}
+      {ajoutModele && <ChoixModele pisteId={id} onFermer={() => setAjoutModele(false)} />}
     </Feuille>
   );
+}
+
+/** Les autres étapes de la même pièce, qu'une étape peut attendre précisément. */
+function etapesCandidates(d: typeof donnees.value, e: Ligne): { id: string; nom: string; groupe?: string }[] {
+  return pistesDe(d, e.piece_id).flatMap(p => etapesDePiste(d, p.id)
+    .filter(x => x.id !== e.id)
+    .map(x => ({ id: x.id, nom: `${x.titre}${p.nom ? ` (${p.nom})` : ''}`, groupe: 'Étapes de cette pièce' })));
 }
 
 /** Ce qu'on peut attendre : les autres pistes de la pièce, et les autres pièces du costume. */
@@ -201,17 +219,23 @@ export function CollerListe({ costumeId, pieceId, onFermer }: { costumeId: strin
 
 // ---------- Modèles ----------
 
-export function ChoixModele({ pieceId, onFermer }: { pieceId: string; onFermer: () => void }) {
+export function ChoixModele({ pieceId, pisteId, onFermer }: { pieceId?: string; pisteId?: string; onFermer: () => void }) {
   const d = donnees.value;
   const modeles = tous(d, 'Modeles');
+  const inserer = (mo: Ligne) => {
+    const l = analyserListe(mo.contenu);
+    if (pisteId) faire(ajouterModeleDansPiste(d, pisteId, l), `Étapes « ${mo.nom} » ajoutées`);
+    else faire(insererModele(d, pieceId!, mo.nom, l), `Piste « ${mo.nom} » ajoutée`);
+    onFermer();
+  };
   return (
-    <Feuille titre="Ajouter une piste depuis un modèle" onFermer={onFermer}>
+    <Feuille titre={pisteId ? 'Ajouter les étapes d\'un modèle à la suite' : 'Ajouter une piste depuis un modèle'} onFermer={onFermer}>
       {!modeles.length && <p>Aucun modèle. Crée-en dans Réglages, ou enregistre une piste existante comme modèle.</p>}
       <div class="menu-liste">
         {modeles.map(mo => {
           const etapes = analyserListe(mo.contenu).pieces.flatMap(p => p.pistes.flatMap(pi => pi.etapes));
           return (
-            <button class="menu-action modele" onClick={() => { faire(insererModele(d, pieceId, mo.nom, analyserListe(mo.contenu)), `Piste « ${mo.nom} » ajoutée`); onFermer(); }}>
+            <button class="menu-action modele" onClick={() => inserer(mo)}>
               <strong>{mo.nom}</strong>
               <span class="petit-texte">{etapes.map(e => e.titre).join(' → ')}</span>
             </button>

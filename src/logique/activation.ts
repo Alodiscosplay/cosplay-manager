@@ -1,10 +1,10 @@
 // Bascules automatiques, appliquées à l'ouverture de l'appli (une PWA ne tourne pas en arrière-plan) :
-//  - date de début atteinte : costume « projet » → « en cours », pièce « à venir » → « en cours » ;
+//  - date de début atteinte : costume « projet » → « en cours », pièce « en pause » → « en cours » ;
 //  - pièce à 100 % → « terminée », et retour « en cours » si on décoche une étape.
 import { type Donnees } from '../modele/schema';
 import { costumes, piecesDe } from './acces';
 import { lireJour, type Jour } from './dates';
-import { pieceTerminee } from './disponibilite';
+import { pieceTerminee, statutStockePiece } from './disponibilite';
 import { etapesDePiece } from './acces';
 
 export interface Changement { table: 'Costumes' | 'Pieces'; id: string; champs: Record<string, string> }
@@ -16,7 +16,7 @@ export function activationsDuJour(d: Donnees, jour: Jour): Changement[] {
     if (c.statut === 'projet' && debut && debut <= jour) res.push({ table: 'Costumes', id: c.id, champs: { statut: 'en cours' } });
     for (const p of piecesDe(d, c.id)) {
       const dp = lireJour(p.debut);
-      if ((p.statut || 'à venir') === 'à venir' && dp && dp <= jour) res.push({ table: 'Pieces', id: p.id, champs: { statut: 'en cours' } });
+      if (statutStockePiece(p) === 'en pause' && dp && dp <= jour) res.push({ table: 'Pieces', id: p.id, champs: { statut: 'en cours' } });
     }
   }
   return res;

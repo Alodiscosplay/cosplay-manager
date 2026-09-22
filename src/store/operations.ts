@@ -41,7 +41,7 @@ export function creerCostume(d: Donnees, nom: string): Changement[] {
   return [creer('Costumes', { nom, statut: 'projet', ordre: ordreSuivant(costumes(d)) })];
 }
 
-export function creerPiece(d: Donnees, costumeId: string, nom: string, statut = 'à venir'): Changement[] {
+export function creerPiece(d: Donnees, costumeId: string, nom: string, statut = 'en pause'): Changement[] {
   const piece = creer('Pieces', { costume_id: costumeId, nom, statut, ordre: ordreSuivant(piecesDe(d, costumeId)) });
   const piste = creer('Pistes', { piece_id: piece.id, nom: '', active: OUI, ordre: '1' });
   return [piece, piste];
@@ -149,6 +149,13 @@ export function insererModele(d: Donnees, pieceId: string, nom: string, l: Liste
     else { const cp = creerPiste(vue(d, ch), pieceId, nomPiste); ch.push(...cp); idPiste = cp[0].id; }
     for (const et of pi.etapes) ch.push(...creerEtape(vue(d, ch), idPiste, et.titre, et.duree));
   }
+  return ch;
+}
+
+/** Ajoute les étapes d'un modèle à la fin d'une piste existante (ex. une broderie avant la couture). */
+export function ajouterModeleDansPiste(d: Donnees, pisteId: string, l: ListeTexte): Changement[] {
+  const ch: Changement[] = [];
+  for (const pt of l.pieces) for (const pi of pt.pistes) for (const et of pi.etapes) ch.push(...creerEtape(vue(d, ch), pisteId, et.titre, et.duree));
   return ch;
 }
 

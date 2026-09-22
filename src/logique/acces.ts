@@ -58,8 +58,10 @@ export function ordreSuivant(lignes: Ligne[]): string {
   return String(lignes.reduce((m, l) => Math.max(m, num(l.ordre, 0)), 0) + 1);
 }
 
-/** Nom lisible d'un élément qu'on peut « attendre » (piste ou pièce). */
+/** Nom lisible d'un élément qu'on peut « attendre » (étape, piste ou pièce). */
 export function nomAttendu(d: Donnees, id: string): string {
+  const etape = ligne(d, 'Etapes', id);
+  if (etape) return `« ${etape.titre} »`;
   const piste = ligne(d, 'Pistes', id);
   if (piste) {
     const piece = ligne(d, 'Pieces', piste.piece_id);

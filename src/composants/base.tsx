@@ -34,19 +34,25 @@ export function Puce({ children, ton = 'neutre', titre }: { children: ComponentC
 /** Feuille modale (en bas sur mobile, centrée sur ordinateur). Se ferme avec Échap ou en touchant le fond. */
 export function Feuille({ titre, onFermer, children, pied, large }: { titre: string; onFermer: () => void; children: ComponentChildren; pied?: ComponentChildren; large?: boolean }) {
   const ref = useRef<HTMLDialogElement>(null);
+  // Ne fermer que si l'appui ET le relâchement ont lieu sur le fond : sélectionner du texte
+  // en glissant hors de la fenêtre ne doit pas la fermer.
+  const appuiSurFond = useRef(false);
+  // Avant de fermer, on valide le champ en cours de saisie (les champs n'enregistrent qu'à la sortie).
+  const fermer = () => { (document.activeElement as HTMLElement | null)?.blur(); onFermer(); };
   useEffect(() => {
     const d = ref.current!;
     if (!d.open) d.showModal();
-    const echap = (e: Event) => { e.preventDefault(); onFermer(); };
+    const echap = (e: Event) => { e.preventDefault(); fermer(); };
     d.addEventListener('cancel', echap);
     return () => d.removeEventListener('cancel', echap);
   }, []);
   return (
-    <dialog ref={ref} class={`feuille${large ? ' large' : ''}`} onClick={e => { if (e.target === ref.current) onFermer(); }} aria-label={titre}>
+    <dialog ref={ref} class={`feuille${large ? ' large' : ''}`} onMouseDown={e => { appuiSurFond.current = e.target === ref.current; }}
+      onClick={e => { if (e.target === ref.current && appuiSurFond.current) fermer(); appuiSurFond.current = false; }} aria-label={titre}>
       <div class="feuille-corps">
         <header class="feuille-tete">
           <h2>{titre}</h2>
-          <button class="bouton-icone" onClick={onFermer} aria-label="Fermer"><Icone nom="croix" /></button>
+          <button class="bouton-icone" onClick={fermer} aria-label="Fermer"><Icone nom="croix" /></button>
         </header>
         <div class="feuille-contenu">{children}</div>
         {pied && <footer class="feuille-pied">{pied}</footer>}
@@ -102,7 +108,7 @@ export function Selection<T extends string>({ valeur, options, onChange, label }
 }
 
 /** Image d'une photo (locale ou Drive), chargée à la demande. */
-export function PhotoImg({ id, alt, class: cls }: { id: string; alt: string; class?: string }) {
+export function PhotoImg({ id, alt, class: cls, style }: { id: string; alt: string; class?: string; style?: Record<string, string | undefined> }) {
   const [url, setUrl] = useState(urlConnue(id));
   void photosChargees.value;
   useEffect(() => {
@@ -114,7 +120,7 @@ export function PhotoImg({ id, alt, class: cls }: { id: string; alt: string; cla
     return () => { vivant = false; };
   }, [id, photosChargees.value]);
   if (!url) return <div class={`photo-vide ${cls ?? ''}`} aria-label={alt}><Icone nom="photo" taille={28} /></div>;
-  return <img src={url} alt={alt} class={cls} loading="lazy" />;
+  return <img src={url} alt={alt} class={cls} style={style} loading="lazy" draggable={false} />;
 }
 
 export function Vide({ icone, titre, children }: { icone: string; titre: string; children?: ComponentChildren }) {

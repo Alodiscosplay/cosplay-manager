@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { construire, appliquer, vide } from './aide';
 import { avancement, avancementPiece, formatPct } from '../src/logique/avancement';
-import { aFaire, etapeDisponible, creeraitBoucle } from '../src/logique/disponibilite';
+import { aFaire, etapeDisponible, creeraitBoucle, texteAttente, champsStatutPiece } from '../src/logique/disponibilite';
 import { activationsDuJour } from '../src/logique/activation';
 import { repartirSuite, repartirPiece, repartirCostume, retard } from '../src/logique/planning';
 import { quantiteNombre, budgetCostume, totalCommande } from '../src/logique/budget';
@@ -37,7 +37,7 @@ describe('À faire : pistes, ordre, focus', () => {
         { nom: 'Bijoux', etapes: ['modéliser', 'couler en Fimo'] },
         { nom: 'Montage', etapes: ['assembler'] },
       ] },
-      { nom: 'Robe', statut: 'à venir', pistes: [{ nom: '', etapes: ['couper la robe'] }] },
+      { nom: 'Robe', statut: 'en pause', pistes: [{ nom: '', etapes: ['couper la robe'] }] },
     ],
   });
 
@@ -71,10 +71,10 @@ describe('À faire : pistes, ordre, focus', () => {
     const { d } = chapeau();
     const r = aFaire(d, '2026-10-01');
     expect(titres(r)).not.toContain('couper la robe');
-    expect(r.repli.piecesAVenir.map(p => p.piece.nom)).toEqual(['Robe']);
+    expect(r.repli.piecesEnPause.map(p => p.piece.nom)).toEqual(['Robe']);
   });
 
-  it('une pièce à venir qui commence le 3 novembre : absente le 2, présente le 3', () => {
+  it('une pièce en pause qui commence le 3 novembre : absente le 2, présente le 3', () => {
     const { d, ids } = chapeau();
     d.Pieces[ids.Robe].debut = '2026-11-03';
     expect(titres(aFaire(d, '2026-11-02'))).not.toContain('couper la robe');
@@ -118,6 +118,46 @@ describe('À faire : pistes, ordre, focus', () => {
   });
 });
 
+describe('pistes libres et attentes d’étape', () => {
+  const robe = () => construire({ pieces: [{ nom: 'Robe', pistes: [
+    { nom: 'Patronage', champs: { libre: 'oui' }, etapes: ['patron Belle', 'patron organza'] },
+    { nom: 'Coupe', champs: { libre: 'oui' }, etapes: ['couper satin', 'couper organza'] },
+    { nom: 'Montage', etapes: ['assembler'] },
+  ] }] });
+
+  it('une piste libre propose toutes ses étapes à la fois', () => {
+    const { d, ids } = robe();
+    d.Etapes[ids['Robe/Coupe/couper satin']].attend = ids['Robe/Patronage/patron Belle'];
+    d.Etapes[ids['Robe/Coupe/couper organza']].attend = ids['Robe/Patronage/patron organza'];
+    d.Pistes[ids['Robe/Montage']].attend = ids['Robe/Coupe'];
+    expect(titres(aFaire(d, '2026-10-01'))).toEqual(['patron Belle', 'patron organza']);
+  });
+
+  it('une étape qui attend une étape précise se libère dès que celle-ci est cochée', () => {
+    const { d, ids } = robe();
+    d.Etapes[ids['Robe/Coupe/couper satin']].attend = ids['Robe/Patronage/patron Belle'];
+    d.Etapes[ids['Robe/Coupe/couper organza']].attend = ids['Robe/Patronage/patron organza'];
+    d.Pistes[ids['Robe/Montage']].attend = ids['Robe/Coupe'];
+    d.Etapes[ids['Robe/Patronage/patron Belle']].fait = 'oui';
+    const r = aFaire(d, '2026-10-01');
+    expect(titres(r)).toEqual(['patron organza', 'couper satin']);
+    expect(texteAttente(r.repli.bloquees.find(b => b.piste.nom === 'Montage')!.attente)).toBe('attend : Coupe (0/2)');
+  });
+
+  it('mettre en pause une pièce dont la date de début est passée efface la date', () => {
+    const { d, ids } = robe();
+    d.Pieces[ids.Robe].debut = '2026-09-01';
+    expect(champsStatutPiece(d.Pieces[ids.Robe], 'en pause', '2026-10-01')).toEqual({ statut: 'en pause', debut: '' });
+    expect(champsStatutPiece(d.Pieces[ids.Robe], 'en pause', '2026-08-01')).toEqual({ statut: 'en pause' });
+  });
+
+  it('l’ancien statut « à venir » se lit « en pause »', () => {
+    const { d, ids } = robe();
+    d.Pieces[ids.Robe].statut = 'à venir';
+    expect(aFaire(d, '2026-10-01').repli.piecesEnPause).toHaveLength(1);
+  });
+});
+
 describe('cocher : statut de la pièce', () => {
   it('passe « terminée » à 100 % et redevient « en cours » si on décoche', () => {
     const { d, ids } = construire({ pieces: [{ nom: 'Jupe', pistes: [{ nom: '', etapes: [['a', 1, true], ['b', 1]] }] }] });
@@ -155,7 +195,7 @@ describe('Répartir', () => {
     const { d, ids } = construire({
       costume: { deadline: '2026-11-21' },
       pieces: [
-        { nom: 'Robe', statut: 'à venir', champs: { debut: '2026-10-02' }, pistes: [{ nom: '', etapes: [['a', 1], ['b', 1]] }] },
+        { nom: 'Robe', statut: 'en pause', champs: { debut: '2026-10-02' }, pistes: [{ nom: '', etapes: [['a', 1], ['b', 1]] }] },
         { nom: 'Perruque', pistes: [{ nom: '', etapes: [['c', 1]] }] },
       ],
     });

@@ -43,7 +43,21 @@ Perles sur le corsage (long)`), c1));
   const [tissu, bijoux, montage] = pistesDe(d, chapeau.id);
   maj1('Pieces', chapeau.id, { statut: 'en cours', deadline: ajouterJours(jour, 30), patron: 'Patron maison' });
   maj1('Pistes', montage.id, { attend: `${tissu.id},${bijoux.id}` });
-  maj1('Pieces', robe.id, { statut: 'à venir', debut: ajouterJours(jour, 10), patron: 'TV341 vue B' });
+  // Patronage libre : deux patrons indépendants, vérifiables dans n'importe quel ordre ;
+  // chaque coupe attend SON patron.
+  faire(appliquerListe(d, analyserListe(`### Patronage
+Vérifier le patron de la jupe
+Vérifier le patron du haut
+### Coupe
+Couper le satin (rapide)
+Couper l'organza (rapide)`), c1, robe.id));
+  const [, patronage, coupe] = pistesDe(d, robe.id);
+  maj1('Pistes', patronage.id, { libre: 'oui' });
+  maj1('Pistes', coupe.id, { libre: 'oui' });
+  const et = (titre: string) => Object.values(d.Etapes).find(e => e.titre === titre)!.id;
+  maj1('Etapes', et('Couper le satin'), { attend: et('Vérifier le patron de la jupe') });
+  maj1('Etapes', et("Couper l'organza"), { attend: et('Vérifier le patron du haut') });
+  maj1('Pieces', robe.id, { statut: 'en pause', debut: ajouterJours(jour, 10), patron: 'TV341 vue B' });
   const premiere = Object.values(d.Etapes).find(e => e.titre === 'Patronner le chapeau')!;
   maj1('Etapes', premiere.id, { fait: 'oui', fait_le: ajouterJours(jour, -2) });
 

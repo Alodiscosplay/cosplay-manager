@@ -1,5 +1,5 @@
 // Planification : répartir les étapes jusqu'à une deadline, repérer le retard, alimenter l'agenda.
-import { type Donnees, type Ligne, bool } from '../modele/schema';
+import { type Donnees, type Ligne, bool, vivant } from '../modele/schema';
 import { costumes, piecesDe, pistesDe, etapesDePiste, etapesDePiece, ligne, idsAttendus } from './acces';
 import { poids, avancement } from './avancement';
 import { lireJour, ajouterJours, ecartJours, type Jour } from './dates';
@@ -177,7 +177,7 @@ export function agenda(d: Donnees, depuis: Jour, jusqua: Jour, costumeFiltre?: s
   const garder = (costumeId?: string) => !costumeFiltre || costumeFiltre === costumeId;
 
   for (const ev of Object.values(d.Evenements)) {
-    if (bool(ev.supprime)) continue;
+    if (!vivant(ev)) continue;
     const j = lireJour(ev.date_debut);
     if (!costumeFiltre && dans(j)) res.push({ jour: j, type: 'evenement', titre: ev.nom, detail: ev.lieu || '', fait: false, ref: { table: 'Evenements', id: ev.id } });
   }
@@ -209,7 +209,7 @@ export function agenda(d: Donnees, depuis: Jour, jusqua: Jour, costumeFiltre?: s
     }
   }
   for (const t of Object.values(d.Taches)) {
-    if (bool(t.supprime) || !garder(t.costume_id || undefined)) continue;
+    if (!vivant(t) || !garder(t.costume_id || undefined)) continue;
     const j = lireJour(t.date);
     if (dans(j)) res.push({ jour: j, type: 'tache', titre: t.titre, detail: ligne(d, 'Costumes', t.costume_id)?.nom ?? 'tâche', costumeId: t.costume_id || undefined, fait: bool(t.fait), ref: { table: 'Taches', id: t.id } });
   }

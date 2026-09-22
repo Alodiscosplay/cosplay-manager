@@ -1,6 +1,6 @@
 // État de l'appli : données réactives, enregistrement local, synchro avec le Sheet, annulation.
 import { signal } from '@preact/signals';
-import { type Donnees, type NomTable, donneesVides, NOMS_TABLES } from '../modele/schema';
+import { type Donnees, type NomTable, donneesVides, NOMS_TABLES, vivant } from '../modele/schema';
 import { appliquerChangements, type Changement } from './operations';
 import { ouvrirBase, lireKv, ecrireKv, type Base, lirePhoto, ecrirePhoto } from './idb';
 import { activationsDuJour } from '../logique/activation';
@@ -204,8 +204,8 @@ async function envoyerPhotosEnAttente(): Promise<void> {
   if (!base || !meta.emplacement) return;
   const d = donnees.value;
   const locales = new Set<string>();
-  for (const p of Object.values(d.Photos)) if (p.drive_id?.startsWith('local:') && p.supprime !== 'oui') locales.add(p.drive_id);
-  for (const c of Object.values(d.Costumes)) if (c.image_ref?.startsWith('local:') && c.supprime !== 'oui') locales.add(c.image_ref);
+  for (const p of Object.values(d.Photos)) if (p.drive_id?.startsWith('local:') && vivant(p)) locales.add(p.drive_id);
+  for (const c of Object.values(d.Costumes)) if (c.image_ref?.startsWith('local:') && vivant(c)) locales.add(c.image_ref);
   for (const idLocal of locales) {
     const blob = await lirePhoto(base, idLocal);
     if (!blob) continue;

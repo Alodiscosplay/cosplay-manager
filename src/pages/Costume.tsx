@@ -6,10 +6,11 @@ import { statutCostume } from '../logique/disponibilite';
 import { deadlineCostume } from '../logique/planning';
 import { relatif, jourCourt } from '../logique/dates';
 import { STATUTS_COSTUME, bool, txtBool, type NomTable } from '../modele/schema';
-import { supprimer, nouvelId } from '../store/operations';
+import { supprimer, nouvelId, purger } from '../store/operations';
 import { ajouterImage } from '../store/photos';
 import { aller, lienCostume } from '../routeur';
-import { Barre, Pct, PhotoImg, Puce, Feuille, Champ, Texte, ChoixDate, Selection, Menu, Vide } from '../composants/base';
+import { Barre, Pct, Puce, Feuille, Champ, Texte, ChoixDate, Selection, Menu, Vide } from '../composants/base';
+import { ImageCadree, EditeurCadrage } from '../composants/Cadrage';
 import { Icone } from '../composants/Icone';
 import { OngletPieces } from './costume/Pieces';
 import { OngletFournitures } from './costume/Fournitures';
@@ -19,12 +20,16 @@ import { OngletPlanning } from './costume/Planning';
 import { OngletWip } from './costume/Wip';
 import { OngletArchiver } from './costume/Archiver';
 
+const purgerNouveau = (id: string) => [purger('Costumes', donnees.value.Costumes[id])];
+
 export const maj = (table: NomTable, id: string, champs: Record<string, string>) => faire([{ table, id, champs }]);
 
 export function PageCostume({ id, onglet = 'pieces' }: { id: string; onglet?: string }) {
   const d = donnees.value;
   const c = ligne(d, 'Costumes', id);
   const [fiche, setFiche] = useState(false);
+  const [menuImage, setMenuImage] = useState(false);
+  const [recadrer, setRecadrer] = useState(false);
   if (!c) return <div class="page"><Vide icone="boite" titre="Costume introuvable"><a href="#/">Retour aux costumes</a></Vide></div>;
   if (c.statut === 'archivé') aller('/archives');
 
@@ -40,16 +45,30 @@ export function PageCostume({ id, onglet = 'pieces' }: { id: string; onglet?: st
     ...(sc === 'terminé' ? [['archiver', 'Archiver'] as [string, string]] : []),
   ];
 
-  const changerImage = async (f?: File) => { if (f) maj('Costumes', id, { image_ref: await ajouterImage(f) }); };
+  const changerImage = async (f?: File) => {
+    if (!f) return;
+    maj('Costumes', id, { image_ref: await ajouterImage(f), cadrage: '' });
+    setMenuImage(false);
+    setRecadrer(true); // on propose tout de suite de recadrer la nouvelle image
+  };
+  const choixFichier = (
+    <input type="file" accept="image/*" class="cache" onChange={e => changerImage((e.target as HTMLInputElement).files?.[0])} />
+  );
 
   return (
     <div class="page page-costume">
       <a class="lien-retour" href="#/"><Icone nom="retour" taille={16} />Costumes</a>
       <header class="costume-tete">
-        <label class="costume-image" title="Changer l'image de référence">
-          {c.image_ref ? <PhotoImg id={c.image_ref} alt={`Référence ${c.nom}`} /> : <div class="photo-vide"><Icone nom="photo" taille={28} /><span>Image de référence</span></div>}
-          <input type="file" accept="image/*" class="cache" onChange={e => changerImage((e.target as HTMLInputElement).files?.[0])} />
-        </label>
+        {c.image_ref ? (
+          <button class="costume-image" title="Image de référence : recadrer ou changer" onClick={() => setMenuImage(true)}>
+            <ImageCadree id={c.image_ref} cadrage={c.cadrage} alt={`Référence ${c.nom}`} />
+          </button>
+        ) : (
+          <label class="costume-image" title="Ajouter une image de référence">
+            <div class="photo-vide"><Icone nom="photo" taille={28} /><span>Image de référence</span></div>
+            {choixFichier}
+          </label>
+        )}
         <div class="costume-infos">
           <div class="titre-ligne">
             <h1>{c.nom}</h1>
@@ -86,21 +105,48 @@ export function PageCostume({ id, onglet = 'pieces' }: { id: string; onglet?: st
       {onglet === 'archiver' && <OngletArchiver costume={c} />}
 
       {fiche && <FicheCostume id={id} onFermer={() => setFiche(false)} />}
+      {menuImage && (
+        <Feuille titre="Image de référence" onFermer={() => setMenuImage(false)}>
+          <div class="menu-liste">
+            <button class="menu-action" onClick={() => { setMenuImage(false); setRecadrer(true); }}><Icone nom="photo" /><span>Recadrer</span></button>
+            <label class="menu-action"><Icone nom="telecharger" /><span>Changer d'image</span>{choixFichier}</label>
+            <button class="menu-action danger" onClick={() => { maj('Costumes', id, { image_ref: '', cadrage: '' }); setMenuImage(false); }}><Icone nom="poubelle" /><span>Retirer l'image</span></button>
+          </div>
+        </Feuille>
+      )}
+      {recadrer && c.image_ref && (
+        <EditeurCadrage id={c.image_ref} cadrage={c.cadrage} onValider={v => maj('Costumes', id, { cadrage: v })} onFermer={() => setRecadrer(false)} />
+      )}
     </div>
   );
 }
 
-function FicheCostume({ id, onFermer }: { id: string; onFermer: () => void }) {
+/**
+ * Fiche du costume. `nouveau` : à la création, le costume existe déjà (vide) ; si on ferme sans lui
+ * donner de nom, il est retiré sans laisser de trace, sinon on ouvre sa page.
+ */
+export function FicheCostume({ id, onFermer, nouveau }: { id: string; onFermer: () => void; nouveau?: boolean }) {
   const d = donnees.value;
   const c = d.Costumes[id];
   const m = (champs: Record<string, string>) => maj('Costumes', id, champs);
   const autres = costumes(d).filter(x => x.id !== id && x.statut !== 'archivé');
   const evenements = tous(d, 'Evenements');
   const [nouvelEv, setNouvelEv] = useState(false);
+  const fermer = () => {
+    // Valide le champ en cours de saisie (les champs n'enregistrent qu'à la sortie).
+    (document.activeElement as HTMLElement | null)?.blur();
+    if (!nouveau) { onFermer(); return; }
+    if (!donnees.value.Costumes[id]?.nom) faire(purgerNouveau(id)); // fermé sans nom : on oublie
+    else aller(`/costume/${id}`);
+    onFermer();
+  };
 
   return (
-    <Feuille titre="Fiche du costume" onFermer={onFermer} pied={<button class="bouton principal" onClick={onFermer}>Terminé</button>}>
-      <Champ label="Nom"><Texte valeur={c.nom} onValider={v => v && m({ nom: v })} /></Champ>
+    <Feuille titre={nouveau ? 'Nouveau costume' : 'Fiche du costume'} onFermer={fermer} pied={<>
+      {nouveau && <button class="bouton" onClick={() => { faire(purgerNouveau(id)); onFermer(); }}>Annuler</button>}
+      <button class="bouton principal" onClick={fermer}>{nouveau ? 'Créer' : 'Terminé'}</button>
+    </>}>
+      <Champ label="Nom"><Texte valeur={c.nom} autoFocus={nouveau} placeholder="ex. Mary Poppins — Jolly Holiday" onValider={v => v && m({ nom: v })} /></Champ>
       <div class="deux-colonnes">
         <Champ label="Personnage"><Texte valeur={c.personnage ?? ''} onValider={v => m({ personnage: v })} /></Champ>
         <Champ label="Œuvre"><Texte valeur={c.oeuvre ?? ''} onValider={v => m({ oeuvre: v })} /></Champ>

@@ -3,11 +3,11 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import Sortable from 'sortablejs';
 import { donnees, jour, faire } from '../../store/store';
 import { piecesDe, pistesDe, etapesDePiste } from '../../logique/acces';
-import { avancementPiece, avancementPiste } from '../../logique/avancement';
-import { statutPiece, etatPiste, attentes, texteAttente } from '../../logique/disponibilite';
-import { deadlineCostume, deadlinePiece } from '../../logique/planning';
+import { avancementPiece, avancementPiste, poids } from '../../logique/avancement';
+import { statutPiece, statutStockePiece, champsStatutPiece, etatPiste, attentes, texteAttente } from '../../logique/disponibilite';
+import { deadlineCostume } from '../../logique/planning';
 import { jourCourt, relatif, lireJour } from '../../logique/dates';
-import { bool, txtBool, type Ligne } from '../../modele/schema';
+import { DUREES, NOMS_DUREES, bool, txtBool, type Duree, type Ligne } from '../../modele/schema';
 import { creerPiece, creerPiste, creerEtape, cocherEtape, deplacerEtape, reordonner } from '../../store/operations';
 import { Barre, Pct, Puce, Case, Menu, Vide } from '../../composants/base';
 import { Icone } from '../../composants/Icone';
@@ -27,7 +27,7 @@ export function OngletPieces({ costume }: { costume: Ligne }) {
   useEffect(() => {
     if (!liste.current) return;
     const s = Sortable.create(liste.current, {
-      handle: '.poignee-piece', animation: 150,
+      handle: '.poignee-piece', draggable: '.carte-piece', animation: 150,
       onEnd: evt => {
         annulerDeplacementDom(evt);
         const ordre = piecesDe(donnees.value, costume.id);
@@ -41,7 +41,7 @@ export function OngletPieces({ costume }: { costume: Ligne }) {
 
   const ajouterPiece = () => {
     if (!nouvelle.trim()) return;
-    faire(creerPiece(d, costume.id, nouvelle.trim(), pieces.length ? 'à venir' : 'en cours'));
+    faire(creerPiece(d, costume.id, nouvelle.trim(), pieces.length ? 'en pause' : 'en cours'));
     setNouvelle('');
   };
 
@@ -78,9 +78,10 @@ export function OngletPieces({ costume }: { costume: Ligne }) {
 
 /** Sortable déplace le DOM lui-même ; on le remet en place et on laisse Preact redessiner depuis les données. */
 function annulerDeplacementDom(evt: Sortable.SortableEvent): void {
-  const { item, from, to, oldIndex, newIndex } = evt;
-  if (from === to) from.insertBefore(item, from.children[oldIndex! > newIndex! ? oldIndex! + 1 : oldIndex!] ?? null);
-  else from.insertBefore(item, from.children[oldIndex!] ?? null);
+  const { item, from, oldIndex } = evt;
+  // Les frères de l'élément, sans lui, sont dans l'ordre d'origine : on le remet à son ancien rang.
+  const reste = [...from.children].filter(c => c !== item);
+  from.insertBefore(item, reste[oldIndex!] ?? null);
 }
 
 const CLE_REPLI = 'cosplay-planner.pieces-repliees';
@@ -91,15 +92,40 @@ function CartePiece({ piece, ouvrir }: { piece: Ligne; ouvrir: (o: Ouvert) => vo
   const j = jour.value;
   const sp = statutPiece(piece, j);
   const [replie, setReplie] = useState(() => lireReplis()[piece.id] ?? (sp === 'terminée'));
+  const [nouvellePiste, setNouvellePiste] = useState('');
+  const conteneur = useRef<HTMLDivElement>(null);
   const a = avancementPiece(d, piece.id);
   const pistes = pistesDe(d, piece.id);
-  const plusieurs = pistes.length > 1 || pistes.some(p => p.nom);
   const att = attentes(d, piece);
   const dl = lireJour(piece.deadline);
+  const debutFutur = statutStockePiece(piece) === 'en pause' && lireJour(piece.debut) > j ? lireJour(piece.debut) : '';
   const basculer = () => {
     const r = lireReplis(); r[piece.id] = !replie;
     try { localStorage.setItem(CLE_REPLI, JSON.stringify(r)); } catch { /* stockage indisponible */ }
     setReplie(!replie);
+  };
+  const statut = (s: string) => maj('Pieces', piece.id, champsStatutPiece(piece, s, j));
+
+  // Réordonner les pistes de la pièce
+  useEffect(() => {
+    if (!conteneur.current) return;
+    const s = Sortable.create(conteneur.current, {
+      handle: '.poignee-piste', draggable: '.piste', animation: 150,
+      onEnd: evt => {
+        annulerDeplacementDom(evt);
+        if (evt.oldIndex === evt.newIndex) return;
+        const ordre = pistesDe(donnees.value, piece.id);
+        const [bouge] = ordre.splice(evt.oldIndex!, 1);
+        ordre.splice(evt.newIndex!, 0, bouge);
+        faire(reordonner('Pistes', ordre));
+      },
+    });
+    return () => s.destroy();
+  }, [piece.id, replie, pistes.length]);
+
+  const ajouterPiste = () => {
+    faire(creerPiste(d, piece.id, nouvellePiste.trim() || `Piste ${pistes.length + 1}`));
+    setNouvellePiste('');
   };
 
   return (
@@ -113,11 +139,10 @@ function CartePiece({ piece, ouvrir }: { piece: Ligne; ouvrir: (o: Ouvert) => vo
         <div class="piece-droite">
           <Pct a={a} />
           {sp === 'en cours'
-            ? <button class="bouton-icone" title="Mettre en pause" aria-label="Mettre la pièce en pause" onClick={() => maj('Pieces', piece.id, { statut: 'en pause' })}><Icone nom="pause" taille={18} /></button>
-            : sp !== 'terminée' && <button class="bouton petit" title="Travailler sur cette pièce" onClick={() => maj('Pieces', piece.id, { statut: 'en cours' })}><Icone nom="lecture" taille={14} />En cours</button>}
+            ? <button class="bouton-icone" title="Mettre en pause" aria-label="Mettre la pièce en pause" onClick={() => statut('en pause')}><Icone nom="pause" taille={18} /></button>
+            : sp !== 'terminée' && <button class="bouton petit" title="Travailler sur cette pièce" onClick={() => statut('en cours')}><Icone nom="lecture" taille={14} />En cours</button>}
           <Menu label={`Actions pour ${piece.nom}`} actions={[
             { texte: 'Modifier la pièce', icone: 'crayon', faire: () => ouvrir({ type: 'piece', id: piece.id }) },
-            { texte: 'Ajouter une piste parallèle', icone: 'calques', faire: () => faire(creerPiste(d, piece.id, 'Nouvelle piste')) },
             { texte: 'Ajouter une piste depuis un modèle', icone: 'calques', faire: () => ouvrir({ type: 'modele', id: piece.id }) },
             { texte: 'Coller des étapes', icone: 'coller', faire: () => ouvrir({ type: 'coller', id: piece.id }) },
           ]} />
@@ -127,24 +152,34 @@ function CartePiece({ piece, ouvrir }: { piece: Ligne; ouvrir: (o: Ouvert) => vo
         <Barre a={a} fine />
         <div class="puces">
           <Puce ton={sp === 'en cours' ? 'accent' : sp === 'terminée' ? 'vert' : 'gris'}>{sp}</Puce>
-          {piece.statut === 'à venir' && piece.debut && <Puce ton="gris">début {jourCourt(piece.debut)}</Puce>}
+          {debutFutur && <Puce ton="gris"><Icone nom="horloge" taille={12} />reprend le {jourCourt(debutFutur)}</Puce>}
           {dl && <Puce ton={dl < j && a.pct !== 100 ? 'rouge' : 'gris'}><Icone nom="drapeau" taille={12} />{jourCourt(dl)} · {relatif(dl, j)}</Puce>}
-          {!dl && deadlinePiece(d, piece) && null}
-          {piece.patron && <Puce ton="gris">{piece.patron}</Puce>}
+          {piece.patron
+            ? <button class="puce-bouton" title="Modifier le patron" onClick={() => ouvrir({ type: 'piece', id: piece.id })}><Puce ton="accent">Patron : {piece.patron}</Puce></button>
+            : <button class="puce-bouton ajout" onClick={() => ouvrir({ type: 'piece', id: piece.id })}><Puce ton="gris"><Icone nom="plus" taille={12} />Patron</Puce></button>}
           {att.length > 0 && <Puce ton="orange"><Icone nom="cadenas" taille={12} />{texteAttente(att)}</Puce>}
         </div>
       </div>
       {!replie && (
         <div class="piece-contenu">
-          {pistes.map(p => <BlocPiste key={p.id} piste={p} piece={piece} plusieurs={plusieurs} ouvrir={ouvrir} />)}
-          {!pistes.length && <button class="bouton petit" onClick={() => faire(creerPiste(d, piece.id, ''))}><Icone nom="plus" taille={16} />Ajouter une piste</button>}
+          <div class="pistes" ref={conteneur}>
+            {pistes.map(p => <BlocPiste key={p.id} piste={p} piece={piece} ouvrir={ouvrir} />)}
+          </div>
+          <div class="ajout-piste">
+            <form class="ajout-etape" onSubmit={ev => { ev.preventDefault(); ajouterPiste(); }}>
+              <Icone nom="calques" taille={16} />
+              <input value={nouvellePiste} placeholder="Ajouter une piste (ex. Broderie)" aria-label={`Ajouter une piste à ${piece.nom}`}
+                onInput={ev => setNouvellePiste((ev.target as HTMLInputElement).value)} />
+            </form>
+            <button class="bouton petit" onClick={() => ouvrir({ type: 'modele', id: piece.id })}><Icone nom="plus" taille={14} />Depuis un modèle</button>
+          </div>
         </div>
       )}
     </article>
   );
 }
 
-function BlocPiste({ piste, piece, plusieurs, ouvrir }: { piste: Ligne; piece: Ligne; plusieurs: boolean; ouvrir: (o: Ouvert) => void }) {
+function BlocPiste({ piste, piece, ouvrir }: { piste: Ligne; piece: Ligne; ouvrir: (o: Ouvert) => void }) {
   const d = donnees.value;
   const j = jour.value;
   const etapes = etapesDePiste(d, piste.id);
@@ -153,11 +188,13 @@ function BlocPiste({ piste, piece, plusieurs, ouvrir }: { piste: Ligne; piece: L
   const liste = useRef<HTMLUListElement>(null);
   const [texte, setTexte] = useState('');
   const pieceActive = statutPiece(piece, j) === 'en cours';
+  const disponibles = new Set(pieceActive && e.ouverte && !e.bloqueePar.length ? e.disponibles.map(x => x.id) : []);
+  const libre = bool(piste.libre);
 
   useEffect(() => {
     if (!liste.current) return;
     const s = Sortable.create(liste.current, {
-      group: `etapes-${piece.id}`, handle: '.poignee', animation: 150,
+      group: `etapes-${piece.id}`, handle: '.poignee', draggable: '.etape', animation: 150,
       onEnd: evt => {
         annulerDeplacementDom(evt);
         const id = (evt.item as HTMLElement).dataset.id!;
@@ -177,25 +214,25 @@ function BlocPiste({ piste, piece, plusieurs, ouvrir }: { piste: Ligne; piece: L
   };
 
   return (
-    <div class={`piste${bool(piste.active) ? '' : ' en-pause'}`}>
-      {plusieurs && (
-        <div class="piste-tete">
-          <button class="piste-nom" onClick={() => ouvrir({ type: 'piste', id: piste.id })}>{piste.nom || 'Piste principale'}</button>
-          <span class="piste-compte">{a.nbFait}/{a.nb}</span>
-          <label class="bascule" title={bool(piste.active) ? 'Active : remonte dans « À faire »' : 'En pause : ne remonte pas dans « À faire »'}>
-            <input type="checkbox" checked={bool(piste.active)} onChange={ev => maj('Pistes', piste.id, { active: txtBool((ev.target as HTMLInputElement).checked) })} />
-            <span>{bool(piste.active) ? 'Active' : 'En pause'}</span>
-          </label>
-          <button class="bouton-icone petit" aria-label={`Modifier la piste ${piste.nom}`} onClick={() => ouvrir({ type: 'piste', id: piste.id })}><Icone nom="crayon" taille={16} /></button>
-        </div>
-      )}
+    <div class={`piste${bool(piste.active) ? '' : ' en-pause'}`} data-id={piste.id}>
+      <div class="piste-tete">
+        <span class="poignee poignee-piste" aria-label="Déplacer la piste" title="Glisser pour réordonner les pistes"><Icone nom="poignee" taille={16} /></span>
+        <button class="piste-nom" onClick={() => ouvrir({ type: 'piste', id: piste.id })}>{piste.nom || 'Piste principale'}</button>
+        <span class="piste-compte">{a.nbFait}/{a.nb}</span>
+        <button class={`bascule-ordre${libre ? ' libre' : ''}`} onClick={() => maj('Pistes', piste.id, { libre: txtBool(!libre) })}
+          title={libre ? 'Libre : toutes les étapes sont faisables en même temps. Cliquer pour imposer l\'ordre.' : 'Dans l\'ordre : chaque étape attend la précédente. Cliquer pour rendre libre.'}>
+          {libre ? '⇉ libre' : '→ dans l\'ordre'}
+        </button>
+        <label class="bascule" title={bool(piste.active) ? 'Active : remonte dans « À faire »' : 'En pause : ne remonte pas dans « À faire »'}>
+          <input type="checkbox" checked={bool(piste.active)} onChange={ev => maj('Pistes', piste.id, { active: txtBool((ev.target as HTMLInputElement).checked) })} />
+          <span>{bool(piste.active) ? 'Active' : 'En pause'}</span>
+        </label>
+        <button class="bouton-icone petit" aria-label={`Modifier la piste ${piste.nom}`} onClick={() => ouvrir({ type: 'piste', id: piste.id })}><Icone nom="crayon" taille={16} /></button>
+      </div>
       {e.bloqueePar.length > 0 && !e.terminee && <p class="piste-bloquee"><Icone nom="cadenas" taille={14} />{texteAttente(e.bloqueePar)}</p>}
       {e.debutFutur && <p class="piste-bloquee"><Icone nom="horloge" taille={14} />commence le {jourCourt(e.debutFutur)}</p>}
       <ul class="etapes" ref={liste} data-piste={piste.id}>
-        {etapes.map(et => {
-          const suivante = pieceActive && e.ouverte && !e.bloqueePar.length && e.prochaine?.id === et.id;
-          return <LigneEtape key={et.id} etape={et} suivante={suivante} ouvrir={() => ouvrir({ type: 'etape', id: et.id })} />;
-        })}
+        {etapes.map(et => <LigneEtape key={et.id} etape={et} suivante={disponibles.has(et.id)} ouvrir={() => ouvrir({ type: 'etape', id: et.id })} />)}
       </ul>
       <form class="ajout-etape" onSubmit={ev => { ev.preventDefault(); ajouter(); }}>
         <Icone nom="plus" taille={16} />
@@ -203,6 +240,22 @@ function BlocPiste({ piste, piece, plusieurs, ouvrir }: { piste: Ligne; piece: L
           onInput={ev => setTexte((ev.target as HTMLInputElement).value)} />
       </form>
     </div>
+  );
+}
+
+/** Choix rapide de la durée (= poids) d'une étape, directement dans la liste. */
+function ChoixDuree({ etape }: { etape: Ligne }) {
+  const duree = (etape.duree || 'normal') as Duree;
+  const p = poids(etape);
+  const perso = p !== DUREES[duree];
+  return (
+    <select class={`choix-duree duree-${duree.replace(' ', '-')}`} value={perso ? 'perso' : duree} aria-label={`Durée de « ${etape.titre} »`}
+      title="Durée : plus c'est long, plus l'étape compte dans le %"
+      onClick={e => e.stopPropagation()}
+      onChange={e => { const v = (e.target as HTMLSelectElement).value as Duree; maj('Etapes', etape.id, { duree: v, poids: String(DUREES[v]) }); }}>
+      {NOMS_DUREES.map(n => <option value={n}>{n} ({DUREES[n]})</option>)}
+      {perso && <option value="perso" disabled>poids {p}</option>}
+    </select>
   );
 }
 
@@ -221,13 +274,13 @@ function LigneEtape({ etape, suivante, ouvrir }: { etape: Ligne; suivante: boole
         <span class="etape-titre">{etape.titre}</span>
         <span class="etape-meta">
           {suivante && <span class="marque-suivante">à faire</span>}
-          {etape.duree && etape.duree !== 'normal' && <span>{etape.duree}</span>}
           {prevue && !fait && <span class={prevue < j ? 'en-retard' : ''}><Icone nom="horloge" taille={12} />{jourCourt(prevue)}</span>}
           {dl && !fait && <span class={dl < j ? 'en-retard' : ''}><Icone nom="drapeau" taille={12} />{jourCourt(dl)}</span>}
           {att.length > 0 && <span class="attente"><Icone nom="cadenas" taille={12} />{att.map(x => x.nom).join(', ')}</span>}
           {etape.detail && <span class="a-detail" title={etape.detail}>note</span>}
         </span>
       </button>
+      <ChoixDuree etape={etape} />
     </li>
   );
 }

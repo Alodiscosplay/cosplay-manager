@@ -91,11 +91,10 @@ export function PageAFaire() {
         <details class="repli">
           <summary>Pas dans la liste ({n})</summary>
           <ul>
-            {r.repli.piecesAVenir.map(x => <li><a href={lienCostume(x.costume.id)}>{x.piece.nom}</a> ({x.costume.nom}) · à venir{x.debut ? `, commence le ${jourCourt(x.debut)}` : ''}</li>)}
             {r.repli.pistesPlanifiees.map(x => <li><a href={lienCostume(x.costume.id)}>{x.piece.nom} · {x.piste.nom || 'piste'}</a> · commence le {jourCourt(x.debut)}</li>)}
             {r.repli.bloquees.map(x => <li><a href={lienCostume(x.costume.id)}>{x.piece.nom}{x.piste.nom ? ` · ${x.piste.nom}` : ''}</a>{x.etape ? ` (« ${x.etape.titre} »)` : ''} · {texteAttente(x.attente)}</li>)}
             {r.repli.pistesEnPause.map(x => <li><a href={lienCostume(x.costume.id)}>{x.piece.nom} · {x.piste.nom || 'piste'}</a> · piste en pause</li>)}
-            {r.repli.piecesEnPause.map(x => <li><a href={lienCostume(x.costume.id)}>{x.piece.nom}</a> ({x.costume.nom}) · en pause</li>)}
+            {r.repli.piecesEnPause.map(x => <li><a href={lienCostume(x.costume.id)}>{x.piece.nom}</a> ({x.costume.nom}) · en pause{x.debut ? `, reprend le ${jourCourt(x.debut)}` : ''}</li>)}
             {r.repli.costumesEnAttente.map(c => <li><a href={lienCostume(c.id)}>{c.nom}</a> · en attente{ligne(d, 'Costumes', c.attend_costume_id) ? ` de ${ligne(d, 'Costumes', c.attend_costume_id)!.nom}` : ''}</li>)}
             {r.repli.costumesProjet.map(c => <li><a href={lienCostume(c.id)}>{c.nom}</a> · en projet{c.debut ? `, commence le ${jourCourt(c.debut)}` : ''}</li>)}
             {r.repli.costumesEnPause.map(c => <li><a href={lienCostume(c.id)}>{c.nom}</a> · en pause</li>)}

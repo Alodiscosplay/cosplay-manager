@@ -6,10 +6,10 @@ export const VERSION_SCHEMA = 1;
 
 export const TABLES = {
   Costumes: ['nom', 'personnage', 'oeuvre', 'statut', 'attend_costume_id', 'debut', 'deadline', 'evenement_id',
-    'suivi_budget', 'budget_prevu', 'image_ref', 'notes', 'ordre', 'archive_le', 'resume_archive', 'vignette'],
+    'suivi_budget', 'budget_prevu', 'image_ref', 'cadrage', 'notes', 'ordre', 'archive_le', 'resume_archive', 'vignette'],
   Evenements: ['nom', 'date_debut', 'date_fin', 'lieu', 'notes'],
   Pieces: ['costume_id', 'nom', 'statut', 'debut', 'deadline', 'attend', 'patron', 'notes', 'ordre'],
-  Pistes: ['piece_id', 'nom', 'active', 'debut', 'deadline', 'attend', 'ordre'],
+  Pistes: ['piece_id', 'nom', 'active', 'libre', 'debut', 'deadline', 'attend', 'ordre'],
   Etapes: ['piste_id', 'piece_id', 'titre', 'detail', 'duree', 'poids', 'attend', 'fait', 'fait_le',
     'date_prevue', 'deadline', 'ordre'],
   Taches: ['titre', 'costume_id', 'date', 'fait', 'fait_le', 'ordre'],
@@ -45,7 +45,8 @@ export function donneesVides(): Donnees {
 // ---------- Valeurs énumérées ----------
 
 export const STATUTS_COSTUME = ['projet', 'en attente', 'en cours', 'en pause', 'terminé', 'archivé'] as const;
-export const STATUTS_PIECE = ['à venir', 'en cours', 'en pause', 'terminée'] as const;
+// « à venir » n'existe plus (redondant avec « en pause ») ; une ancienne valeur « à venir » se lit « en pause ».
+export const STATUTS_PIECE = ['en cours', 'en pause', 'terminée'] as const;
 export const STATUTS_FOURNITURE = ['à acheter', 'commandé', 'reçu', 'déjà là'] as const;
 export const STATUTS_COMMANDE = ['à passer', 'passée', 'reçue'] as const;
 
@@ -76,6 +77,7 @@ export function liste(v: string | undefined): string[] {
 }
 export function txtListe(ids: string[]): string { return ids.join(','); }
 
+/** Ni supprimée (« oui », corbeille) ni purgée (« purge », après archivage ou création annulée). */
 export function vivant(l: Ligne | undefined): l is Ligne {
-  return !!l && !bool(l.supprime);
+  return !!l && !bool(l.supprime) && l.supprime !== 'purge';
 }

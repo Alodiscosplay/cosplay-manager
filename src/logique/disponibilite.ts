@@ -2,7 +2,8 @@
 //
 // Règles :
 //  - une pièce contient des pistes ; les étapes d'une piste se suivent, les pistes avancent en parallèle ;
-//  - une piste ou une étape peut « attendre » d'autres pistes ou d'autres pièces ;
+//  - une piste « libre » propose toutes ses étapes à la fois (ex. vérifier deux patrons indépendants) ;
+//  - une piste, une pièce ou une étape peut « attendre » d'autres pistes, pièces ou étapes précises ;
 //  - seuls les costumes « en cours » et, dedans, les pièces « en cours » alimentent « À faire » ;
 //  - une date de début atteinte fait passer l'élément en cours tout seul ;
 //  - rien n'est masqué en silence : tout ce qui est écarté est compté dans le « repli ».
@@ -19,10 +20,26 @@ export function statutCostume(c: Ligne, jour: Jour): string {
   return c.statut || 'projet';
 }
 
+/** Statut stocké, normalisé : l'ancien « à venir » (et le vide) valent « en pause ». */
+export function statutStockePiece(p: Ligne): string {
+  return !p.statut || p.statut === 'à venir' ? 'en pause' : p.statut;
+}
+
+/** Une pièce en pause avec une date de début atteinte est en cours. */
 export function statutPiece(p: Ligne, jour: Jour): string {
+  const s = statutStockePiece(p);
   const debut = lireJour(p.debut);
-  if ((p.statut || 'à venir') === 'à venir' && debut && debut <= jour) return 'en cours';
-  return p.statut || 'à venir';
+  if (s === 'en pause' && debut && debut <= jour) return 'en cours';
+  return s;
+}
+
+/**
+ * Champs à écrire quand l'utilisateur change le statut d'une pièce à la main. Mettre en pause une
+ * pièce dont la date de début est passée efface cette date, sinon elle se « réveillerait » aussitôt.
+ */
+export function champsStatutPiece(p: Ligne, statut: string, jour: Jour): Record<string, string> {
+  const debut = lireJour(p.debut);
+  return statut === 'en pause' && debut && debut <= jour ? { statut, debut: '' } : { statut };
 }
 
 /** Une piste est ouverte si elle est active et que sa date de début (s'il y en a une) est atteinte. */
@@ -51,6 +68,11 @@ export interface Attente { id: string; nom: string; nbFait: number; nb: number }
 export function attentes(d: Donnees, l: Ligne): Attente[] {
   const res: Attente[] = [];
   for (const id of idsAttendus(l)) {
+    const etape = ligne(d, 'Etapes', id);
+    if (etape) {
+      if (!bool(etape.fait)) res.push({ id, nom: `« ${etape.titre} »`, nbFait: 0, nb: 1 });
+      continue;
+    }
     const piste = ligne(d, 'Pistes', id);
     if (piste) {
       if (!pisteTerminee(d, id)) {
@@ -69,7 +91,7 @@ export function attentes(d: Donnees, l: Ligne): Attente[] {
 }
 
 export function texteAttente(a: Attente[]): string {
-  return 'attend : ' + a.map(x => `${x.nom} (${x.nbFait}/${x.nb})`).join(', ');
+  return 'attend : ' + a.map(x => (x.nom.startsWith('«') ? x.nom : `${x.nom} (${x.nbFait}/${x.nb})`)).join(', ');
 }
 
 // ---------- État d'une piste ----------
@@ -81,12 +103,17 @@ export interface EtatPiste {
   terminee: boolean;
   bloqueePar: Attente[];   // attentes de la piste elle-même
   prochaine?: Ligne;       // première étape non cochée
-  prochaineBloqueePar: Attente[];
+  libre: boolean;          // étapes sans ordre imposé
+  disponibles: Ligne[];    // étapes faisables (hors attentes de la piste) : une au plus si « dans l'ordre »
+  prochaineBloqueePar: Attente[]; // pourquoi rien n'est disponible alors qu'il reste des étapes
 }
 
 export function etatPiste(d: Donnees, piste: Ligne, jour: Jour): EtatPiste {
-  const etapes = etapesDePiste(d, piste.id);
-  const prochaine = etapes.find(e => !bool(e.fait));
+  const libre = bool(piste.libre);
+  const restantes = etapesDePiste(d, piste.id).filter(e => !bool(e.fait));
+  const prochaine = restantes[0];
+  const candidates = libre ? restantes : restantes.slice(0, 1);
+  const disponibles = candidates.filter(e => attentes(d, e).length === 0);
   const debut = lireJour(piste.debut);
   return {
     piste,
@@ -95,7 +122,9 @@ export function etatPiste(d: Donnees, piste: Ligne, jour: Jour): EtatPiste {
     terminee: !prochaine,
     bloqueePar: attentes(d, piste),
     prochaine,
-    prochaineBloqueePar: prochaine ? attentes(d, prochaine) : [],
+    libre,
+    disponibles,
+    prochaineBloqueePar: !disponibles.length && candidates.length ? attentes(d, candidates[0]) : [],
   };
 }
 
@@ -105,7 +134,7 @@ export function etapeDisponible(d: Donnees, etape: Ligne, jour: Jour): boolean {
   const piste = ligne(d, 'Pistes', etape.piste_id);
   if (!piste) return false;
   const e = etatPiste(d, piste, jour);
-  return e.ouverte && e.bloqueePar.length === 0 && e.prochaine?.id === etape.id && e.prochaineBloqueePar.length === 0;
+  return e.ouverte && e.bloqueePar.length === 0 && e.disponibles.some(x => x.id === etape.id);
 }
 
 // ---------- La page « À faire » ----------
@@ -117,8 +146,7 @@ export interface Repli {
   costumesProjet: Ligne[];
   costumesEnPause: Ligne[];
   costumesSansPieceEnCours: Ligne[];
-  piecesAVenir: { costume: Ligne; piece: Ligne; debut: Jour | '' }[];
-  piecesEnPause: { costume: Ligne; piece: Ligne }[];
+  piecesEnPause: { costume: Ligne; piece: Ligne; debut: Jour | '' }[];
   pistesEnPause: { costume: Ligne; piece: Ligne; piste: Ligne }[];
   pistesPlanifiees: { costume: Ligne; piece: Ligne; piste: Ligne; debut: Jour }[];
   bloquees: { costume: Ligne; piece: Ligne; piste: Ligne; etape?: Ligne; attente: Attente[] }[];
@@ -129,7 +157,7 @@ export interface AFaire { elements: ElementAFaire[]; taches: Ligne[]; repli: Rep
 export function aFaire(d: Donnees, jour: Jour): AFaire {
   const repli: Repli = {
     costumesEnAttente: [], costumesProjet: [], costumesEnPause: [], costumesSansPieceEnCours: [],
-    piecesAVenir: [], piecesEnPause: [], pistesEnPause: [], pistesPlanifiees: [], bloquees: [],
+    piecesEnPause: [], pistesEnPause: [], pistesPlanifiees: [], bloquees: [],
   };
   const elements: ElementAFaire[] = [];
 
@@ -143,8 +171,7 @@ export function aFaire(d: Donnees, jour: Jour): AFaire {
     let pieceEnCours = false;
     for (const piece of piecesDe(d, costume.id)) {
       const sp = statutPiece(piece, jour);
-      if (sp === 'à venir') { repli.piecesAVenir.push({ costume, piece, debut: lireJour(piece.debut) }); continue; }
-      if (sp === 'en pause') { repli.piecesEnPause.push({ costume, piece }); continue; }
+      if (sp === 'en pause') { repli.piecesEnPause.push({ costume, piece, debut: lireJour(piece.debut) }); continue; }
       if (sp !== 'en cours') continue; // terminée
       pieceEnCours = true;
 
@@ -157,11 +184,11 @@ export function aFaire(d: Donnees, jour: Jour): AFaire {
         if (e.debutFutur) { repli.pistesPlanifiees.push({ costume, piece, piste, debut: e.debutFutur }); continue; }
         const bloque = [...attentePiece, ...e.bloqueePar];
         if (bloque.length) { repli.bloquees.push({ costume, piece, piste, attente: bloque }); continue; }
-        if (e.prochaineBloqueePar.length) {
+        if (!e.disponibles.length) {
           repli.bloquees.push({ costume, piece, piste, etape: e.prochaine, attente: e.prochaineBloqueePar });
           continue;
         }
-        elements.push({ costume, piece, piste, etape: e.prochaine!, plusieursPistes: pistes.length > 1 });
+        for (const etape of e.disponibles) elements.push({ costume, piece, piste, etape, plusieursPistes: pistes.length > 1 });
       }
     }
     if (!pieceEnCours) repli.costumesSansPieceEnCours.push(costume);
@@ -175,7 +202,7 @@ export function aFaire(d: Donnees, jour: Jour): AFaire {
 
 export function tailleRepli(r: Repli): number {
   return r.costumesEnAttente.length + r.costumesProjet.length + r.costumesEnPause.length
-    + r.piecesAVenir.length + r.piecesEnPause.length + r.pistesEnPause.length
+    + r.piecesEnPause.length + r.pistesEnPause.length
     + r.pistesPlanifiees.length + r.bloquees.length;
 }
 
@@ -188,10 +215,13 @@ export function creeraitBoucle(d: Donnees, depuisId: string, cibleId: string): b
     if (id === depuisId) return true;
     if (vus.has(id)) continue;
     vus.add(id);
-    const l = d.Pistes[id] ?? d.Pieces[id];
+    const l = d.Pistes[id] ?? d.Pieces[id] ?? d.Etapes[id];
     if (vivant(l)) pile.push(...idsAttendus(l));
     // une pièce attend aussi à travers ses pistes
     if (d.Pieces[id]) for (const p of pistesDe(d, id)) pile.push(...idsAttendus(p));
+    // une piste attend aussi à travers ses étapes, une pièce à travers toutes les siennes
+    if (d.Pistes[id]) for (const e of etapesDePiste(d, id)) pile.push(...idsAttendus(e));
+    if (d.Pieces[id]) for (const e of etapesDePiece(d, id)) pile.push(...idsAttendus(e));
   }
   return false;
 }

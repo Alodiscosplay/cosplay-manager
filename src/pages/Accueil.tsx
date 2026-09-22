@@ -6,8 +6,10 @@ import { statutCostume } from '../logique/disponibilite';
 import { deadlineCostume, alertes } from '../logique/planning';
 import { relatif, jourCourt } from '../logique/dates';
 import { creerCostume } from '../store/operations';
-import { aller, lienCostume } from '../routeur';
-import { Barre, Pct, PhotoImg, Puce, Feuille, Vide } from '../composants/base';
+import { lienCostume } from '../routeur';
+import { FicheCostume } from './Costume';
+import { ImageCadree } from '../composants/Cadrage';
+import { Barre, Pct, Puce, Vide } from '../composants/base';
 import { Icone } from '../composants/Icone';
 import { IndicateurSync } from '../app';
 import { type Ligne } from '../modele/schema';
@@ -74,7 +76,7 @@ function CarteCostume({ c }: { c: Ligne }) {
   const ev = ligne(d, 'Evenements', c.evenement_id);
   return (
     <a class="carte-costume" href={lienCostume(c.id)}>
-      <div class="carte-image">{c.image_ref ? <PhotoImg id={c.image_ref} alt={`Référence ${c.nom}`} /> : <div class="photo-vide"><span aria-hidden="true">✂</span></div>}</div>
+      <div class="carte-image">{c.image_ref ? <ImageCadree id={c.image_ref} cadrage={c.cadrage} alt={`Référence ${c.nom}`} /> : <div class="photo-vide"><span aria-hidden="true">✂</span></div>}</div>
       <div class="carte-corps">
         <h3>{c.nom}</h3>
         {(c.personnage || c.oeuvre) && <p class="sous-titre">{[c.personnage, c.oeuvre].filter(Boolean).join(' · ')}</p>}
@@ -89,26 +91,8 @@ function CarteCostume({ c }: { c: Ligne }) {
   );
 }
 
+/** Crée le costume tout de suite (vide) et ouvre sa fiche complète ; fermé sans nom, il disparaît. */
 function NouveauCostume({ onFermer }: { onFermer: () => void }) {
-  const [nom, setNom] = useState('');
-  const creer = () => {
-    if (!nom.trim()) return;
-    const ch = creerCostume(donnees.value, nom.trim());
-    faire(ch);
-    onFermer();
-    aller(`/costume/${ch[0].id}`);
-  };
-  return (
-    <Feuille titre="Nouveau costume" onFermer={onFermer} pied={<>
-      <button class="bouton" onClick={onFermer}>Annuler</button>
-      <button class="bouton principal" onClick={creer} disabled={!nom.trim()}>Créer</button>
-    </>}>
-      <form onSubmit={e => { e.preventDefault(); creer(); }}>
-        <label class="champ">
-          <span class="champ-label">Nom du costume</span>
-          <input value={nom} autoFocus placeholder="ex. Furina V2" onInput={e => setNom((e.target as HTMLInputElement).value)} />
-        </label>
-      </form>
-    </Feuille>
-  );
+  const [id] = useState(() => { const ch = creerCostume(donnees.value, ''); faire(ch); return ch[0].id; });
+  return <FicheCostume id={id} nouveau onFermer={onFermer} />;
 }
