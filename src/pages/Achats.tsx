@@ -4,7 +4,7 @@ import { costumes, tous, ligne } from '../logique/acces';
 import { regrouperAchats, SANS_FOURNISSEUR, type GroupementAchats, regrouperParNom, lignesCommande, totalCommande, euros, montant } from '../logique/budget';
 import { jourCourt } from '../logique/dates';
 import { STATUTS_FOURNITURE, STATUTS_COMMANDE, num, type Ligne } from '../modele/schema';
-import { creerCommandes, changerStatutCommande, supprimer, retirerDeCommande, nouvelId } from '../store/operations';
+import { creerCommandes, changerStatutCommande, supprimer, purger, retirerDeCommande, nouvelId } from '../store/operations';
 import { GroupeFourniture, EditeurFourniture } from '../composants/Fournitures';
 import { Feuille, Champ, Texte, Selection, Puce, Vide, Menu } from '../composants/base';
 import { Icone } from '../composants/Icone';
@@ -43,6 +43,8 @@ function ListeCourses() {
   const [ouvert, setOuvert] = useState<string | 'nouveau' | null>(null);
   const [par, setParEtat] = useState<GroupementAchats>(() => { try { return localStorage.getItem(CLE_GROUPEMENT) === 'costume' ? 'costume' : 'fournisseur'; } catch { return 'fournisseur'; } });
   const setPar = (v: GroupementAchats) => { setParEtat(v); try { localStorage.setItem(CLE_GROUPEMENT, v); } catch { /* ignoré */ } };
+  // Le filtre ne propose que les fournisseurs qui ont au moins une fourniture.
+  const utilises = new Set(tous(d, 'Fournitures').map(f => f.fournisseur_id).filter(Boolean));
   const groupes = regrouperAchats(d, { costumeId: costume || undefined, fournisseurId: fournisseur || undefined, statuts: statut ? [statut] : undefined }, par);
   const nb = groupes.reduce((s, g) => s + g.lignes.length, 0);
   const choisirPlusieurs = (ids: string[], v: boolean) => { const s = new Set(selection); for (const id of ids) { if (v) s.add(id); else s.delete(id); } setSelection(s); };
@@ -62,7 +64,7 @@ function ListeCourses() {
         <button class="bouton principal" onClick={() => setOuvert('nouveau')}><Icone nom="plus" />Fourniture</button>
         <Selection label="Tri" valeur={par} options={[['fournisseur', 'Tri par fournisseur'], ['costume', 'Tri par costume']]} onChange={v => setPar(v as GroupementAchats)} />
         <Selection label="Costume" valeur={costume} options={[['', 'Tous les costumes'], ...costumes(d).filter(c => c.statut !== 'archivé').map(c => [c.id, c.nom] as [string, string])]} onChange={setCostume} />
-        <Selection label="Fournisseur" valeur={fournisseur} options={[['', 'Tous les fournisseurs'], ...tous(d, 'Fournisseurs').sort((a, b) => a.nom.localeCompare(b.nom)).map(f => [f.id, f.nom] as [string, string]), [SANS_FOURNISSEUR, 'Sans fournisseur']]} onChange={setFournisseur} />
+        <Selection label="Fournisseur" valeur={fournisseur} options={[['', 'Tous les fournisseurs'], ...tous(d, 'Fournisseurs').filter(f => utilises.has(f.id)).sort((a, b) => a.nom.localeCompare(b.nom)).map(f => [f.id, f.nom] as [string, string]), [SANS_FOURNISSEUR, 'Sans fournisseur']]} onChange={setFournisseur} />
         <Selection label="Statut" valeur={statut} options={[['', 'Tous les statuts'], ...STATUTS_FOURNITURE.map(s => [s, s] as [string, string])]} onChange={setStatut} />
       </div>
       {selection.size > 0 && (
@@ -175,6 +177,8 @@ function EditeurCommande({ id, onFermer }: { id: string; onFermer: () => void })
   );
 }
 
+const NOM_PROVISOIRE = 'Nouveau fournisseur';
+
 function Fournisseurs() {
   const d = donnees.value;
   const [ouvert, setOuvert] = useState<string | null>(null);
@@ -183,7 +187,7 @@ function Fournisseurs() {
   return (
     <section class="contenu-onglet">
       <div class="barre-outils">
-        <button class="bouton principal" onClick={() => { const id = nouvelId(); faire([{ table: 'Fournisseurs', id, champs: { nom: 'Nouveau fournisseur' } }]); setOuvert(id); }}><Icone nom="plus" />Fournisseur</button>
+        <button class="bouton principal" onClick={() => { const id = nouvelId(); faire([{ table: 'Fournisseurs', id, champs: { nom: NOM_PROVISOIRE } }]); setOuvert(id); }}><Icone nom="plus" />Fournisseur</button>
       </div>
       {!liste.length && <Vide icone="boite" titre="Aucun fournisseur"><p>Ajoute ici tes fournisseurs habituels.</p></Vide>}
       <ul class="liste-simple fournisseurs">
@@ -196,7 +200,12 @@ function Fournisseurs() {
           </li>
         ))}
       </ul>
-      {ouvert && d.Fournisseurs[ouvert] && <EditeurFournisseur id={ouvert} onFermer={() => setOuvert(null)} />}
+      {ouvert && d.Fournisseurs[ouvert] && <EditeurFournisseur id={ouvert} onFermer={() => {
+        // Fermé sans lui donner de nom : la fiche vide n'est pas gardée.
+        const f = donnees.value.Fournisseurs[ouvert];
+        if (f && f.nom === NOM_PROVISOIRE && !f.url && !f.type && !f.notes && !f.frais_port && !f.franco && !tous(donnees.value, 'Fournitures').some(x => x.fournisseur_id === f.id)) faire([purger('Fournisseurs', f)]);
+        setOuvert(null);
+      }} />}
     </section>
   );
 }
@@ -209,7 +218,7 @@ function EditeurFournisseur({ id, onFermer }: { id: string; onFermer: () => void
       <button class="bouton danger" onClick={() => { faire(supprimer('Fournisseurs', id), `« ${f.nom} » supprimé`); onFermer(); }}>Supprimer</button>
       <button class="bouton principal" onClick={onFermer}>Terminé</button>
     </>}>
-      <Champ label="Nom"><Texte valeur={f.nom} autoFocus={f.nom === 'Nouveau fournisseur'} onValider={v => v && m({ nom: v })} /></Champ>
+      <Champ label="Nom"><Texte valeur={f.nom} autoFocus={f.nom === NOM_PROVISOIRE} onValider={v => v && m({ nom: v })} /></Champ>
       <Champ label="Site"><Texte type="url" valeur={f.url ?? ''} placeholder="https://…" onValider={v => m({ url: v })} /></Champ>
       <Champ label="Type"><Texte valeur={f.type ?? ''} onValider={v => m({ type: v })} /></Champ>
       <div class="deux-colonnes">
