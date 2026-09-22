@@ -39,7 +39,6 @@ export function OngletFournitures({ costume }: { costume: Ligne }) {
           <Selection label="Filtrer par pièce" valeur={piece} onChange={setPiece}
             options={[['', 'Tout le costume'], ...pieces.map(p => [p.id, p.nom] as [string, string]), ['__general', 'Hors pièces']]} />
         )}
-        <a class="bouton" href="#/achats">Liste d'achats commune</a>
       </div>
       {toutes.length > 0 && (
         <div class="total-fournitures" aria-live="polite">
