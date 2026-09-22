@@ -18,7 +18,7 @@ export function OngletBudget({ costume }: { costume: Ligne }) {
         </label>
         <div class="tuile-chiffre"><span class="chiffre">{euros(b.prevu)}</span><span class="legende">budget futur dépensé</span></div>
         <div class="tuile-chiffre"><span class="chiffre">{euros(b.recu + b.commande)}</span><span class="legende">budget actuel dépensé</span></div>
-        <div class="tuile-chiffre"><span class="chiffre">{euros(b.total)}</span><span class="legende">budget total</span></div>
+        <div class="tuile-chiffre"><span class="chiffre">{euros(b.total)}</span><span class="legende">budget réel</span></div>
         <div class={`tuile-chiffre${depasse ? ' depasse' : ''}`}><span class="chiffre">{b.cible !== null ? euros(b.cible - b.total) : '—'}</span><span class="legende">budget restant</span></div>
       </div>
       {b.total > 0 && <BarreBudget b={b} />}
