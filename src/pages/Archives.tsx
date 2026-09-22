@@ -67,7 +67,7 @@ export function PageArchives() {
                   ]} />
                 </div>
                 {(c.personnage || c.oeuvre) && <p class="sous-titre">{[c.personnage, c.oeuvre].filter(Boolean).join(' · ')}</p>}
-                {r && <p class="petit-texte">{r.pct ?? '—'} % · {r.pieces} pièces · {r.etapes} étapes · {r.photos} photos{r.budget !== null ? ` · ${euros(r.budget)}` : ''}</p>}
+                {r && <p class="petit-texte">{r.pct ?? '—'} % · {r.pieces} pièces · {r.etapes} sous-étapes · {r.photos} photos{r.budget !== null ? ` · ${euros(r.budget)}` : ''}</p>}
                 {r?.debut && <p class="petit-texte">Réalisé du {jourCourt(r.debut, '')} au {jourCourt(r.fin, '')}</p>}
                 <p class="petit-texte">Archivé le {c.archive_le ? jourCourt(c.archive_le, '') : '?'}</p>
               </div>

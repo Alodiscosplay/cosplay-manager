@@ -22,6 +22,15 @@ export const TABLES = {
 } as const;
 
 export type NomTable = keyof typeof TABLES;
+
+/**
+ * Titre de l'onglet dans le Sheet. Dans l'appli, une « piste » (code) s'appelle une « étape » et une
+ * « étape » (code) une « sous-étape » : les onglets suivent le vocabulaire affiché.
+ */
+export const ONGLET: Record<NomTable, string> = {
+  Costumes: 'Costumes', Evenements: 'Evenements', Pieces: 'Pieces', Pistes: 'Etapes', Etapes: 'Sous-etapes',
+  Taches: 'Taches', Fournisseurs: 'Fournisseurs', Fournitures: 'Fournitures', Commandes: 'Commandes', Photos: 'Photos', Modeles: 'Modeles',
+};
 export const NOMS_TABLES = Object.keys(TABLES) as NomTable[];
 
 /** Colonnes communes à toutes les tables. */

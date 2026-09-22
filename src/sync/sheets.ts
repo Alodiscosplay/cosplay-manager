@@ -1,6 +1,6 @@
 // Accès brut au Google Sheet : lire tous les onglets, compléter la structure, écrire des lignes.
 import { gjson } from './google';
-import { NOMS_TABLES, entetes, type NomTable } from '../modele/schema';
+import { NOMS_TABLES, ONGLET, entetes, type NomTable } from '../modele/schema';
 
 const API = 'https://sheets.googleapis.com/v4/spreadsheets';
 
@@ -18,25 +18,25 @@ async function proprietes(id: string): Promise<Proprietes[]> {
 /** Lit toutes les tables en deux appels. Les onglets absents sont créés, les en-têtes manquants ajoutés. */
 export async function lireClasseur(id: string): Promise<Classeur> {
   let props = await proprietes(id);
-  const manquants = NOMS_TABLES.filter(t => !props.some(p => p.title === t));
+  const manquants = NOMS_TABLES.filter(t => !props.some(p => p.title === ONGLET[t]));
   if (manquants.length) {
     await gjson(`${API}/${id}:batchUpdate`, { method: 'POST', body: JSON.stringify({
-      requests: manquants.map(t => ({ addSheet: { properties: { title: t, gridProperties: { frozenRowCount: 1 } } } })),
+      requests: manquants.map(t => ({ addSheet: { properties: { title: ONGLET[t], gridProperties: { frozenRowCount: 1 } } } })),
     }) });
     props = await proprietes(id);
   }
-  const ranges = NOMS_TABLES.map(t => `ranges=${encodeURIComponent(`'${t}'`)}`).join('&');
+  const ranges = NOMS_TABLES.map(t => `ranges=${encodeURIComponent(`'${ONGLET[t]}'`)}`).join('&');
   const r = await gjson<{ valueRanges: { values?: string[][] }[] }>(
     `${API}/${id}/values:batchGet?${ranges}&valueRenderOption=FORMATTED_VALUE&majorDimension=ROWS`);
   const res: Classeur = {};
   const ajoutsEntetes: { range: string; values: string[][] }[] = [];
   NOMS_TABLES.forEach((t, i) => {
-    const p = props.find(x => x.title === t)!;
+    const p = props.find(x => x.title === ONGLET[t])!;
     const valeurs = (r.valueRanges[i]?.values ?? []).map(l => l.map(v => String(v ?? '')));
     const tete = (valeurs[0] ?? []).map(h => h.trim());
     const aAjouter = entetes(t).filter(h => !tete.includes(h));
     if (aAjouter.length) {
-      ajoutsEntetes.push({ range: `'${t}'!${colonne(tete.length)}1`, values: [aAjouter] });
+      ajoutsEntetes.push({ range: `'${ONGLET[t]}'!${colonne(tete.length)}1`, values: [aAjouter] });
       tete.push(...aAjouter);
     }
     res[t] = { sheetId: p.sheetId, nbLignesGrille: p.gridProperties.rowCount, nbColonnesGrille: p.gridProperties.columnCount, entetes: tete, valeurs };
@@ -49,7 +49,7 @@ export interface Ecriture { table: NomTable; numero: number; valeurs: string[] }
 
 export async function ecrireLignes(id: string, classeur: Classeur, ecritures: Ecriture[]): Promise<void> {
   if (!ecritures.length) return;
-  await ecrireValeurs(id, ecritures.map(e => ({ range: `'${e.table}'!A${e.numero}`, values: [e.valeurs] })), classeur);
+  await ecrireValeurs(id, ecritures.map(e => ({ range: `'${ONGLET[e.table]}'!A${e.numero}`, values: [e.valeurs] })), classeur);
 }
 
 /** Écrit des plages, en agrandissant d'abord la grille si nécessaire (sinon l'API refuse). */
@@ -61,7 +61,7 @@ async function ecrireValeurs(id: string, data: { range: string; values: string[]
     let maxLigne = 0, maxCol = 0;
     for (const d of data) {
       const m = /^'(.+)'!([A-Z]+)(\d+)$/.exec(d.range);
-      if (!m || m[1] !== t) continue;
+      if (!m || m[1] !== ONGLET[t]) continue;
       maxLigne = Math.max(maxLigne, Number(m[3]) + d.values.length - 1);
       maxCol = Math.max(maxCol, indiceColonne(m[2]) + Math.max(...d.values.map(v => v.length)));
     }

@@ -1,7 +1,7 @@
 // Fichiers de l'appli dans le Drive de l'utilisateur : un dossier « Cosplay Planner »,
 // le Sheet de données dedans, et un sous-dossier « Photos ». Retrouvés par leurs appProperties.
 import { gjson, gfetch } from './google';
-import { NOMS_TABLES, entetes, VERSION_SCHEMA } from '../modele/schema';
+import { NOMS_TABLES, ONGLET, entetes, VERSION_SCHEMA } from '../modele/schema';
 
 const DRIVE = 'https://www.googleapis.com/drive/v3/files';
 const UPLOAD = 'https://www.googleapis.com/upload/drive/v3/files';
@@ -46,7 +46,7 @@ export async function trouverOuCreer(): Promise<Emplacement & { cree: boolean }>
 async function initialiserClasseur(id: string): Promise<void> {
   const SHEETS = `https://sheets.googleapis.com/v4/spreadsheets/${id}`;
   const info = await gjson<{ sheets: { properties: { sheetId: number } }[] }>(`${SHEETS}?fields=sheets.properties.sheetId`);
-  const requests: unknown[] = [...NOMS_TABLES, '_meta'].map(t => ({
+  const requests: unknown[] = [...NOMS_TABLES.map(t => ONGLET[t]), '_meta'].map(t => ({
     addSheet: { properties: { title: t, gridProperties: { frozenRowCount: 1 } } },
   }));
   requests.push(...info.sheets.map(s => ({ deleteSheet: { sheetId: s.properties.sheetId } })));
@@ -56,9 +56,9 @@ async function initialiserClasseur(id: string): Promise<void> {
     body: JSON.stringify({
       valueInputOption: 'RAW',
       data: [
-        ...NOMS_TABLES.map(t => ({ range: `'${t}'!A1`, values: [entetes(t)] })),
+        ...NOMS_TABLES.map(t => ({ range: `'${ONGLET[t]}'!A1`, values: [entetes(t)] })),
         { range: `'_meta'!A1`, values: [['cle', 'valeur'], ['version_schema', String(VERSION_SCHEMA)],
-          ['note', "Données de l'appli Cosplay Planner. Modifiable à la main : ne pas renommer les en-têtes ni la colonne id."]] },
+          ['note', "Données de l'appli Cosplay Planner. Modifiable à la main : ne pas renommer les onglets, les en-têtes ni la colonne id. Onglet Etapes = étapes d'une pièce (Doublure, Broderie…), onglet Sous-etapes = ce qu'on coche ; piste_id y désigne l'étape parente."]] },
       ],
     }),
   });

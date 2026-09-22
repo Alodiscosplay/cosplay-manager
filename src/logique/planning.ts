@@ -146,7 +146,7 @@ export function alertes(d: Donnees, jour: Jour, joursAvant = 14): Alerte[] {
       const etapes = etapesDePiece(d, p.id);
       const r = retard(etapes, jour);
       if (r.enRetard.length) res.push({ niveau: 'orange', costumeId: c.id,
-        texte: `${p.nom} (${c.nom}) : ${r.enRetard.length} étape${r.enRetard.length > 1 ? 's' : ''} en retard sur le planning` });
+        texte: `${p.nom} (${c.nom}) : ${r.enRetard.length} sous-étape${r.enRetard.length > 1 ? 's' : ''} en retard sur le planning` });
       for (const e of etapes) {
         if (bool(e.fait)) continue;
         const prevue = lireJour(e.date_prevue);

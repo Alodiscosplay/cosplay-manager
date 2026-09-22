@@ -84,7 +84,7 @@ function CarteCostume({ c }: { c: Ligne }) {
         <div class="puces">
           {dl && <Puce ton={dl < jour.value ? 'rouge' : 'accent'} titre={jourCourt(dl)}><Icone nom="drapeau" taille={12} />{ev ? `${ev.nom} ` : ''}{relatif(dl, jour.value)}</Puce>}
           {attend && <Puce ton="gris">attend {attend.nom}</Puce>}
-          {a.nb > 0 && <Puce ton="gris">{a.nbFait}/{a.nb} étapes</Puce>}
+          {a.nb > 0 && <Puce ton="gris">{a.nbFait}/{a.nb} sous-étapes</Puce>}
         </div>
       </div>
     </a>

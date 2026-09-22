@@ -85,7 +85,7 @@ export function PageCostume({ id, onglet = 'pieces' }: { id: string; onglet?: st
             {c.statut === 'en attente' && c.attend_costume_id && <Puce ton="gris">attend {ligne(d, 'Costumes', c.attend_costume_id)?.nom ?? '?'}</Puce>}
             {dl && <Puce ton={dl < jour.value ? 'rouge' : 'accent'}><Icone nom="drapeau" taille={12} />{ev ? `${ev.nom} · ` : ''}{jourCourt(dl)} ({relatif(dl, jour.value)})</Puce>}
             {c.debut && c.statut === 'projet' && <Puce ton="gris">début {jourCourt(c.debut)}</Puce>}
-            <Puce ton="gris">{a.nbFait}/{a.nb} étapes</Puce>
+            <Puce ton="gris">{a.nbFait}/{a.nb} sous-étapes</Puce>
           </div>
         </div>
       </header>

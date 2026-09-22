@@ -20,7 +20,7 @@ export function Bienvenue() {
         <h1>Cosplay Planner</h1>
         <p class="bienvenue-accroche">Planifier et suivre ses cosplays, pièce par pièce, étape par étape.</p>
         <ul class="bienvenue-points">
-          <li>Chaque costume détaillé en pièces, chaque pièce en étapes à cocher, avec le % d'avancement.</li>
+          <li>Chaque costume détaillé en pièces, chaque pièce en étapes et sous-étapes à cocher, avec le % d'avancement.</li>
           <li>« À faire » : seulement ce sur quoi tu travailles, dans le bon ordre.</li>
           <li>Une liste d'achats commune à tous tes costumes, et des commandes groupées.</li>
           <li>Agenda, dossier WIP en diaporama, archivage des costumes finis.</li>

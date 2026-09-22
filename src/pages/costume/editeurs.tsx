@@ -25,7 +25,7 @@ export function EditeurEtape({ id, onFermer }: { id: string; onFermer: () => voi
   const poidsPerso = e.poids && Number(e.poids) !== DUREES[duree];
 
   return (
-    <Feuille titre="Étape" onFermer={onFermer} pied={<>
+    <Feuille titre="Sous-étape" onFermer={onFermer} pied={<>
       <button class="bouton danger" onClick={() => { faire(supprimer('Etapes', id), `Étape « ${e.titre} » supprimée`); onFermer(); }}>Supprimer</button>
       <button class="bouton principal" onClick={onFermer}>Terminé</button>
     </>}>
@@ -36,7 +36,7 @@ export function EditeurEtape({ id, onFermer }: { id: string; onFermer: () => voi
         <span>Faite{bool(e.fait) && e.fait_le ? ` le ${jourCourt(e.fait_le)}` : ''}</span>
       </label>
       <div class="deux-colonnes">
-        <Champ label="Durée" aide="Plus c'est long, plus l'étape compte dans le %.">
+        <Champ label="Durée" aide="Plus c'est long, plus la sous-étape compte dans le %.">
           <Selection label="Durée" valeur={duree} options={NOMS_DUREES.map(n => [n, `${n} (${DUREES[n]})`] as [Duree, string])}
             onChange={v => m({ duree: v, poids: String(DUREES[v]) })} />
         </Champ>
@@ -49,13 +49,13 @@ export function EditeurEtape({ id, onFermer }: { id: string; onFermer: () => voi
         <Champ label="Deadline"><ChoixDate label="deadline" valeur={e.deadline ?? ''} onChange={v => m({ deadline: v })} /></Champ>
       </div>
       {pistes.length > 1 && (
-        <Champ label="Piste">
-          <Selection label="Piste" valeur={e.piste_id} options={pistes.map(p => [p.id, p.nom || 'Piste principale'] as [string, string])}
+        <Champ label="Étape">
+          <Selection label="Étape" valeur={e.piste_id} options={pistes.map(p => [p.id, p.nom || 'Étape principale'] as [string, string])}
             onChange={v => faire(deplacerEtape(d, id, v, etapesDePiste(d, v).length))} />
         </Champ>
       )}
       <ChoixAttentes table="Etapes" l={e} candidats={[...etapesCandidates(d, e), ...candidatsAttente(d, piece, e.piste_id)]}
-        aide="ex. « Couper le satin » attend « Vérifier le patron de la jupe ». Une étape peut aussi attendre la fin d'une piste ou d'une pièce." />
+        aide="ex. « Couper le satin » attend « Vérifier le patron de la jupe ». Une sous-étape peut aussi attendre la fin d'une étape ou d'une pièce." />
     </Feuille>
   );
 }
@@ -88,7 +88,7 @@ export function EditeurPiece({ id, onFermer }: { id: string; onFermer: () => voi
       <Champ label="Patron (facultatif)"><Texte valeur={p.patron ?? ''} placeholder="ex. TV341 vue B" onValider={v => m({ patron: v })} /></Champ>
       <Champ label="Notes"><Texte multiligne valeur={p.notes ?? ''} onValider={v => m({ notes: v })} /></Champ>
       <ChoixAttentes table="Pieces" l={p} candidats={autres} aide="La pièce entière attend que ces pièces soient finies." />
-      {dl && <button class="bouton" onClick={() => setRepartir(true)}>Répartir les étapes jusqu'au {jourCourt(dl)}</button>}
+      {dl && <button class="bouton" onClick={() => setRepartir(true)}>Répartir les sous-étapes jusqu'au {jourCourt(dl)}</button>}
       {repartir && <Repartir pieceId={id} onFermer={() => setRepartir(false)} />}
     </Feuille>
   );
@@ -105,28 +105,28 @@ export function EditeurPiste({ id, onFermer }: { id: string; onFermer: () => voi
   const piece = d.Pieces[p.piece_id];
   const m = (champs: Record<string, string>) => maj('Pistes', id, champs);
   return (
-    <Feuille titre="Piste" onFermer={onFermer} pied={<>
+    <Feuille titre="Étape" onFermer={onFermer} pied={<>
       <button class="bouton danger" onClick={() => { faire(supprimer('Pistes', id), 'Piste supprimée'); onFermer(); }}>Supprimer</button>
       <button class="bouton principal" onClick={onFermer}>Terminé</button>
     </>}>
-      <p class="petit-texte">Les pistes d'une même pièce avancent en parallèle.</p>
+      <p class="petit-texte">Les étapes d'une même pièce avancent en parallèle (ex. Doublure, Tripliure, Broderie).</p>
       <Champ label="Nom"><Texte valeur={p.nom ?? ''} placeholder="ex. Bijoux" onValider={v => m({ nom: v })} /></Champ>
       <fieldset class="choix-segments colonne">
-        <legend>Ordre des étapes</legend>
-        <label><input type="radio" name="ordre-piste" checked={!bool(p.libre)} onChange={() => m({ libre: '' })} /><span><strong>Dans l'ordre</strong> — chaque étape attend la précédente (couper avant de coudre)</span></label>
-        <label><input type="radio" name="ordre-piste" checked={bool(p.libre)} onChange={() => m({ libre: 'oui' })} /><span><strong>Libre</strong> — toutes les étapes sont faisables en même temps (vérifier deux patrons différents)</span></label>
+        <legend>Ordre des sous-étapes</legend>
+        <label><input type="radio" name="ordre-piste" checked={!bool(p.libre)} onChange={() => m({ libre: '' })} /><span><strong>Dans l'ordre</strong> — chaque sous-étape attend la précédente (couper avant d'assembler)</span></label>
+        <label><input type="radio" name="ordre-piste" checked={bool(p.libre)} onChange={() => m({ libre: 'oui' })} /><span><strong>Libre</strong> — toutes les sous-étapes sont faisables en même temps (vérifier deux patrons différents)</span></label>
       </fieldset>
       <label class="interrupteur">
         <input type="checkbox" checked={bool(p.active)} onChange={e => m({ active: txtBool((e.target as HTMLInputElement).checked) })} />
-        <span>Active : sa prochaine étape remonte dans « À faire »</span>
+        <span>Active : sa prochaine sous-étape remonte dans « À faire »</span>
       </label>
       <div class="deux-colonnes">
         <Champ label="Début (facultatif)"><ChoixDate label="date de début" valeur={p.debut ?? ''} onChange={v => m({ debut: v })} /></Champ>
         <Champ label="Deadline (facultative)"><ChoixDate label="deadline" valeur={p.deadline ?? ''} onChange={v => m({ deadline: v })} /></Champ>
       </div>
-      <ChoixAttentes table="Pistes" l={p} candidats={candidatsAttente(d, piece, id)} aide="ex. « Montage » attend « Tissu » et « Bijoux »." />
+      <ChoixAttentes table="Pistes" l={p} candidats={candidatsAttente(d, piece, id)} aide="ex. « Montage du corset » attend « Doublure », « Tripliure » et « Satin rouge »." />
       <div class="ligne-actions">
-        <button class="bouton" onClick={() => setAjoutModele(true)}><Icone nom="calques" taille={16} />Ajouter les étapes d'un modèle</button>
+        <button class="bouton" onClick={() => setAjoutModele(true)}><Icone nom="calques" taille={16} />Ajouter les sous-étapes d'un modèle</button>
         <button class="bouton" onClick={() => setModele(true)}>Enregistrer comme modèle</button>
       </div>
       {modele && <EnregistrerModele pisteId={id} onFermer={() => setModele(false)} />}
@@ -139,13 +139,13 @@ export function EditeurPiste({ id, onFermer }: { id: string; onFermer: () => voi
 function etapesCandidates(d: typeof donnees.value, e: Ligne): { id: string; nom: string; groupe?: string }[] {
   return pistesDe(d, e.piece_id).flatMap(p => etapesDePiste(d, p.id)
     .filter(x => x.id !== e.id)
-    .map(x => ({ id: x.id, nom: `${x.titre}${p.nom ? ` (${p.nom})` : ''}`, groupe: 'Étapes de cette pièce' })));
+    .map(x => ({ id: x.id, nom: `${x.titre}${p.nom ? ` (${p.nom})` : ''}`, groupe: 'Sous-étapes de cette pièce' })));
 }
 
 /** Ce qu'on peut attendre : les autres pistes de la pièce, et les autres pièces du costume. */
 function candidatsAttente(d: typeof donnees.value, piece: Ligne | undefined, sauf: string): { id: string; nom: string; groupe?: string }[] {
   if (!piece) return [];
-  const pistes = pistesDe(d, piece.id).filter(p => p.id !== sauf).map(p => ({ id: p.id, nom: p.nom || 'Piste principale', groupe: 'Pistes de cette pièce' }));
+  const pistes = pistesDe(d, piece.id).filter(p => p.id !== sauf).map(p => ({ id: p.id, nom: p.nom || 'Étape principale', groupe: 'Étapes de cette pièce' }));
   const pieces = piecesDe(d, piece.costume_id).filter(p => p.id !== piece.id).map(p => ({ id: p.id, nom: p.nom, groupe: 'Autres pièces' }));
   return [...pistes, ...pieces];
 }
@@ -198,19 +198,19 @@ export function CollerListe({ costumeId, pieceId, onFermer }: { costumeId: strin
   const piece = pieceId ? ligne(d, 'Pieces', pieceId) : undefined;
   const sansPiece = l.pieces[0] && !l.pieces[0].nom ? l.pieces[0].pistes.reduce((s, p) => s + p.etapes.length, 0) : 0;
   const ajouter = () => {
-    faire(appliquerListe(d, l, costumeId, pieceId), `${n.etapes} étape${n.etapes > 1 ? 's' : ''} ajoutée${n.etapes > 1 ? 's' : ''}`);
+    faire(appliquerListe(d, l, costumeId, pieceId), `${n.etapes} sous-étape${n.etapes > 1 ? 's' : ''} ajoutée${n.etapes > 1 ? 's' : ''}`);
     onFermer();
   };
   return (
-    <Feuille titre={piece ? `Coller des étapes dans « ${piece.nom} »` : 'Coller une liste'} large onFermer={onFermer} pied={<>
+    <Feuille titre={piece ? `Coller des sous-étapes dans « ${piece.nom} »` : 'Coller une liste'} large onFermer={onFermer} pied={<>
       <button class="bouton" onClick={onFermer}>Annuler</button>
       <button class="bouton principal" disabled={!n.etapes && !n.pieces} onClick={ajouter}>Ajouter</button>
     </>}>
-      <p class="petit-texte">Une étape par ligne. <code>## Nom</code> crée une pièce, <code>### Nom</code> une piste (en parallèle). Une durée entre parenthèses en fin de ligne : <code>(rapide)</code>, <code>(long)</code>, <code>(très long)</code>.</p>
+      <p class="petit-texte">Une sous-étape par ligne. <code>## Nom</code> crée une pièce, <code>### Nom</code> une étape (les étapes avancent en parallèle). Une durée entre parenthèses en fin de ligne : <code>(rapide)</code>, <code>(long)</code>, <code>(très long)</code>.</p>
       <textarea class="zone-collage" rows={12} autoFocus value={texte} onInput={e => setTexte((e.target as HTMLTextAreaElement).value)}
         placeholder={piece ? 'Couper le tissu\nAssembler (long)\nPerles sur le col (très long)' : '## Chapeau\n### Tissu\nPatronner\nCouper\n### Bijoux\nModéliser (long)\nCouler en Fimo\n## Robe\nToile et essayage (long)'} />
       <p class="apercu" aria-live="polite">
-        {n.pieces > 0 && `${n.pieces} pièce${n.pieces > 1 ? 's' : ''} · `}{n.etapes} étape{n.etapes > 1 ? 's' : ''}
+        {n.pieces > 0 && `${n.pieces} pièce${n.pieces > 1 ? 's' : ''} · `}{n.etapes} sous-étape{n.etapes > 1 ? 's' : ''}
         {sansPiece > 0 && !piece && ` · ${sansPiece} sans « ## » iront dans une nouvelle pièce`}
       </p>
     </Feuille>
@@ -224,13 +224,13 @@ export function ChoixModele({ pieceId, pisteId, onFermer }: { pieceId?: string; 
   const modeles = tous(d, 'Modeles');
   const inserer = (mo: Ligne) => {
     const l = analyserListe(mo.contenu);
-    if (pisteId) faire(ajouterModeleDansPiste(d, pisteId, l), `Étapes « ${mo.nom} » ajoutées`);
-    else faire(insererModele(d, pieceId!, mo.nom, l), `Piste « ${mo.nom} » ajoutée`);
+    if (pisteId) faire(ajouterModeleDansPiste(d, pisteId, l), `Sous-étapes « ${mo.nom} » ajoutées`);
+    else faire(insererModele(d, pieceId!, mo.nom, l), `Étape « ${mo.nom} » ajoutée`);
     onFermer();
   };
   return (
-    <Feuille titre={pisteId ? 'Ajouter les étapes d\'un modèle à la suite' : 'Ajouter une piste depuis un modèle'} onFermer={onFermer}>
-      {!modeles.length && <p>Aucun modèle. Crée-en dans Réglages, ou enregistre une piste existante comme modèle.</p>}
+    <Feuille titre={pisteId ? 'Ajouter les sous-étapes d\'un modèle à la suite' : 'Ajouter une étape depuis un modèle'} onFermer={onFermer}>
+      {!modeles.length && <p>Aucun modèle. Crée-en dans Réglages, ou enregistre une étape existante comme modèle.</p>}
       <div class="menu-liste">
         {modeles.map(mo => {
           const etapes = analyserListe(mo.contenu).pieces.flatMap(p => p.pistes.flatMap(pi => pi.etapes));
@@ -260,7 +260,7 @@ function EnregistrerModele({ pisteId, onFermer }: { pisteId: string; onFermer: (
       }}>Enregistrer</button>
     </>}>
       <Champ label="Nom du modèle"><input value={nom} autoFocus onInput={e => setNom((e.target as HTMLInputElement).value)} /></Champ>
-      <pre class="apercu-modele">{contenu || '(piste vide)'}</pre>
+      <pre class="apercu-modele">{contenu || '(étape vide)'}</pre>
     </Feuille>
   );
 }
@@ -276,11 +276,11 @@ export function Repartir({ pieceId, costumeId, onFermer }: { pieceId?: string; c
   const deja = (pieceId ? etapesDePiece(d, pieceId) : piecesDe(d, costumeId!).flatMap(p => etapesDePiece(d, p.id)))
     .filter(e => !bool(e.fait) && e.date_prevue).length;
   return (
-    <Confirmer titre="Répartir les étapes" bouton={`Planifier ${n} étape${n > 1 ? 's' : ''}`} onNon={onFermer}
-      onOui={() => { faire(appliquerRepartition(r), 'Étapes planifiées'); onFermer(); }}
+    <Confirmer titre="Répartir les sous-étapes" bouton={`Planifier ${n} sous-étape${n > 1 ? 's' : ''}`} onNon={onFermer}
+      onOui={() => { faire(appliquerRepartition(r), 'Sous-étapes planifiées'); onFermer(); }}
       texte={<>
-        <p>Les étapes restantes de <strong>{cible.nom}</strong> reçoivent une date prévue entre aujourd'hui et le <strong>{jourCourt(fin)}</strong>, proportionnellement à leur durée, dans l'ordre de chaque piste. Les pistes avancent en parallèle ; une piste qui en attend d'autres vient après.</p>
-        {deja > 0 && <p>{deja} étape{deja > 1 ? 's avaient' : ' avait'} déjà une date prévue : elle{deja > 1 ? 's seront remplacées' : ' sera remplacée'}.</p>}
+        <p>Les sous-étapes restantes de <strong>{cible.nom}</strong> reçoivent une date prévue entre aujourd'hui et le <strong>{jourCourt(fin)}</strong>, proportionnellement à leur durée, dans l'ordre de chaque étape. Les étapes avancent en parallèle ; une étape qui en attend d'autres vient après.</p>
+        {deja > 0 && <p>{deja} sous-étape{deja > 1 ? 's avaient' : ' avait'} déjà une date prévue : elle{deja > 1 ? 's seront remplacées' : ' sera remplacée'}.</p>}
         <p class="petit-texte">Tu pourras ensuite corriger chaque date à la main. « Annuler » dans le bandeau revient en arrière.</p>
       </>} />
   );

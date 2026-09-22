@@ -65,7 +65,7 @@ export function nomAttendu(d: Donnees, id: string): string {
   const piste = ligne(d, 'Pistes', id);
   if (piste) {
     const piece = ligne(d, 'Pieces', piste.piece_id);
-    return piste.nom || piece?.nom || 'piste';
+    return piste.nom || piece?.nom || 'étape';
   }
   return ligne(d, 'Pieces', id)?.nom ?? '(supprimé)';
 }

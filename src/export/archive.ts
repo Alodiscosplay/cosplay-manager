@@ -155,7 +155,7 @@ export function ficheHtml(d: Donnees, costumeId: string, fichiers: Record<string
     const ap = avancementPiece(d, p.id);
     const pistes = pistesDe(d, p.id);
     return `<section class="piece"><h3>${echap(p.nom)} <small>${formatPct(ap)}${p.patron ? ` · ${echap(p.patron)}` : ''}</small></h3>
-      ${pistes.map(pi => `${pistes.length > 1 || pi.nom ? `<h4>${echap(pi.nom || 'Piste principale')}</h4>` : ''}<ol>${etapesDePiste(d, pi.id).map(e =>
+      ${pistes.map(pi => `${pistes.length > 1 || pi.nom ? `<h4>${echap(pi.nom || 'Étape principale')}</h4>` : ''}<ol>${etapesDePiste(d, pi.id).map(e =>
         `<li class="${bool(e.fait) ? 'fait' : ''}">${bool(e.fait) ? '✓' : '○'} ${echap(e.titre)}${e.fait_le ? ` <small>${jourCourt(e.fait_le, '')}</small>` : ''}${e.detail ? `<br><small>${echap(e.detail)}</small>` : ''}</li>`).join('')}</ol>`).join('')}
       ${p.notes ? `<p class="notes">${echap(p.notes)}</p>` : ''}
       <div class="photos">${photos.filter(ph => ph.piece_id === p.id).map(ph => `<figure><img src="${fichiers[ph.drive_id]}" alt=""><figcaption>${jourCourt(ph.date, '')} ${echap(ph.legende ?? '')}</figcaption></figure>`).join('')}</div>
@@ -174,10 +174,10 @@ table{border-collapse:collapse;width:100%}td,th{border-bottom:1px solid #e3dcea;
 </style></head><body>
 <div class="tete">${ref ? `<img src="${ref}" alt="Image de référence">` : ''}<div>
 <h1>${echap(c.nom)}</h1><p>${echap([c.personnage, c.oeuvre].filter(Boolean).join(' — '))}</p>
-<p><strong>${formatPct(a)}</strong> · ${a.nbFait} étapes faites sur ${a.nb} · ${pieces.length} pièces</p>
+<p><strong>${formatPct(a)}</strong> · ${a.nbFait} sous-étapes faites sur ${a.nb} · ${pieces.length} pièces</p>
 ${c.deadline ? `<p>Deadline : ${jourCourt(c.deadline, '')}</p>` : ''}${c.notes ? `<p class="notes">${echap(c.notes)}</p>` : ''}
 <p><small>Archivé le ${jourCourt(new Date().toISOString().slice(0, 10), '')} avec Cosplay Planner.</small></p></div></div>
-<h2>Pièces et étapes</h2>${pieces.map(blocPiece).join('')}
+<h2>Pièces, étapes et sous-étapes</h2>${pieces.map(blocPiece).join('')}
 ${photos.some(p => !p.piece_id) ? `<h2>Photos générales</h2><div class="photos">${photos.filter(p => !p.piece_id).map(ph => `<figure><img src="${fichiers[ph.drive_id]}" alt=""><figcaption>${jourCourt(ph.date, '')} ${echap(ph.legende ?? '')}</figcaption></figure>`).join('')}</div>` : ''}
 <h2>Fournitures</h2>${fournitures.length ? `<table><tr><th>Quoi</th><th>Quantité</th><th>Fournisseur</th><th>Prix</th><th>Statut</th></tr>${fournitures.map(f => {
     const m = montant(f);

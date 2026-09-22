@@ -82,8 +82,8 @@ function EditeurPhoto({ id, costume, onFermer }: { id: string; costume: Ligne; o
         </Champ>
       </div>
       {etapes.length > 0 && (
-        <Champ label="Étape (facultatif)">
-          <Selection label="Étape" valeur={p.etape_id ?? ''} options={[['', '—'], ...etapes.map(e => [e.id, e.titre] as [string, string])]} onChange={v => m({ etape_id: v })} />
+        <Champ label="Sous-étape (facultatif)">
+          <Selection label="Sous-étape" valeur={p.etape_id ?? ''} options={[['', '—'], ...etapes.map(e => [e.id, e.titre] as [string, string])]} onChange={v => m({ etape_id: v })} />
         </Champ>
       )}
       <label class="interrupteur">

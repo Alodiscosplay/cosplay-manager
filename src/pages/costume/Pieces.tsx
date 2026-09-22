@@ -58,7 +58,7 @@ export function OngletPieces({ costume }: { costume: Ligne }) {
 
       {!pieces.length && (
         <Vide icone="calques" titre="Aucune pièce">
-          <p>Découpe le costume en pièces (jupe, corset, perruque, accessoires…), puis ajoute leurs étapes. Tu peux aussi tout coller d'un coup depuis une liste.</p>
+          <p>Découpe le costume en pièces (jupe, corset, perruque, accessoires…), puis leurs étapes et sous-étapes. Tu peux aussi tout coller d'un coup depuis une liste.</p>
         </Vide>
       )}
 
@@ -124,7 +124,7 @@ function CartePiece({ piece, ouvrir }: { piece: Ligne; ouvrir: (o: Ouvert) => vo
   }, [piece.id, replie, pistes.length]);
 
   const ajouterPiste = () => {
-    faire(creerPiste(d, piece.id, nouvellePiste.trim() || `Piste ${pistes.length + 1}`));
+    faire(creerPiste(d, piece.id, nouvellePiste.trim() || `Étape ${pistes.length + 1}`));
     setNouvellePiste('');
   };
 
@@ -143,8 +143,8 @@ function CartePiece({ piece, ouvrir }: { piece: Ligne; ouvrir: (o: Ouvert) => vo
             : sp !== 'terminée' && <button class="bouton petit" title="Travailler sur cette pièce" onClick={() => statut('en cours')}><Icone nom="lecture" taille={14} />En cours</button>}
           <Menu label={`Actions pour ${piece.nom}`} actions={[
             { texte: 'Modifier la pièce', icone: 'crayon', faire: () => ouvrir({ type: 'piece', id: piece.id }) },
-            { texte: 'Ajouter une piste depuis un modèle', icone: 'calques', faire: () => ouvrir({ type: 'modele', id: piece.id }) },
-            { texte: 'Coller des étapes', icone: 'coller', faire: () => ouvrir({ type: 'coller', id: piece.id }) },
+            { texte: 'Ajouter une étape depuis un modèle', icone: 'calques', faire: () => ouvrir({ type: 'modele', id: piece.id }) },
+            { texte: 'Coller des sous-étapes', icone: 'coller', faire: () => ouvrir({ type: 'coller', id: piece.id }) },
           ]} />
         </div>
       </header>
@@ -168,7 +168,7 @@ function CartePiece({ piece, ouvrir }: { piece: Ligne; ouvrir: (o: Ouvert) => vo
           <div class="ajout-piste">
             <form class="ajout-etape" onSubmit={ev => { ev.preventDefault(); ajouterPiste(); }}>
               <Icone nom="calques" taille={16} />
-              <input value={nouvellePiste} placeholder="Ajouter une piste (ex. Broderie)" aria-label={`Ajouter une piste à ${piece.nom}`}
+              <input value={nouvellePiste} placeholder="Ajouter une étape (ex. Doublure, Broderie)" aria-label={`Ajouter une étape à ${piece.nom}`}
                 onInput={ev => setNouvellePiste((ev.target as HTMLInputElement).value)} />
             </form>
             <button class="bouton petit" onClick={() => ouvrir({ type: 'modele', id: piece.id })}><Icone nom="plus" taille={14} />Depuis un modèle</button>
@@ -216,18 +216,18 @@ function BlocPiste({ piste, piece, ouvrir }: { piste: Ligne; piece: Ligne; ouvri
   return (
     <div class={`piste${bool(piste.active) ? '' : ' en-pause'}`} data-id={piste.id}>
       <div class="piste-tete">
-        <span class="poignee poignee-piste" aria-label="Déplacer la piste" title="Glisser pour réordonner les pistes"><Icone nom="poignee" taille={16} /></span>
-        <button class="piste-nom" onClick={() => ouvrir({ type: 'piste', id: piste.id })}>{piste.nom || 'Piste principale'}</button>
+        <span class="poignee poignee-piste" aria-label="Déplacer l'étape" title="Glisser pour réordonner les étapes"><Icone nom="poignee" taille={16} /></span>
+        <button class="piste-nom" onClick={() => ouvrir({ type: 'piste', id: piste.id })}>{piste.nom || 'Étape principale'}</button>
         <span class="piste-compte">{a.nbFait}/{a.nb}</span>
         <button class={`bascule-ordre${libre ? ' libre' : ''}`} onClick={() => maj('Pistes', piste.id, { libre: txtBool(!libre) })}
-          title={libre ? 'Libre : toutes les étapes sont faisables en même temps. Cliquer pour imposer l\'ordre.' : 'Dans l\'ordre : chaque étape attend la précédente. Cliquer pour rendre libre.'}>
+          title={libre ? 'Libre : toutes les sous-étapes sont faisables en même temps. Cliquer pour imposer l\'ordre.' : 'Dans l\'ordre : chaque sous-étape attend la précédente. Cliquer pour rendre libre.'}>
           {libre ? '⇉ libre' : '→ dans l\'ordre'}
         </button>
         <label class="bascule" title={bool(piste.active) ? 'Active : remonte dans « À faire »' : 'En pause : ne remonte pas dans « À faire »'}>
           <input type="checkbox" checked={bool(piste.active)} onChange={ev => maj('Pistes', piste.id, { active: txtBool((ev.target as HTMLInputElement).checked) })} />
           <span>{bool(piste.active) ? 'Active' : 'En pause'}</span>
         </label>
-        <button class="bouton-icone petit" aria-label={`Modifier la piste ${piste.nom}`} onClick={() => ouvrir({ type: 'piste', id: piste.id })}><Icone nom="crayon" taille={16} /></button>
+        <button class="bouton-icone petit" aria-label={`Modifier l'étape ${piste.nom}`} onClick={() => ouvrir({ type: 'piste', id: piste.id })}><Icone nom="crayon" taille={16} /></button>
       </div>
       {e.bloqueePar.length > 0 && !e.terminee && <p class="piste-bloquee"><Icone nom="cadenas" taille={14} />{texteAttente(e.bloqueePar)}</p>}
       {e.debutFutur && <p class="piste-bloquee"><Icone nom="horloge" taille={14} />commence le {jourCourt(e.debutFutur)}</p>}
@@ -236,7 +236,7 @@ function BlocPiste({ piste, piece, ouvrir }: { piste: Ligne; piece: Ligne; ouvri
       </ul>
       <form class="ajout-etape" onSubmit={ev => { ev.preventDefault(); ajouter(); }}>
         <Icone nom="plus" taille={16} />
-        <input value={texte} placeholder="Ajouter une étape" aria-label={`Ajouter une étape à ${piste.nom || piece.nom}`}
+        <input value={texte} placeholder="Ajouter une sous-étape" aria-label={`Ajouter une sous-étape à ${piste.nom || piece.nom}`}
           onInput={ev => setTexte((ev.target as HTMLInputElement).value)} />
       </form>
     </div>
@@ -250,7 +250,7 @@ function ChoixDuree({ etape }: { etape: Ligne }) {
   const perso = p !== DUREES[duree];
   return (
     <select class={`choix-duree duree-${duree.replace(' ', '-')}`} value={perso ? 'perso' : duree} aria-label={`Durée de « ${etape.titre} »`}
-      title="Durée : plus c'est long, plus l'étape compte dans le %"
+      title="Durée : plus c'est long, plus la sous-étape compte dans le %"
       onClick={e => e.stopPropagation()}
       onChange={e => { const v = (e.target as HTMLSelectElement).value as Duree; maj('Etapes', etape.id, { duree: v, poids: String(DUREES[v]) }); }}>
       {NOMS_DUREES.map(n => <option value={n}>{n} ({DUREES[n]})</option>)}
@@ -268,7 +268,7 @@ function LigneEtape({ etape, suivante, ouvrir }: { etape: Ligne; suivante: boole
   const dl = lireJour(etape.deadline);
   return (
     <li class={`etape${fait ? ' faite' : ''}${suivante ? ' suivante' : ''}`} data-id={etape.id}>
-      <span class="poignee" aria-label="Déplacer l'étape" title="Glisser pour réordonner ou changer de piste"><Icone nom="poignee" taille={16} /></span>
+      <span class="poignee" aria-label="Déplacer la sous-étape" title="Glisser pour réordonner ou changer d'étape"><Icone nom="poignee" taille={16} /></span>
       <Case coche={fait} label={etape.titre} onChange={v => faire(cocherEtape(d, etape.id, v, j))} />
       <button class="etape-texte" onClick={ouvrir}>
         <span class="etape-titre">{etape.titre}</span>

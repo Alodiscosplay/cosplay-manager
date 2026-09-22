@@ -75,7 +75,7 @@ export async function genererWip(d: Donnees, costumeId: string, opts: OptionsWip
     progres?.(`Pièce « ${nom} »`);
     const sec = pptx.addSlide({ masterName: 'WIP' });
     sec.addText(nom, { x: 0.8, y: 2.6, w: L - 1.6, h: 1.2, fontSize: 40, color: ACCENT, bold: true });
-    const infos = [piece?.patron ? `Patron : ${piece.patron}` : '', piece ? `${etapesDePiece(d, piece.id).length} étapes · ${formatPct(avancementPiece(d, piece.id))}` : ''].filter(Boolean).join('   ·   ');
+    const infos = [piece?.patron ? `Patron : ${piece.patron}` : '', piece ? `${etapesDePiece(d, piece.id).length} sous-étapes · ${formatPct(avancementPiece(d, piece.id))}` : ''].filter(Boolean).join('   ·   ');
     if (infos) sec.addText(infos, { x: 0.8, y: 3.8, w: L - 1.6, h: 0.5, fontSize: 16, color: DOUX });
 
     for (let i = 0; i < siennes.length; i += opts.parDiapo) {
@@ -100,7 +100,7 @@ export async function genererWip(d: Donnees, costumeId: string, opts: OptionsWip
   const a = avancementCostume(d, costumeId);
   fin.addText('Bilan', { x: 0.8, y: 0.8, w: L - 1.6, h: 0.8, fontSize: 32, color: ENCRE, bold: true });
   const lignes = [
-    `Avancement : ${formatPct(a)} (${a.nbFait} étapes sur ${a.nb})`,
+    `Avancement : ${formatPct(a)} (${a.nbFait} sous-étapes sur ${a.nb})`,
     `${piecesDe(d, costumeId).length} pièces · ${photos.length} photos de travail`,
   ];
   if (bool(c.suivi_budget)) {
@@ -127,10 +127,10 @@ function legende(d: Donnees, p: Ligne, piece: Ligne | undefined, detaille: boole
   const date = lireJour(p.date);
   const morceaux = [[date ? jourCourt(date, '') : '', p.legende].filter(Boolean).join(' — ')];
   const etape = ligne(d, 'Etapes', p.etape_id);
-  if (etape) morceaux.push(`Étape : ${etape.titre}`);
+  if (etape) morceaux.push(`Sous-étape : ${etape.titre}`);
   else if (piece && date) {
     const proches = etapesDePiece(d, piece.id).filter(e => bool(e.fait) && lireJour(e.fait_le) && Math.abs(ecartJours(lireJour(e.fait_le), date)) <= 3);
-    if (proches.length) morceaux.push(`Étapes : ${proches.slice(0, detaille ? 5 : 2).map(e => e.titre).join(', ')}`);
+    if (proches.length) morceaux.push(`Sous-étapes : ${proches.slice(0, detaille ? 5 : 2).map(e => e.titre).join(', ')}`);
   }
   return morceaux.filter(Boolean).join('\n');
 }

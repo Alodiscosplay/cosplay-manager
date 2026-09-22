@@ -87,11 +87,11 @@ function Modeles() {
   const [ouvert, setOuvert] = useState<string | null>(null);
   return (
     <section class="carte-reglage">
-      <h2>Modèles de pistes</h2>
-      <p class="petit-texte">Une suite d'étapes qui revient toujours dans le même ordre (impression 3D, perruque…). On l'insère comme piste dans n'importe quelle pièce.</p>
+      <h2>Modèles d'étapes</h2>
+      <p class="petit-texte">Une suite de sous-étapes qui revient toujours dans le même ordre (impression 3D, perruque…). On l'insère comme étape dans n'importe quelle pièce, ou à la suite d'une étape existante.</p>
       <ul class="liste-simple">
         {modeles.map(m => (
-          <li><button class="lien-bouton" onClick={() => setOuvert(m.id)}><strong>{m.nom}</strong></button> <span class="petit-texte">{compter(analyserListe(m.contenu)).etapes} étapes</span></li>
+          <li><button class="lien-bouton" onClick={() => setOuvert(m.id)}><strong>{m.nom}</strong></button> <span class="petit-texte">{compter(analyserListe(m.contenu)).etapes} sous-étapes</span></li>
         ))}
       </ul>
       <button class="bouton" onClick={() => { const id = nouvelId(); faire([{ table: 'Modeles', id, champs: { nom: 'Nouveau modèle', contenu: '', ordre: ordreSuivant(modeles) } }]); setOuvert(id); }}>
@@ -111,7 +111,7 @@ function EditeurModele({ id, onFermer }: { id: string; onFermer: () => void }) {
       <button class="bouton principal" onClick={onFermer}>Terminé</button>
     </>}>
       <Champ label="Nom"><Texte valeur={m.nom} onValider={v => v && maj({ nom: v })} /></Champ>
-      <Champ label="Étapes" aide="Une par ligne, durée facultative : (rapide), (long), (très long). « ### Nom » crée plusieurs pistes.">
+      <Champ label="Sous-étapes" aide="Une par ligne, durée facultative : (rapide), (long), (très long). « ### Nom » crée plusieurs étapes.">
         <Texte multiligne class="zone-collage" valeur={m.contenu} onValider={v => maj({ contenu: v })} />
       </Champ>
       <p class="petit-texte">Pour partager ce modèle avec un·e ami·e : copie le texte, il suffit de le coller dans un nouveau modèle.</p>
@@ -120,7 +120,7 @@ function EditeurModele({ id, onFermer }: { id: string; onFermer: () => void }) {
 }
 
 const TITRES: Partial<Record<NomTable, string>> = {
-  Costumes: 'Costume', Pieces: 'Pièce', Pistes: 'Piste', Etapes: 'Étape', Fournitures: 'Fourniture', Fournisseurs: 'Fournisseur',
+  Costumes: 'Costume', Pieces: 'Pièce', Pistes: 'Étape', Etapes: 'Sous-étape', Fournitures: 'Fourniture', Fournisseurs: 'Fournisseur',
   Commandes: 'Commande', Taches: 'Tâche', Photos: 'Photo', Evenements: 'Événement', Modeles: 'Modèle',
 };
 
@@ -134,7 +134,7 @@ function Corbeille() {
   return (
     <section class="carte-reglage">
       <h2>Corbeille</h2>
-      <p class="petit-texte">Ce qui a été supprimé reste restaurable. Restaurer un costume ramène aussi ses pièces et étapes.</p>
+      <p class="petit-texte">Ce qui a été supprimé reste restaurable. Restaurer un costume ramène aussi ses pièces, étapes et sous-étapes.</p>
       {!elements.length ? <p class="petit-texte">Vide.</p> : (
         <>
           <button class="bouton" onClick={() => setOuverte(!ouverte)}>{ouverte ? 'Masquer' : `Voir (${elements.length})`}</button>

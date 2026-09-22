@@ -30,7 +30,7 @@ export function OngletPlanning({ costume }: { costume: Ligne }) {
   if (dates.length === 1) {
     return (
       <Vide icone="tableau" titre="Rien de planifié">
-        <p>Donne une deadline au costume (ou à une pièce), puis « Répartir » place les étapes dans le temps. Tu peux aussi dater chaque étape à la main.</p>
+        <p>Donne une deadline au costume (ou à une pièce), puis « Répartir » place les sous-étapes dans le temps. Tu peux aussi dater chaque sous-étape à la main.</p>
         {dl && <button class="bouton principal" onClick={() => setRepartir(true)}>Répartir</button>}
       </Vide>
     );
@@ -40,7 +40,7 @@ export function OngletPlanning({ costume }: { costume: Ligne }) {
     <section>
       <div class="barre-outils">
         {dl && <button class="bouton" onClick={() => setRepartir(true)}>Répartir jusqu'au {jourCourt(dl)}</button>}
-        <span class="petit-texte">Chaque case : étapes prévues cette semaine (faites / prévues). ⚑ deadline · ▶ début</span>
+        <span class="petit-texte">Chaque case : sous-étapes prévues cette semaine (faites / prévues). ⚑ deadline · ▶ début</span>
       </div>
       <div class="planning-defile">
         <table class="planning">
