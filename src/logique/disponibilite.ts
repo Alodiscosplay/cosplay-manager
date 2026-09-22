@@ -42,9 +42,11 @@ export function champsStatutPiece(p: Ligne, statut: string, jour: Jour): Record<
   return statut === 'en pause' && debut && debut <= jour ? { statut, debut: '' } : { statut };
 }
 
-/** Une piste est ouverte si elle est active et que sa date de début (s'il y en a une) est atteinte. */
+/**
+ * Une étape est ouverte quand sa date de début (s'il y en a une) est atteinte. La mise en pause se fait
+ * sur la pièce ou le costume ; l'ancienne colonne `active` des étapes n'est plus lue.
+ */
 export function pisteOuverte(p: Ligne, jour: Jour): boolean {
-  if (!bool(p.active)) return false;
   const debut = lireJour(p.debut);
   return !debut || debut <= jour;
 }
@@ -98,7 +100,7 @@ export function texteAttente(a: Attente[]): string {
 
 export interface EtatPiste {
   piste: Ligne;
-  ouverte: boolean;        // active et date de début atteinte
+  ouverte: boolean;        // date de début atteinte (ou pas de date)
   debutFutur: Jour | '';   // date de début pas encore atteinte
   terminee: boolean;
   bloqueePar: Attente[];   // attentes de la piste elle-même
@@ -147,7 +149,6 @@ export interface Repli {
   costumesEnPause: Ligne[];
   costumesSansPieceEnCours: Ligne[];
   piecesEnPause: { costume: Ligne; piece: Ligne; debut: Jour | '' }[];
-  pistesEnPause: { costume: Ligne; piece: Ligne; piste: Ligne }[];
   pistesPlanifiees: { costume: Ligne; piece: Ligne; piste: Ligne; debut: Jour }[];
   bloquees: { costume: Ligne; piece: Ligne; piste: Ligne; etape?: Ligne; attente: Attente[] }[];
 }
@@ -157,7 +158,7 @@ export interface AFaire { elements: ElementAFaire[]; taches: Ligne[]; repli: Rep
 export function aFaire(d: Donnees, jour: Jour): AFaire {
   const repli: Repli = {
     costumesEnAttente: [], costumesProjet: [], costumesEnPause: [], costumesSansPieceEnCours: [],
-    piecesEnPause: [], pistesEnPause: [], pistesPlanifiees: [], bloquees: [],
+    piecesEnPause: [], pistesPlanifiees: [], bloquees: [],
   };
   const elements: ElementAFaire[] = [];
 
@@ -180,7 +181,6 @@ export function aFaire(d: Donnees, jour: Jour): AFaire {
       for (const piste of pistes) {
         const e = etatPiste(d, piste, jour);
         if (e.terminee) continue;
-        if (!bool(piste.active)) { repli.pistesEnPause.push({ costume, piece, piste }); continue; }
         if (e.debutFutur) { repli.pistesPlanifiees.push({ costume, piece, piste, debut: e.debutFutur }); continue; }
         const bloque = [...attentePiece, ...e.bloqueePar];
         if (bloque.length) { repli.bloquees.push({ costume, piece, piste, attente: bloque }); continue; }
@@ -202,7 +202,7 @@ export function aFaire(d: Donnees, jour: Jour): AFaire {
 
 export function tailleRepli(r: Repli): number {
   return r.costumesEnAttente.length + r.costumesProjet.length + r.costumesEnPause.length
-    + r.piecesEnPause.length + r.pistesEnPause.length
+    + r.piecesEnPause.length
     + r.pistesPlanifiees.length + r.bloquees.length;
 }
 

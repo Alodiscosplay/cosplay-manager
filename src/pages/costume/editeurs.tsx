@@ -7,7 +7,7 @@ import { creeraitBoucle, statutStockePiece, champsStatutPiece } from '../../logi
 import { analyserListe, compter, versTexte } from '../../logique/collerListe';
 import { repartirPiece, repartirCostume, deadlinePiece, deadlineCostume } from '../../logique/planning';
 import { jourCourt } from '../../logique/dates';
-import { DUREES, NOMS_DUREES, STATUTS_PIECE, bool, txtBool, liste, txtListe, type Duree, type Ligne, type NomTable } from '../../modele/schema';
+import { DUREES, NOMS_DUREES, STATUTS_PIECE, bool, liste, txtListe, type Duree, type Ligne, type NomTable } from '../../modele/schema';
 import { supprimer, appliquerListe, insererModele, ajouterModeleDansPiste, deplacerEtape, cocherEtape, appliquerRepartition, nouvelId } from '../../store/operations';
 import { Feuille, Champ, Texte, ChoixDate, Selection, Confirmer } from '../../composants/base';
 import { maj } from '../Costume';
@@ -120,10 +120,6 @@ export function EditeurPiste({ id, onFermer }: { id: string; onFermer: () => voi
         <label><input type="radio" name="ordre-piste" checked={!bool(p.libre)} onChange={() => m({ libre: '' })} /><span><strong>Dans l'ordre</strong> — chaque sous-étape attend la précédente</span></label>
         <label><input type="radio" name="ordre-piste" checked={bool(p.libre)} onChange={() => m({ libre: 'oui' })} /><span><strong>Libre</strong> — toutes les sous-étapes sont faisables en même temps</span></label>
       </fieldset>
-      <label class="interrupteur">
-        <input type="checkbox" checked={bool(p.active)} onChange={e => m({ active: txtBool((e.target as HTMLInputElement).checked) })} />
-        <span>Active : sa prochaine sous-étape remonte dans « À faire »</span>
-      </label>
       <div class="deux-colonnes">
         <Champ label="Début (facultatif)"><ChoixDate label="date de début" valeur={p.debut ?? ''} onChange={v => m({ debut: v })} /></Champ>
         <Champ label="Deadline (facultative)"><ChoixDate label="deadline" valeur={p.deadline ?? ''} min={p.debut || undefined} onChange={v => m({ deadline: v })} /></Champ>

@@ -70,12 +70,10 @@ describe('À faire : pistes, ordre, focus', () => {
     expect(titres(r)).toEqual(['assembler']);
   });
 
-  it('une piste en pause disparaît de « À faire » mais reste comptée', () => {
+  it('une ancienne étape marquée inactive remonte quand même : la pause se règle sur la pièce', () => {
     const { d, ids } = chapeau();
     d.Pistes[ids['Chapeau/Bijoux']].active = '';
-    const r = aFaire(d, '2026-10-01');
-    expect(titres(r)).toEqual(['patronner', 'assembler']);
-    expect(r.repli.pistesEnPause.map(p => p.piste.nom)).toEqual(['Bijoux']);
+    expect(titres(aFaire(d, '2026-10-01'))).toEqual(['patronner', 'modéliser', 'assembler']);
   });
 
   it('une pièce non focus n’apparaît pas, mais est comptée dans le repli', () => {

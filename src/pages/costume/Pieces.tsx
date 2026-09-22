@@ -231,7 +231,7 @@ function BlocPiste({ piste, piece, ouvrir }: { piste: Ligne; piece: Ligne; ouvri
   };
 
   return (
-    <div class={`piste${bool(piste.active) ? '' : ' en-pause'}`} data-id={piste.id}>
+    <div class="piste" data-id={piste.id}>
       <div class="piste-tete">
         <button class="bouton-icone petit" onClick={basculer} aria-expanded={!replie}
           aria-label={`${replie ? 'Déplier' : 'Replier'} l'étape ${piste.nom || 'principale'}`}><Icone nom={replie ? 'chevron' : 'bas'} taille={16} /></button>
@@ -242,10 +242,6 @@ function BlocPiste({ piste, piece, ouvrir }: { piste: Ligne; piece: Ligne; ouvri
           title={libre ? 'Libre : toutes les sous-étapes sont faisables en même temps. Cliquer pour imposer l\'ordre.' : 'Dans l\'ordre : chaque sous-étape attend la précédente. Cliquer pour rendre libre.'}>
           {libre ? '⇉ libre' : '→ dans l\'ordre'}
         </button>
-        <label class="bascule" title={bool(piste.active) ? 'Active : remonte dans « À faire »' : 'En pause : ne remonte pas dans « À faire »'}>
-          <input type="checkbox" checked={bool(piste.active)} onChange={ev => maj('Pistes', piste.id, { active: txtBool((ev.target as HTMLInputElement).checked) })} />
-          <span>{bool(piste.active) ? 'Active' : 'En pause'}</span>
-        </label>
         <button class="bouton-icone petit" aria-label={`Modifier l'étape ${piste.nom}`} onClick={() => ouvrir({ type: 'piste', id: piste.id })}><Icone nom="crayon" taille={16} /></button>
       </div>
       {e.bloqueePar.length > 0 && !e.terminee && <p class="piste-bloquee"><Icone nom="cadenas" taille={14} />{texteAttente(e.bloqueePar)}</p>}
