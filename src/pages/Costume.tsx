@@ -4,7 +4,7 @@ import { ligne, costumes, tous } from '../logique/acces';
 import { avancementCostume } from '../logique/avancement';
 import { statutCostume } from '../logique/disponibilite';
 import { deadlineCostume } from '../logique/planning';
-import { relatif, jourCourt } from '../logique/dates';
+import { relatif, jourCourt, ajouterJours } from '../logique/dates';
 import { STATUTS_COSTUME, bool, txtBool, type NomTable } from '../modele/schema';
 import { supprimer, nouvelId, purger } from '../store/operations';
 import { ajouterImage } from '../store/photos';
@@ -201,7 +201,7 @@ export function EditeurEvenement({ id, onFermer }: { id?: string; onFermer: (id?
       <Champ label="Nom"><input value={v.nom} autoFocus onInput={e => setV({ ...v, nom: (e.target as HTMLInputElement).value })} /></Champ>
       <div class="deux-colonnes">
         <Champ label="Du"><ChoixDate label="date de début" valeur={v.date_debut}
-          onChange={x => setV({ ...v, date_debut: x, date_fin: x && (!v.date_fin || v.date_fin < x) ? x : v.date_fin })} /></Champ>
+          onChange={x => setV({ ...v, date_debut: x, date_fin: x && (!v.date_fin || v.date_fin < x) ? ajouterJours(x, 1) : v.date_fin })} /></Champ>
         <Champ label="Au"><ChoixDate label="date de fin" valeur={v.date_fin} min={v.date_debut || undefined} onChange={x => setV({ ...v, date_fin: x })} /></Champ>
       </div>
       <Champ label="Lieu"><input value={v.lieu} onInput={e => setV({ ...v, lieu: (e.target as HTMLInputElement).value })} /></Champ>
