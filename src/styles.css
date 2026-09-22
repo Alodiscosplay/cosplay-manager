@@ -405,6 +405,22 @@ dialog.feuille::backdrop { background: rgb(20 12 28 / 45%); }
 .tuile-chiffre.depasse { border-color: var(--rouge); }
 .tuile-chiffre.depasse .legende { color: var(--rouge); }
 .budget { display: flex; flex-direction: column; gap: 14px; }
+.saisie-euros { display: flex; align-items: baseline; gap: 4px; }
+.tuile-chiffre input.chiffre-saisie { font: inherit; min-height: 0; border-radius: 0; box-shadow: none; width: auto; field-sizing: content; min-width: 2ch; max-width: 100%; border: 0; border-bottom: 1px dashed var(--bord); background: none; color: inherit; padding: 0; -moz-appearance: textfield; }
+.tuile-chiffre input.chiffre-saisie:focus { outline: none; border-bottom-color: var(--accent); }
+.chiffre-saisie::-webkit-inner-spin-button, .chiffre-saisie::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.budget .titre-section { margin: 8px 0 -8px; font-size: 1rem; }
+.barre-budget { display: flex; flex-direction: column; gap: 6px; }
+.barre-budget-piste { position: relative; display: flex; height: 18px; background: var(--surface-2); border-radius: 99px; overflow: visible; }
+.barre-budget-piste .seg { height: 100%; }
+.barre-budget-piste .seg:first-child { border-radius: 99px 0 0 99px; }
+.seg.recu, .pastille.recu { background: var(--vert); }
+.seg.commande, .pastille.commande { background: var(--accent); }
+.seg.prevu, .pastille.prevu { background: repeating-linear-gradient(45deg, color-mix(in srgb, var(--accent) 35%, var(--surface)) 0 6px, color-mix(in srgb, var(--accent) 18%, var(--surface)) 6px 12px); }
+.repere-cible { position: absolute; top: -4px; bottom: -4px; width: 2px; margin-left: -1px; background: var(--encre); border-radius: 2px; }
+.barre-budget-legende { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 0; font-size: .85rem; color: var(--doux); }
+.barre-budget-legende span { display: inline-flex; align-items: center; gap: 6px; }
+.pastille { display: inline-block; width: 10px; height: 10px; border-radius: 3px; }
 .barres-horizontales { display: flex; flex-direction: column; gap: 8px; }
 .barre-h { display: grid; grid-template-columns: minmax(80px, 30%) 1fr auto; gap: 10px; align-items: center; font-size: .9rem; }
 .barre-h-nom { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

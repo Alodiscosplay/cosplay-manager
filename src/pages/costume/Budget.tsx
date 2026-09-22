@@ -3,7 +3,8 @@ import { fournituresDe, piecesDe, piecesDeFourniture } from '../../logique/acces
 import { budgetCostume, montant, euros } from '../../logique/budget';
 import { type Ligne } from '../../modele/schema';
 import { maj } from '../Costume';
-import { Champ, Texte } from '../../composants/base';
+import { Texte } from '../../composants/base';
+import { type Budget } from '../../logique/budget';
 
 export function OngletBudget({ costume }: { costume: Ligne }) {
   const d = donnees.value;
@@ -27,15 +28,17 @@ export function OngletBudget({ costume }: { costume: Ligne }) {
         <div class="tuile-chiffre"><span class="chiffre">{euros(b.prevu)}</span><span class="legende">prévu (reste à acheter)</span></div>
         <div class="tuile-chiffre"><span class="chiffre">{euros(b.commande)}</span><span class="legende">commandé</span></div>
         <div class="tuile-chiffre"><span class="chiffre">{euros(b.recu)}</span><span class="legende">reçu</span></div>
-        <div class={`tuile-chiffre${depasse ? ' depasse' : ''}`}>
-          <span class="chiffre">{b.cible !== null ? euros(b.cible) : '—'}</span>
+        <label class={`tuile-chiffre${depasse ? ' depasse' : ''}`}>
+          <span class="chiffre saisie-euros"><Texte type="number" class="chiffre-saisie" valeur={costume.budget_prevu ?? ''} placeholder="—" onValider={v => maj('Costumes', costume.id, { budget_prevu: v })} /> €</span>
           <span class="legende">budget visé{depasse ? ` · dépassé de ${euros(b.total - b.cible!)}` : ''}</span>
-        </div>
+        </label>
       </div>
-      <Champ label="Budget visé (€)"><Texte type="number" valeur={costume.budget_prevu ?? ''} onValider={v => maj('Costumes', costume.id, { budget_prevu: v })} /></Champ>
+      {b.total > 0 && <BarreBudget b={b} />}
       {b.sansPrix > 0 && <p class="petit-texte">{b.sansPrix} fourniture{b.sansPrix > 1 ? 's' : ''} sans prix : le total est incomplet.</p>}
-      {parPiece.length > 0 && (
-        <div class="barres-horizontales" role="list" aria-label="Montant par pièce">
+      {parPiece.length > 0 && <>
+        <h3 class="titre-section">Coût par pièce</h3>
+        <p class="petit-texte">Ce que coûtent les fournitures de chaque pièce, pour voir laquelle pèse le plus. « Général » : les fournitures qui ne sont rattachées à aucune pièce.</p>
+        <div class="barres-horizontales" role="list" aria-label="Coût par pièce">
           {parPiece.map(x => (
             <div class="barre-h" role="listitem">
               <span class="barre-h-nom">{x.nom}</span>
@@ -44,8 +47,35 @@ export function OngletBudget({ costume }: { costume: Ligne }) {
             </div>
           ))}
         </div>
-      )}
-      <p class="petit-texte">Les frais de port restent au niveau des commandes (page Achats).</p>
+      </>}
     </section>
+  );
+}
+
+/**
+ * Où en sont les dépenses : reçu, puis commandé, puis encore à acheter, sur l'échelle du budget visé
+ * (ou du total s'il le dépasse, ou s'il n'y a pas de budget visé).
+ */
+function BarreBudget({ b }: { b: Budget }) {
+  const echelle = Math.max(b.total, b.cible ?? 0) || 1;
+  const pct = (x: number) => `${(100 * x) / echelle}%`;
+  const depense = b.recu + b.commande;
+  return (
+    <div class="barre-budget">
+      <div class="barre-budget-piste" role="img" aria-label={`${euros(depense)} reçus ou commandés, ${euros(b.prevu)} encore à acheter${b.cible !== null ? `, sur ${euros(b.cible)} visés` : ''}`}>
+        <span class="seg recu" style={{ width: pct(b.recu) }} />
+        <span class="seg commande" style={{ width: pct(b.commande) }} />
+        <span class="seg prevu" style={{ width: pct(b.prevu) }} />
+        {b.cible !== null && b.cible > 0 && <span class="repere-cible" style={{ left: pct(b.cible) }} />}
+      </div>
+      <p class="barre-budget-legende">
+        <span><i class="pastille recu" />reçu {euros(b.recu)}</span>
+        <span><i class="pastille commande" />commandé {euros(b.commande)}</span>
+        <span><i class="pastille prevu" />à acheter {euros(b.prevu)}</span>
+        {b.cible !== null && (b.total > b.cible
+          ? <strong class="erreur">{euros(b.total - b.cible)} au-dessus du budget</strong>
+          : <span>marge {euros(b.cible - b.total)}</span>)}
+      </p>
+    </div>
   );
 }
