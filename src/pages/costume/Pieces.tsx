@@ -55,13 +55,12 @@ export function OngletPieces({ costume }: { costume: Ligne }) {
           <input value={nouvelle} placeholder="Nouvelle pièce" aria-label="Nom de la nouvelle pièce" onInput={e => setNouvelle((e.target as HTMLInputElement).value)} />
           <button class="bouton principal" disabled={!nouvelle.trim()}><Icone nom="plus" />Pièce</button>
         </form>
-        <button class="bouton" onClick={() => setOuvert({ type: 'coller' })}><Icone nom="coller" />Coller une liste</button>
         {dl && pieces.length > 0 && <button class="bouton" onClick={() => setOuvert({ type: 'repartir' })}><Icone nom="agenda" />Répartir jusqu'au {jourCourt(dl)}</button>}
       </div>
 
       {!pieces.length && (
         <Vide icone="calques" titre="Aucune pièce">
-          <p>Découpe le costume en pièces, puis en étapes et sous-étapes. Tu peux aussi tout coller d'un coup depuis une liste.</p>
+          <p>Découpe le costume en pièces, puis en étapes et sous-étapes.</p>
         </Vide>
       )}
 
