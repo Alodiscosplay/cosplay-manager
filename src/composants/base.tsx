@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import { Icone } from './Icone';
 import { type Avancement, formatPct } from '../logique/avancement';
 import { chargerPhoto, urlConnue, photosChargees } from '../store/photos';
+import { lireJourSaisi, jourSaisi } from '../logique/dates';
 
 /** Case ronde au trait : un rond plein se lirait comme « déjà coché ». */
 export function Case({ coche, onChange, label, disabled }: { coche: boolean; onChange: (v: boolean) => void; label: string; disabled?: boolean }) {
@@ -92,12 +93,46 @@ export function Texte({ valeur, onValider, placeholder, multiligne, type = 'text
         onKeyDown={(e: KeyboardEvent) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }} />;
 }
 
-/** Date facultative, avec un bouton pour l'effacer. */
-export function ChoixDate({ valeur, onChange, label }: { valeur: string; onChange: (v: string) => void; label: string }) {
+/**
+ * Date facultative : on la TAPE (« 03/11/2026 », « 3/11/26 »…) ou on la choisit au calendrier (icône).
+ * `min` : date plancher (ex. le « Du » d'un « Au ») — le calendrier s'ouvre dessus, une date antérieure est refusée.
+ */
+export function ChoixDate({ valeur, onChange, label, min }: { valeur: string; onChange: (v: string) => void; label: string; min?: string }) {
+  const [texte, setTexte] = useState(jourSaisi(valeur));
+  const [erreur, setErreur] = useState('');
+  const calendrier = useRef<HTMLInputElement>(null);
+  useEffect(() => { setTexte(jourSaisi(valeur)); setErreur(''); }, [valeur]);
+
+  const valider = (brut: string) => {
+    if (!brut.trim()) { setErreur(''); if (valeur) onChange(''); return; }
+    const j = lireJourSaisi(brut);
+    if (!j) { setErreur('Date non reconnue (jj/mm/aaaa)'); return; }
+    if (min && j < min) { setErreur(`Pas avant le ${jourSaisi(min)}`); return; }
+    setErreur('');
+    setTexte(jourSaisi(j));
+    if (j !== valeur) onChange(j);
+  };
+  const ouvrirCalendrier = () => {
+    const c = calendrier.current;
+    if (!c) return;
+    // Sans date, le calendrier s'ouvre sur la date plancher (le « Du »).
+    c.value = valeur || min || '';
+    try { c.showPicker(); } catch { c.focus(); c.click(); }
+  };
+
   return (
     <div class="choix-date">
-      <input type="date" value={valeur} aria-label={label} onChange={e => onChange((e.target as HTMLInputElement).value)} />
-      {valeur && <button type="button" class="bouton-icone petit" aria-label={`Effacer ${label}`} onClick={() => onChange('')}><Icone nom="croix" taille={16} /></button>}
+      <div class={`champ-date${erreur ? ' invalide' : ''}`}>
+        <input type="text" inputMode="numeric" value={texte} placeholder="jj/mm/aaaa" aria-label={label} aria-invalid={!!erreur}
+          onInput={e => setTexte((e.target as HTMLInputElement).value)}
+          onBlur={e => valider((e.target as HTMLInputElement).value)}
+          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); valider((e.target as HTMLInputElement).value); } }} />
+        <button type="button" class="bouton-icone petit" aria-label={`Choisir ${label} dans le calendrier`} onClick={ouvrirCalendrier}><Icone nom="agenda" taille={16} /></button>
+        <input ref={calendrier} type="date" class="calendrier-cache" tabIndex={-1} aria-hidden="true" min={min || undefined}
+          onChange={e => { const v = (e.target as HTMLInputElement).value; if (v) valider(v); }} />
+      </div>
+      {valeur && <button type="button" class="bouton-icone petit" aria-label={`Effacer ${label}`} onClick={() => { setTexte(''); setErreur(''); onChange(''); }}><Icone nom="croix" taille={16} /></button>}
+      {erreur && <span class="erreur-date" role="alert">{erreur}</span>}
     </div>
   );
 }

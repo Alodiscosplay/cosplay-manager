@@ -164,7 +164,7 @@ export function FicheCostume({ id, onFermer, nouveau }: { id: string; onFermer: 
           <ChoixDate label="date de début" valeur={c.debut ?? ''} onChange={v => m({ debut: v })} />
         </Champ>
         <Champ label="Deadline (facultative)">
-          <ChoixDate label="deadline" valeur={c.deadline ?? ''} onChange={v => m({ deadline: v })} />
+          <ChoixDate label="deadline" valeur={c.deadline ?? ''} min={c.debut || undefined} onChange={v => m({ deadline: v })} />
         </Champ>
       </div>
       <Champ label="Convention / événement (facultatif)" aide="Sans deadline, la date de l'événement sert de deadline.">
@@ -200,8 +200,9 @@ export function EditeurEvenement({ id, onFermer }: { id?: string; onFermer: (id?
     </>}>
       <Champ label="Nom"><input value={v.nom} autoFocus onInput={e => setV({ ...v, nom: (e.target as HTMLInputElement).value })} /></Champ>
       <div class="deux-colonnes">
-        <Champ label="Du"><ChoixDate label="date de début" valeur={v.date_debut} onChange={x => setV({ ...v, date_debut: x })} /></Champ>
-        <Champ label="Au"><ChoixDate label="date de fin" valeur={v.date_fin} onChange={x => setV({ ...v, date_fin: x })} /></Champ>
+        <Champ label="Du"><ChoixDate label="date de début" valeur={v.date_debut}
+          onChange={x => setV({ ...v, date_debut: x, date_fin: x && (!v.date_fin || v.date_fin < x) ? x : v.date_fin })} /></Champ>
+        <Champ label="Au"><ChoixDate label="date de fin" valeur={v.date_fin} min={v.date_debut || undefined} onChange={x => setV({ ...v, date_fin: x })} /></Champ>
       </div>
       <Champ label="Lieu"><input value={v.lieu} onInput={e => setV({ ...v, lieu: (e.target as HTMLInputElement).value })} /></Champ>
       <Champ label="Notes"><textarea rows={2} value={v.notes} onInput={e => setV({ ...v, notes: (e.target as HTMLTextAreaElement).value })} /></Champ>

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { construire, appliquer, vide } from './aide';
+import { lireJourSaisi, jourSaisi } from '../src/logique/dates';
 import { avancement, avancementPiece, formatPct } from '../src/logique/avancement';
 import { aFaire, etapeDisponible, creeraitBoucle, texteAttente, champsStatutPiece } from '../src/logique/disponibilite';
 import { activationsDuJour } from '../src/logique/activation';
@@ -10,6 +11,16 @@ import { cocherEtape, creerCommandes, changerStatutCommande, appliquerListe, ins
 import { etapesDePiste, pistesDe, piecesDe, etapesDePiece, piecesDeFourniture } from '../src/logique/acces';
 
 const titres = (r: ReturnType<typeof aFaire>) => r.elements.map(e => e.etape.titre);
+
+describe('dates tapées au clavier', () => {
+  it('lit les formats courants et refuse les dates impossibles', () => {
+    for (const x of ['3/11/2026', '03/11/26', '3-11-2026', '3.11.26', '03112026', '031126', '2026-11-03', ' 3 11 2026 '])
+      expect(lireJourSaisi(x)).toBe('2026-11-03');
+    expect(lireJourSaisi('31/02/2026')).toBe('');
+    expect(lireJourSaisi('hier')).toBe('');
+    expect(jourSaisi('2026-11-03')).toBe('03/11/2026');
+  });
+});
 
 describe('avancement pondéré', () => {
   it('poids 1/2/1 : cocher l’étape de poids 2 donne 50 %', () => {

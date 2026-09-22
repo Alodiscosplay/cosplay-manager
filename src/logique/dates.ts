@@ -67,3 +67,29 @@ export function lundi(j: Jour): Jour {
   const decalage = (d.getDay() + 6) % 7;
   return ajouterJours(j, -decalage);
 }
+
+/**
+ * Date tapée au clavier : « 3/11/2026 », « 03/11/26 », « 3-11-2026 », « 3.11.26 », « 03112026 », « 2026-11-03 ».
+ * Renvoie '' si illisible ou si la date n'existe pas (31/02).
+ */
+export function lireJourSaisi(v: string): Jour {
+  const s = v.trim();
+  if (!s) return '';
+  let j: number, m: number, a: number;
+  let r = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(s);
+  if (r) { a = +r[1]; m = +r[2]; j = +r[3]; }
+  else if ((r = /^(\d{1,2})[/.\-\s](\d{1,2})[/.\-\s](\d{2}|\d{4})$/.exec(s))) { j = +r[1]; m = +r[2]; a = +r[3]; }
+  else if ((r = /^(\d{2})(\d{2})(\d{2}|\d{4})$/.exec(s))) { j = +r[1]; m = +r[2]; a = +r[3]; }
+  else return '';
+  if (a < 100) a += 2000;
+  const d = new Date(a, m - 1, j);
+  if (d.getFullYear() !== a || d.getMonth() !== m - 1 || d.getDate() !== j) return '';
+  return versJour(d);
+}
+
+/** « 03/11/2026 » pour l'affichage dans un champ. */
+export function jourSaisi(j: Jour): string {
+  if (!j) return '';
+  const [a, m, d] = j.split('-');
+  return `${d}/${m}/${a}`;
+}

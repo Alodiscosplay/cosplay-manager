@@ -85,7 +85,7 @@ export function EditeurPiece({ id, onFermer }: { id: string; onFermer: () => voi
         <Champ label="Début (facultatif)" aide="Une pièce en pause passe en cours toute seule ce jour-là.">
           <ChoixDate label="date de début" valeur={p.debut ?? ''} onChange={v => m({ debut: v })} />
         </Champ>
-        <Champ label="Deadline (facultative)"><ChoixDate label="deadline" valeur={p.deadline ?? ''} onChange={v => m({ deadline: v })} /></Champ>
+        <Champ label="Deadline (facultative)"><ChoixDate label="deadline" valeur={p.deadline ?? ''} min={p.debut || undefined} onChange={v => m({ deadline: v })} /></Champ>
       </div>
       <Champ label="Patron (facultatif)"><Texte valeur={p.patron ?? ''} onValider={v => m({ patron: v })} /></Champ>
       <Champ label="Notes"><Texte multiligne valeur={p.notes ?? ''} onValider={v => m({ notes: v })} /></Champ>
@@ -126,7 +126,7 @@ export function EditeurPiste({ id, onFermer }: { id: string; onFermer: () => voi
       </label>
       <div class="deux-colonnes">
         <Champ label="Début (facultatif)"><ChoixDate label="date de début" valeur={p.debut ?? ''} onChange={v => m({ debut: v })} /></Champ>
-        <Champ label="Deadline (facultative)"><ChoixDate label="deadline" valeur={p.deadline ?? ''} onChange={v => m({ deadline: v })} /></Champ>
+        <Champ label="Deadline (facultative)"><ChoixDate label="deadline" valeur={p.deadline ?? ''} min={p.debut || undefined} onChange={v => m({ deadline: v })} /></Champ>
       </div>
       <ChoixAttentes table="Pistes" l={p} candidats={candidatsAttente(d, piece, id)} aide="L'étape ne commence qu'une fois ces étapes terminées. Pour attendre une autre pièce, règle-le sur la pièce." />
       <div class="ligne-actions">
