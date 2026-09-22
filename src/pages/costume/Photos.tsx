@@ -1,4 +1,4 @@
-import { useState } from 'preact/hooks';
+import { useEffect, useState } from 'preact/hooks';
 import { donnees, faire, jour } from '../../store/store';
 import { photosDe, piecesDe, pistesDe, etapesDePiste, ligne } from '../../logique/acces';
 import { jourCourt } from '../../logique/dates';
@@ -13,6 +13,8 @@ export function OngletPhotos({ costume }: { costume: Ligne }) {
   const d = donnees.value;
   const photos = photosDe(d, costume.id);
   const [ouverte, setOuverte] = useState<string | null>(null);
+  // Liste figée à l'ouverture : trier une photo « divers » ne la fait pas disparaître de la navigation.
+  const [parcours, setParcours] = useState<string[]>([]);
   const [envoi, setEnvoi] = useState(0);
   const [filtre, setFiltre] = useState(''); // '' = toutes, '__divers' = à trier, sinon id de pièce
   const [ajout, setAjout] = useState(false);
@@ -51,7 +53,7 @@ export function OngletPhotos({ costume }: { costume: Ligne }) {
       {!visibles.length && <Vide icone="photo" titre="Aucune photo"><p>Les photos d'avancement servent au dossier WIP. Elles sont réduites avant l'envoi dans ton Drive.</p></Vide>}
       <div class="grille-photos">
         {visibles.map(p => (
-          <button class="tuile-photo" onClick={() => setOuverte(p.id)}>
+          <button class="tuile-photo" onClick={() => { setParcours(visibles.map(x => x.id)); setOuverte(p.id); }}>
             <PhotoImg id={p.drive_id} alt={p.legende || 'Photo'} />
             <span class="tuile-legende">
               {bool(p.dans_wip) && <Puce ton="accent">WIP</Puce>}
@@ -64,13 +66,32 @@ export function OngletPhotos({ costume }: { costume: Ligne }) {
       </div>
       {ajout && <AjoutPhotos costume={costume} pieceParDefaut={filtre && filtre !== '__divers' ? filtre : ''}
         onFichiers={ajouter} onFermer={() => setAjout(false)} />}
-      {ouverte && <EditeurPhoto id={ouverte} costume={costume} onFermer={() => setOuverte(null)} />}
+      {ouverte && <EditeurPhoto id={ouverte} costume={costume} parcours={parcours} onAller={setOuverte} onFermer={() => setOuverte(null)} />}
     </section>
   );
 }
 
-function EditeurPhoto({ id, costume, onFermer }: { id: string; costume: Ligne; onFermer: () => void }) {
+function EditeurPhoto({ id, costume, parcours, onAller, onFermer }: {
+  id: string; costume: Ligne; parcours: string[]; onAller: (id: string) => void; onFermer: () => void;
+}) {
   const d = donnees.value;
+  const ids = parcours.filter(x => d.Photos[x] && d.Photos[x].supprime !== 'oui');
+  const rang = ids.indexOf(id);
+  const precedente = rang > 0 ? ids[rang - 1] : undefined;
+  const suivante = rang >= 0 && rang < ids.length - 1 ? ids[rang + 1] : undefined;
+  // ← → pour passer d'une photo à l'autre (sauf pendant la saisie d'un champ)
+  useEffect(() => {
+    const touche = (e: KeyboardEvent) => {
+      const cible = e.target as HTMLElement;
+      if (/^(INPUT|TEXTAREA|SELECT)$/.test(cible.tagName)) return;
+      if (e.key === 'ArrowLeft' && precedente) { e.preventDefault(); aller(precedente); }
+      if (e.key === 'ArrowRight' && suivante) { e.preventDefault(); aller(suivante); }
+    };
+    window.addEventListener('keydown', touche);
+    return () => window.removeEventListener('keydown', touche);
+  }, [precedente, suivante]);
+  // Valide le champ en cours (légende) avant de changer de photo.
+  const aller = (x: string) => { (document.activeElement as HTMLElement | null)?.blur(); onAller(x); };
   const p = d.Photos[id];
   if (!p) return null;
   const m = (champs: Record<string, string>) => maj('Photos', id, champs);
@@ -84,7 +105,14 @@ function EditeurPhoto({ id, costume, onFermer }: { id: string; costume: Ligne; o
       <button class="bouton danger" onClick={() => { faire(supprimer('Photos', id), 'Photo supprimée'); onFermer(); }}>Supprimer</button>
       <button class="bouton principal" onClick={onFermer}>Terminé</button>
     </>}>
-      <div class="photo-grande"><PhotoImg id={p.drive_id} alt={p.legende || 'Photo'} /></div>
+      <div class="photo-grande">
+        <PhotoImg id={p.drive_id} alt={p.legende || 'Photo'} />
+        {ids.length > 1 && <>
+          <button class="fleche-photo gauche" disabled={!precedente} aria-label="Photo précédente" onClick={() => precedente && aller(precedente)}><Icone nom="retour" taille={24} /></button>
+          <button class="fleche-photo droite" disabled={!suivante} aria-label="Photo suivante" onClick={() => suivante && aller(suivante)}><Icone nom="chevron" taille={24} /></button>
+          <span class="rang-photo">{rang + 1} / {ids.length}</span>
+        </>}
+      </div>
       <Champ label="Légende"><Texte valeur={p.legende ?? ''} onValider={v => m({ legende: v })} /></Champ>
       <div class="deux-colonnes">
         <Champ label="Date"><ChoixDate label="date" valeur={p.date ?? ''} onChange={v => m({ date: v })} /></Champ>
