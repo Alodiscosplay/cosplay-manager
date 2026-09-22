@@ -339,6 +339,9 @@ dialog.feuille::backdrop { background: rgb(20 12 28 / 45%); }
 .choix-statut.gris { background: var(--surface-2) !important; color: var(--doux); }
 .choix-statut option { background: var(--surface); color: var(--encre); }
 .entete-groupe .fourniture-texte { cursor: pointer; }
+.total-fournitures { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; padding: 10px 14px; border-radius: var(--rayon); background: var(--accent-fond); }
+.total-titre { font-weight: 600; }
+.total-montant { font-size: 1.25rem; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--accent); }
 .total-quantite { color: var(--accent); font-weight: 600; }
 .details-groupe { list-style: none; margin: 0; padding: 0 0 0 28px; }
 .fourniture.detail { min-height: 44px; }
