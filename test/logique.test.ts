@@ -7,7 +7,7 @@ import { repartirSuite, repartirPiece, repartirCostume, retard } from '../src/lo
 import { quantiteNombre, budgetCostume, totalCommande } from '../src/logique/budget';
 import { analyserListe, versTexte } from '../src/logique/collerListe';
 import { cocherEtape, creerCommandes, changerStatutCommande, appliquerListe, insererModele, deplacerEtape, creerCostume } from '../src/store/operations';
-import { etapesDePiste, pistesDe, piecesDe, etapesDePiece } from '../src/logique/acces';
+import { etapesDePiste, pistesDe, piecesDe, etapesDePiece, piecesDeFourniture } from '../src/logique/acces';
 
 const titres = (r: ReturnType<typeof aFaire>) => r.elements.map(e => e.etape.titre);
 
@@ -213,6 +213,14 @@ describe('Répartir', () => {
 });
 
 describe('achats et budget', () => {
+  it('une fourniture peut concerner plusieurs pièces (et une ancienne valeur à une seule pièce reste lue)', () => {
+    const { d, ids } = construire({ pieces: [{ nom: 'Robe', pistes: [] }, { nom: 'Corset', pistes: [] }, { nom: 'Jupon', pistes: [] }] });
+    d.Fournitures.f = { id: 'f', maj: '', supprime: '', costume_id: ids.costume, libelle: 'Biais', piece_id: `${ids.Robe},${ids.Corset}` };
+    d.Fournitures.g = { id: 'g', maj: '', supprime: '', costume_id: ids.costume, libelle: 'Zip', piece_id: ids.Jupon };
+    expect(piecesDeFourniture(d, d.Fournitures.f).map(p => p.nom)).toEqual(['Robe', 'Corset']);
+    expect(piecesDeFourniture(d, d.Fournitures.g).map(p => p.nom)).toEqual(['Jupon']);
+  });
+
   it('lit les quantités écrites à la main', () => {
     expect(quantiteNombre('1m20')).toBeCloseTo(1.2);
     expect(quantiteNombre('1,5')).toBe(1.5);

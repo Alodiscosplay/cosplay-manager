@@ -38,6 +38,11 @@ export function fournituresDe(d: Donnees, costumeId: string): Ligne[] {
   return vivants(d.Fournitures).filter(f => f.costume_id === costumeId).sort(parOrdre);
 }
 
+/** Pièces concernées par une fourniture (0, 1 ou plusieurs ; les pièces supprimées sont ignorées). */
+export function piecesDeFourniture(d: Donnees, f: Ligne): Ligne[] {
+  return liste(f.piece_id).map(id => ligne(d, 'Pieces', id)).filter((p): p is Ligne => !!p);
+}
+
 export function photosDe(d: Donnees, costumeId: string): Ligne[] {
   return vivants(d.Photos).filter(p => p.costume_id === costumeId)
     .sort((a, b) => (a.date || '').localeCompare(b.date || '') || parOrdre(a, b));

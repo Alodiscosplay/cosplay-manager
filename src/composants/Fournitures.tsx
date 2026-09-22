@@ -1,22 +1,24 @@
 // Fournitures : une ligne de la liste de courses, et son éditeur. Partagé entre la page Achats et le costume.
 import { useState } from 'preact/hooks';
 import { donnees, faire } from '../store/store';
-import { costumes, piecesDe, tous, ligne } from '../logique/acces';
+import { costumes, piecesDe, piecesDeFourniture, tous, ligne } from '../logique/acces';
 import { montant, euros } from '../logique/budget';
-import { STATUTS_FOURNITURE, type Ligne } from '../modele/schema';
+import { STATUTS_FOURNITURE, liste, txtListe, type Ligne } from '../modele/schema';
 import { nouvelId, supprimer, retirerDeCommande } from '../store/operations';
 import { Feuille, Champ, Selection, Puce } from './base';
 import { Icone } from './Icone';
 
 const TON_STATUT: Record<string, 'gris' | 'accent' | 'vert' | 'orange'> = { 'à acheter': 'orange', 'commandé': 'accent', 'reçu': 'vert', 'déjà là': 'gris' };
 
-export function LigneFourniture({ f, afficherCostume, selectionnee, onSelection, onOuvrir }: {
-  f: Ligne; afficherCostume?: boolean; selectionnee?: boolean; onSelection?: (v: boolean) => void; onOuvrir: () => void;
+/** `pieceCourante` : affichée dans le groupe d'une pièce, la ligne ne cite que les AUTRES pièces concernées. */
+export function LigneFourniture({ f, afficherCostume, selectionnee, onSelection, onOuvrir, pieceCourante }: {
+  f: Ligne; afficherCostume?: boolean; selectionnee?: boolean; onSelection?: (v: boolean) => void; onOuvrir: () => void; pieceCourante?: string;
 }) {
   const d = donnees.value;
   const m = montant(f);
   const c = ligne(d, 'Costumes', f.costume_id);
-  const piece = ligne(d, 'Pieces', f.piece_id);
+  const pieces = piecesDeFourniture(d, f);
+  const autres = pieceCourante ? pieces.filter(p => p.id !== pieceCourante) : pieces;
   const statut = f.statut || 'à acheter';
   return (
     <li class={`fourniture statut-${statut.replace(/\s/g, '-')}`}>
@@ -29,7 +31,7 @@ export function LigneFourniture({ f, afficherCostume, selectionnee, onSelection,
         <span class="etape-meta">
           {(f.quantite || f.unite) && <span>{[f.quantite, f.unite].filter(Boolean).join(' ')}</span>}
           {afficherCostume && c && <span class="costume-nom">{c.nom}</span>}
-          {piece && <span>{piece.nom}</span>}
+          {autres.length > 0 && <span>{pieceCourante ? 'aussi : ' : ''}{autres.map(p => p.nom).join(', ')}</span>}
           {f.commande_id && ligne(d, 'Commandes', f.commande_id) && <span><Icone nom="boite" taille={12} />en commande</span>}
         </span>
       </button>
@@ -77,10 +79,22 @@ export function EditeurFourniture({ id, costumeId, onFermer }: { id?: string; co
           <Champ label="Pour le costume">
             <Selection label="Costume" valeur={v.costume_id} options={listeCostumes.map(c => [c.id, c.nom] as [string, string])} onChange={x => setV({ ...v, costume_id: x, piece_id: '' })} />
           </Champ>
-          <Champ label="Pièce (facultatif)">
-            <Selection label="Pièce" valeur={v.piece_id} options={[['', '—'], ...piecesDe(d, v.costume_id).map(p => [p.id, p.nom] as [string, string])]} onChange={x => setV({ ...v, piece_id: x })} />
-          </Champ>
         </div>
+        {piecesDe(d, v.costume_id).length > 0 && (
+          <fieldset class="attentes">
+            <legend>Pièces concernées (facultatif)</legend>
+            {piecesDe(d, v.costume_id).map(p => {
+              const ids = liste(v.piece_id);
+              return (
+                <label class="case-ligne">
+                  <input type="checkbox" checked={ids.includes(p.id)}
+                    onChange={e => setV({ ...v, piece_id: txtListe((e.target as HTMLInputElement).checked ? [...ids, p.id] : ids.filter(x => x !== p.id)) })} />
+                  <span>{p.nom}</span>
+                </label>
+              );
+            })}
+          </fieldset>
+        )}
         <div class="trois-colonnes">
           <Champ label="Quantité"><input value={v.quantite} onInput={change('quantite')} /></Champ>
           <Champ label="Unité"><input value={v.unite} onInput={change('unite')} /></Champ>

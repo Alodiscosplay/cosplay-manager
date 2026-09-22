@@ -115,7 +115,10 @@ export async function lireArchive(fichier: Blob, d: Donnees): Promise<{ changeme
   for (const [t, champsRef] of Object.entries(refs) as [NomTable, string[]][]) {
     for (const l of contenu.lignes[t] ?? []) {
       const champs = sansTechnique(l);
-      for (const k of champsRef) champs[k] = k === 'attend_costume_id' && !nouveaux.has(l[k]) ? (d.Costumes[l[k]] ? l[k] : '') : nid(l[k]);
+      for (const k of champsRef) {
+        if (k === 'attend_costume_id' && !nouveaux.has(l[k])) champs[k] = d.Costumes[l[k]] ? l[k] : '';
+        else champs[k] = txtListe(liste(l[k]).map(nid)); // un champ peut contenir plusieurs ids (pièces d'une fourniture)
+      }
       if (l.attend) champs.attend = txtListe(liste(l.attend).map(x => nouveaux.get(x) ?? '').filter(Boolean));
       if (t === 'Costumes') {
         champs.statut = 'terminé';
