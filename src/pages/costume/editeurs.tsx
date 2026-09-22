@@ -54,8 +54,8 @@ export function EditeurEtape({ id, onFermer }: { id: string; onFermer: () => voi
             onChange={v => faire(deplacerEtape(d, id, v, etapesDePiste(d, v).length))} />
         </Champ>
       )}
-      <ChoixAttentes table="Etapes" l={e} candidats={[...etapesCandidates(d, e), ...candidatsAttente(d, piece, e.piste_id)]}
-        aide="Une sous-étape peut attendre une autre sous-étape, la fin d'une étape ou celle d'une pièce." />
+      <ChoixAttentes table="Etapes" l={e} candidats={[...candidatsAttente(d, piece, e.piste_id), ...etapesCandidates(d, e)]}
+        aide="La sous-étape attend la fin d'une autre étape de la pièce, ou une sous-étape précise." />
     </Feuille>
   );
 }
@@ -124,7 +124,7 @@ export function EditeurPiste({ id, onFermer }: { id: string; onFermer: () => voi
         <Champ label="Début (facultatif)"><ChoixDate label="date de début" valeur={p.debut ?? ''} onChange={v => m({ debut: v })} /></Champ>
         <Champ label="Deadline (facultative)"><ChoixDate label="deadline" valeur={p.deadline ?? ''} onChange={v => m({ deadline: v })} /></Champ>
       </div>
-      <ChoixAttentes table="Pistes" l={p} candidats={candidatsAttente(d, piece, id)} aide="L'étape ne commence qu'une fois ces étapes ou pièces terminées." />
+      <ChoixAttentes table="Pistes" l={p} candidats={candidatsAttente(d, piece, id)} aide="L'étape ne commence qu'une fois ces étapes terminées. Pour attendre une autre pièce, règle-le sur la pièce." />
       <div class="ligne-actions">
         <button class="bouton" onClick={() => setAjoutModele(true)}><Icone nom="calques" taille={16} />Ajouter les sous-étapes d'un modèle</button>
         <button class="bouton" onClick={() => setModele(true)}>Enregistrer comme modèle</button>
@@ -143,11 +143,13 @@ function etapesCandidates(d: typeof donnees.value, e: Ligne): { id: string; nom:
 }
 
 /** Ce qu'on peut attendre : les autres pistes de la pièce, et les autres pièces du costume. */
+/**
+ * Ce qu'une étape (ou une sous-étape) peut attendre : les AUTRES étapes de sa pièce.
+ * Attendre une autre pièce se règle au niveau de la pièce, pas de l'étape.
+ */
 function candidatsAttente(d: typeof donnees.value, piece: Ligne | undefined, sauf: string): { id: string; nom: string; groupe?: string }[] {
   if (!piece) return [];
-  const pistes = pistesDe(d, piece.id).filter(p => p.id !== sauf).map(p => ({ id: p.id, nom: p.nom || 'Étape principale', groupe: 'Étapes de cette pièce' }));
-  const pieces = piecesDe(d, piece.costume_id).filter(p => p.id !== piece.id).map(p => ({ id: p.id, nom: p.nom, groupe: 'Autres pièces' }));
-  return [...pistes, ...pieces];
+  return pistesDe(d, piece.id).filter(p => p.id !== sauf).map(p => ({ id: p.id, nom: p.nom || 'Étape principale', groupe: 'Étapes de cette pièce' }));
 }
 
 export function ChoixAttentes({ table, l, candidats, aide }: { table: NomTable; l: Ligne; candidats: { id: string; nom: string; groupe?: string }[]; aide?: string }) {
