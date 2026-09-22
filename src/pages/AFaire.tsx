@@ -3,7 +3,7 @@ import { donnees, jour, faire } from '../store/store';
 import { aFaire, tailleRepli, texteAttente, type ElementAFaire } from '../logique/disponibilite';
 import { costumes, ligne, tous, ordreSuivant } from '../logique/acces';
 import { jourCourt, lireJour, relatif } from '../logique/dates';
-import { txtBool, type Ligne } from '../modele/schema';
+import { bool, txtBool, type Ligne } from '../modele/schema';
 import { cocherEtape, nouvelId, supprimer } from '../store/operations';
 import { Case, Feuille, Champ, Texte, ChoixDate, Selection, Vide } from '../composants/base';
 import { Icone } from '../composants/Icone';
@@ -17,9 +17,15 @@ export function PageAFaire() {
   const [tache, setTache] = useState<string | null>(null);
   const [nouvelle, setNouvelle] = useState('');
 
+  // Ce qu'elle a marqué urgent remonte en tête, et n'apparaît plus plus bas.
+  const urgents = r.elements.filter(e => bool(e.etape.urgent));
+  const tachesUrgentes = r.taches.filter(t => bool(t.urgent));
+  const taches = r.taches.filter(t => !bool(t.urgent));
+
   // Regroupement costume → pièce, dans l'ordre d'affichage
   const parCostume = new Map<string, { costume: Ligne; pieces: Map<string, ElementAFaire[]> }>();
   for (const e of r.elements) {
+    if (bool(e.etape.urgent)) continue;
     if (!parCostume.has(e.costume.id)) parCostume.set(e.costume.id, { costume: e.costume, pieces: new Map() });
     const g = parCostume.get(e.costume.id)!;
     g.pieces.set(e.piece.id, [...(g.pieces.get(e.piece.id) ?? []), e]);
@@ -51,6 +57,16 @@ export function PageAFaire() {
         <a class="alerte orange" href={lienCostume(c.id)}><Icone nom="lecture" taille={16} />{c.nom} est en cours, mais aucune de ses pièces : choisis sur quoi tu travailles</a>
       ))}
 
+      {(urgents.length > 0 || tachesUrgentes.length > 0) && (
+        <section class="groupe-afaire urgent">
+          <h2><Icone nom="alerte" taille={18} />Urgent</h2>
+          <ul class="etapes">
+            {urgents.map(e => <ElementLigne e={e} contexte />)}
+            {tachesUrgentes.map(t => <TacheLigne t={t} onOuvrir={setTache} />)}
+          </ul>
+        </section>
+      )}
+
       {[...parCostume.values()].map(({ costume, pieces }) => (
         <section class="groupe-afaire">
           <h2><a href={lienCostume(costume.id)}>{costume.nom}</a></h2>
@@ -68,18 +84,7 @@ export function PageAFaire() {
       <section class="groupe-afaire">
         <h2>Tâches libres</h2>
         <ul class="etapes">
-          {r.taches.map(t => (
-            <li class="etape">
-              <Case coche={false} label={t.titre} onChange={() => faire([{ table: 'Taches', id: t.id, champs: { fait: txtBool(true), fait_le: j } }], `« ${t.titre} » faite`)} />
-              <button class="etape-texte" onClick={() => setTache(t.id)}>
-                <span class="etape-titre">{t.titre}</span>
-                <span class="etape-meta">
-                  {lireJour(t.date) && <span class={lireJour(t.date) < j ? 'en-retard' : ''}><Icone nom="horloge" taille={12} />{jourCourt(t.date)} · {relatif(lireJour(t.date), j)}</span>}
-                  {ligne(d, 'Costumes', t.costume_id) && <span class="costume-nom">{ligne(d, 'Costumes', t.costume_id)!.nom}</span>}
-                </span>
-              </button>
-            </li>
-          ))}
+          {taches.map(t => <TacheLigne t={t} onOuvrir={setTache} />)}
         </ul>
         <form class="ajout-etape" onSubmit={e => { e.preventDefault(); ajouterTache(); }}>
           <Icone nom="plus" taille={16} />
@@ -106,23 +111,57 @@ export function PageAFaire() {
   );
 }
 
-function ElementLigne({ e }: { e: ElementAFaire }) {
+/** Le bouton qui met une ligne en avant (ou l'en retire). */
+function BoutonUrgent({ urgent, titre, onChange }: { urgent: boolean; titre: string; onChange: (v: boolean) => void }) {
+  return (
+    <button class={`bouton-icone petit bascule-urgent${urgent ? ' actif' : ''}`} aria-pressed={urgent}
+      aria-label={urgent ? `Retirer « ${titre} » de l'urgent` : `Marquer « ${titre} » urgent`}
+      title={urgent ? "Retirer de l'urgent" : 'Marquer urgent'} onClick={() => onChange(!urgent)}>
+      <Icone nom="alerte" taille={16} />
+    </button>
+  );
+}
+
+function TacheLigne({ t, onOuvrir }: { t: Ligne; onOuvrir: (id: string) => void }) {
+  const d = donnees.value;
+  const j = jour.value;
+  const urgent = bool(t.urgent);
+  return (
+    <li class="etape">
+      <Case coche={false} label={t.titre} onChange={() => faire([{ table: 'Taches', id: t.id, champs: { fait: txtBool(true), fait_le: j, urgent: '' } }], `« ${t.titre} » faite`)} />
+      <button class="etape-texte" onClick={() => onOuvrir(t.id)}>
+        <span class="etape-titre">{t.titre}</span>
+        <span class="etape-meta">
+          {urgent && <span>tâche libre</span>}
+          {lireJour(t.date) && <span class={lireJour(t.date) < j ? 'en-retard' : ''}><Icone nom="horloge" taille={12} />{jourCourt(t.date)} · {relatif(lireJour(t.date), j)}</span>}
+          {ligne(d, 'Costumes', t.costume_id) && <span class="costume-nom">{ligne(d, 'Costumes', t.costume_id)!.nom}</span>}
+        </span>
+      </button>
+      <BoutonUrgent urgent={urgent} titre={t.titre} onChange={v => faire([{ table: 'Taches', id: t.id, champs: { urgent: txtBool(v) } }])} />
+    </li>
+  );
+}
+
+function ElementLigne({ e, contexte }: { e: ElementAFaire; contexte?: boolean }) {
   const d = donnees.value;
   const j = jour.value;
   const prevue = lireJour(e.etape.date_prevue);
   const dl = lireJour(e.etape.deadline);
   return (
     <li class="etape">
-      <Case coche={false} label={e.etape.titre} onChange={() => faire(cocherEtape(d, e.etape.id, true, j), `« ${e.etape.titre} » cochée`)} />
+      <Case coche={false} label={e.etape.titre} onChange={() => faire([...cocherEtape(d, e.etape.id, true, j), { table: 'Etapes', id: e.etape.id, champs: { urgent: '' } }], `« ${e.etape.titre} » cochée`)} />
       <a class="etape-texte" href={lienCostume(e.costume.id)}>
         <span class="etape-titre">{e.etape.titre}</span>
         <span class="etape-meta">
+          {contexte && <span class="costume-nom">{e.costume.nom}</span>}
+          {contexte && <span>{e.piece.nom}</span>}
           {e.plusieursPistes && <span class="piste-etiquette">{e.piste.nom || 'étape principale'}</span>}
           {e.etape.duree && e.etape.duree !== 'normal' && <span>{e.etape.duree}</span>}
           {prevue && <span class={prevue < j ? 'en-retard' : ''}><Icone nom="horloge" taille={12} />{jourCourt(prevue)}</span>}
           {dl && <span class={dl < j ? 'en-retard' : ''}><Icone nom="drapeau" taille={12} />{jourCourt(dl)}</span>}
         </span>
       </a>
+      <BoutonUrgent urgent={bool(e.etape.urgent)} titre={e.etape.titre} onChange={v => faire([{ table: 'Etapes', id: e.etape.id, champs: { urgent: txtBool(v) } }])} />
     </li>
   );
 }
