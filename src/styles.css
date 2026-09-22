@@ -398,8 +398,8 @@ dialog.feuille::backdrop { background: rgb(20 12 28 / 45%); }
 .tuiles-chiffres { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
 .tuile-chiffre { background: var(--surface); border: 1px solid var(--bord); border-radius: var(--rayon); padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; }
 .tuile-chiffre .chiffre { font-size: 1.35rem; font-weight: 700; font-variant-numeric: tabular-nums; }
-.tuile-chiffre .legende { font-size: .8rem; color: var(--doux); display: flex; align-items: center; gap: 4px; }
-.bouton-info { border: 0; background: none; padding: 2px; margin: -2px 0; color: var(--doux); cursor: pointer; display: inline-flex; border-radius: 99px; opacity: .7; }
+.tuile-chiffre .legende { font-size: .8rem; color: var(--doux); white-space: nowrap; }
+.bouton-info { position: absolute; top: 6px; right: 6px; border: 0; background: none; padding: 2px; color: var(--doux); cursor: pointer; display: inline-flex; border-radius: 99px; opacity: .7; }
 .bouton-info:hover, .bouton-info:focus-visible, .bouton-info.actif { opacity: 1; color: var(--accent); }
 .tuile-chiffre { position: relative; }
 .tuile-chiffre:last-child .aide-tuile { left: auto; }

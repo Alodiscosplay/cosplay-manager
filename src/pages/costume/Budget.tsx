@@ -71,12 +71,10 @@ function TuileBudget({ nom, aide, chiffre, depasse, children }: { nom: string; a
   return (
     <div ref={zone} class={`tuile-chiffre${depasse ? ' depasse' : ''}`}>
       {children ?? <span class="chiffre">{euros(chiffre ?? 0)}</span>}
-      <span class="legende">
-        {nom}
-        <button class={`bouton-info${ouvert ? ' actif' : ''}`} aria-expanded={ouvert} aria-label={`Ce que compte le ${nom}`} onClick={() => setOuvert(!ouvert)}>
-          <Icone nom="info" taille={14} />
-        </button>
-      </span>
+      <span class="legende">{nom}</span>
+      <button class={`bouton-info${ouvert ? ' actif' : ''}`} aria-expanded={ouvert} aria-label={`Ce que compte le ${nom}`} onClick={() => setOuvert(!ouvert)}>
+        <Icone nom="info" taille={14} />
+      </button>
       {ouvert && <span class="aide-tuile" role="note">{aide}</span>}
     </div>
   );
