@@ -11,7 +11,7 @@ import { DUREES, NOMS_DUREES, bool, txtBool, type Duree, type Ligne } from '../.
 import { creerPiece, creerPiste, creerEtape, cocherEtape, deplacerEtape, reordonner } from '../../store/operations';
 import { Barre, Pct, Puce, Case, Menu, Vide } from '../../composants/base';
 import { Icone } from '../../composants/Icone';
-import { EditeurEtape, EditeurPiece, EditeurPiste, CollerListe, ChoixModele, Repartir, RattacherFournitures, nbFournituresHorsPieces } from './editeurs';
+import { EditeurEtape, EditeurPiece, EditeurPiste, CollerListe, ChoixModele, Repartir, RattacherFournitures, nbFournituresHorsPieces, EffacerDatesPrevues } from './editeurs';
 import { maj } from '../Costume';
 
 type Ouvert = { type: 'etape' | 'piece' | 'piste' | 'coller' | 'modele' | 'repartir' | 'fournitures' | 'fournitures-creation'; id?: string } | null;
@@ -56,6 +56,7 @@ export function OngletPieces({ costume }: { costume: Ligne }) {
           <button class="bouton principal" disabled={!nouvelle.trim()}><Icone nom="plus" />Pièce</button>
         </form>
         {dl && pieces.length > 0 && <button class="bouton" onClick={() => setOuvert({ type: 'repartir' })}><Icone nom="agenda" />Répartir jusqu'au {jourCourt(dl)}</button>}
+        <EffacerDatesPrevues costumeId={costume.id} />
       </div>
 
       {!pieces.length && (

@@ -94,6 +94,7 @@ export function EditeurPiece({ id, onFermer }: { id: string; onFermer: () => voi
       {rattacher && <RattacherFournitures pieceId={id} onFermer={() => setRattacher(false)} />}
       {dl && <button class="bouton" onClick={() => setRepartir(true)}>Répartir les sous-étapes jusqu'au {jourCourt(dl)}</button>}
       {repartir && <Repartir pieceId={id} onFermer={() => setRepartir(false)} />}
+      <EffacerDatesPrevues pieceId={id} />
     </Feuille>
   );
 }
@@ -320,3 +321,35 @@ export function Repartir({ pieceId, costumeId, onFermer }: { pieceId?: string; c
   );
 }
 
+
+// ---------- Annuler une répartition ----------
+
+/**
+ * Bouton « Effacer les dates prévues » (d'une pièce ou de tout le costume), avec confirmation.
+ * N'apparaît que s'il y a des dates prévues. Deadlines et dates de début ne sont pas touchées.
+ */
+export function EffacerDatesPrevues({ costumeId, pieceId }: { costumeId?: string; pieceId?: string }) {
+  const d = donnees.value;
+  const [confirmer, setConfirmer] = useState(false);
+  const etapes = pieceId ? etapesDePiece(d, pieceId) : piecesDe(d, costumeId!).flatMap(p => etapesDePiece(d, p.id));
+  const datees = etapes.filter(e => e.date_prevue);
+  if (!datees.length) return null;
+  const cible = pieceId ? `la pièce « ${d.Pieces[pieceId]?.nom} »` : 'ce costume';
+  return (
+    <>
+      <button type="button" class="bouton" onClick={() => setConfirmer(true)}><Icone nom="croix" taille={16} />Effacer les dates prévues</button>
+      {confirmer && (
+        <Confirmer titre="Effacer les dates prévues ?" bouton={`Effacer ${datees.length} date${datees.length > 1 ? 's' : ''}`} danger
+          onNon={() => setConfirmer(false)}
+          onOui={() => {
+            faire(datees.map(e => ({ table: 'Etapes' as const, id: e.id, champs: { date_prevue: '' } })), 'Dates prévues effacées');
+            setConfirmer(false);
+          }}
+          texte={<>
+            <p>Les {datees.length} sous-étape{datees.length > 1 ? 's' : ''} de {cible} qui ont une date prévue la perdent, qu'elle vienne de « Répartir » ou d'une saisie à la main.</p>
+            <p class="petit-texte">Les deadlines et les dates de début ne sont pas touchées. « Annuler » dans le bandeau revient en arrière.</p>
+          </>} />
+      )}
+    </>
+  );
+}

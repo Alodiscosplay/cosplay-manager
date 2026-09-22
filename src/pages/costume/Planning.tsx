@@ -6,7 +6,7 @@ import { deadlineCostume, retard } from '../../logique/planning';
 import { lundi, ajouterJours, lireJour, jourCourt, ecartJours } from '../../logique/dates';
 import { bool, type Ligne } from '../../modele/schema';
 import { Vide } from '../../composants/base';
-import { Repartir } from './editeurs';
+import { Repartir, EffacerDatesPrevues } from './editeurs';
 
 export function OngletPlanning({ costume }: { costume: Ligne }) {
   const d = donnees.value;
@@ -40,6 +40,7 @@ export function OngletPlanning({ costume }: { costume: Ligne }) {
     <section>
       <div class="barre-outils">
         {dl && <button class="bouton" onClick={() => setRepartir(true)}>Répartir jusqu'au {jourCourt(dl)}</button>}
+        <EffacerDatesPrevues costumeId={costume.id} />
         <span class="petit-texte">Chaque case : sous-étapes prévues cette semaine (faites / prévues). ⚑ deadline · ▶ début</span>
       </div>
       <div class="planning-defile">
