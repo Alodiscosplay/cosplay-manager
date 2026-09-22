@@ -88,7 +88,59 @@ export function cleNom(libelle: string | undefined): string {
   return (libelle ?? '').normalize('NFC').trim().replace(/\s+/g, ' ').toLocaleLowerCase('fr');
 }
 
-export interface Quantite { unite: string; total: number }
+/**
+ * Quantité totale d'un groupe. Les unités d'une même famille s'additionnent (longueur en mètres,
+ * poids en grammes, volume en millilitres) ; une unité inconnue (« coupon », « paires ») reste à part.
+ */
+export interface Quantite { unite: string; total: number; famille?: Famille }
+export type Famille = 'longueur' | 'masse' | 'volume';
+
+// unité → [famille, facteur vers l'unité de base (m, g, ml)]
+const UNITES: Record<string, [Famille, number]> = {
+  mm: ['longueur', 0.001], millimetre: ['longueur', 0.001],
+  cm: ['longueur', 0.01], centimetre: ['longueur', 0.01],
+  m: ['longueur', 1], mt: ['longueur', 1], mtr: ['longueur', 1], metre: ['longueur', 1],
+  km: ['longueur', 1000],
+  mg: ['masse', 0.001], g: ['masse', 1], gr: ['masse', 1], gramme: ['masse', 1], kg: ['masse', 1000], kilo: ['masse', 1000], kilogramme: ['masse', 1000],
+  ml: ['volume', 1], millilitre: ['volume', 1], cl: ['volume', 10], centilitre: ['volume', 10], dl: ['volume', 100], l: ['volume', 1000], litre: ['volume', 1000],
+};
+
+/** Reconnaît une unité écrite librement : « m », « mètres », « Cm », « kilos »… */
+export function uniteConnue(u: string): [Famille, number] | undefined {
+  const s = u.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\.$/, '').trim();
+  return UNITES[s] ?? UNITES[s.replace(/s$/, '')];
+}
+
+const RE_MESURE = /(\d+(?:[.,]\d+)?)\s*([a-zA-Zéèêàâîôû]+)\.?/g;
+
+/**
+ * Mesure d'une ligne dans sa famille. Exemples (quantité × unité) :
+ * 3 × m → 3 m ; 10 × cm → 0,1 m ; 2 × « coupon de 3 m » → 6 m ; « 1m20 » (quantité seule) → 1,2 m.
+ */
+export function mesure(f: Ligne): Quantite {
+  const q = quantiteNombre(f.quantite);
+  let u = (f.unite ?? '').trim();
+  if (!u) {
+    // unité tapée dans la quantité : « 3 m », « 10cm », « 1m20 »
+    const m = /^\s*\d+(?:[.,]\d+)?\s*([a-zA-Zéèêàâîôû]+)/.exec(f.quantite ?? '');
+    if (m) u = m[1];
+  }
+  const directe = uniteConnue(u);
+  if (directe) return { unite: u, total: q * directe[1], famille: directe[0] };
+  // une unité qui contient une mesure : « coupon de 3 m », « bobine 500 m », « sachet de 250 g »
+  for (const m of u.matchAll(RE_MESURE)) {
+    const connue = uniteConnue(m[2]);
+    if (connue) return { unite: u, total: q * num(m[1]) * connue[1], famille: connue[0] };
+  }
+  return { unite: u, total: q };
+}
+
+function ajouter(quantites: Quantite[], m: Quantite): void {
+  const cle = (x: Quantite) => x.famille ?? `autre:${x.unite.toLocaleLowerCase('fr')}`;
+  const q = quantites.find(x => cle(x) === cle(m));
+  if (q) q.total += m.total; else quantites.push({ ...m });
+}
+
 export interface GroupeNom { cle: string; libelle: string; lignes: Ligne[]; quantites: Quantite[]; montant: number; sansPrix: number }
 
 /** Groupes triés par ordre alphabétique : deux noms presque identiques se retrouvent côte à côte. */
@@ -99,16 +151,24 @@ export function regrouperParNom(lignes: Ligne[]): GroupeNom[] {
     if (!groupes.has(cle)) groupes.set(cle, { cle, libelle: (f.libelle ?? '').trim(), lignes: [], quantites: [], montant: 0, sansPrix: 0 });
     const g = groupes.get(cle)!;
     g.lignes.push(f);
-    const unite = (f.unite ?? '').trim();
-    const q = g.quantites.find(x => x.unite.toLocaleLowerCase('fr') === unite.toLocaleLowerCase('fr'));
-    if (q) q.total += quantiteNombre(f.quantite); else g.quantites.push({ unite, total: quantiteNombre(f.quantite) });
+    ajouter(g.quantites, mesure(f));
     const m = montant(f);
     if (m === null) g.sansPrix++; else g.montant += m;
   }
   return [...groupes.values()].sort((a, b) => a.cle.localeCompare(b.cle, 'fr'));
 }
 
-/** « 8 m », « 8 m + 2 sachets », « 3 ». */
+const nombre = (n: number, decimales: number) => {
+  const arrondi = Math.round(n * 10 ** decimales) / 10 ** decimales;
+  return (Number.isInteger(arrondi) ? String(arrondi) : arrondi.toFixed(decimales)).replace('.', ',');
+};
+
+/** « 3,10 m », « 3,10 m + 250 g + 2 paires », « 3 ». */
 export function texteQuantites(q: Quantite[]): string {
-  return q.map(x => `${Math.round(x.total * 100) / 100}`.replace('.', ',') + (x.unite ? ` ${x.unite}` : '')).join(' + ');
+  return q.map(x => {
+    if (x.famille === 'longueur') return x.total >= 1 ? `${nombre(x.total, 2)} m` : `${nombre(x.total * 100, 1)} cm`;
+    if (x.famille === 'masse') return x.total >= 1000 ? `${nombre(x.total / 1000, 2)} kg` : `${nombre(x.total, 0)} g`;
+    if (x.famille === 'volume') return x.total >= 1000 ? `${nombre(x.total / 1000, 2)} l` : `${nombre(x.total, 0)} ml`;
+    return nombre(x.total, 2) + (x.unite ? ` ${x.unite}` : '');
+  }).join(' + ');
 }

@@ -232,6 +232,18 @@ describe('achats et budget', () => {
     expect(texteQuantites(g[1].quantites)).toBe('8 m + 2 coupons');
   });
 
+  it('additionne les unités d’une même famille, et laisse à part ce qui ne se convertit pas', () => {
+    const f = (quantite: string, unite: string) => ({ id: quantite + unite, maj: '', supprime: '', libelle: 'Satin', quantite, unite });
+    const total = (...l: ReturnType<typeof f>[]) => texteQuantites(regrouperParNom(l)[0].quantites);
+    expect(total(f('3', 'm'), f('10', 'cm'))).toBe('3,10 m');
+    expect(total(f('2', 'coupon de 3 m'), f('50', 'cm'))).toBe('6,50 m');
+    expect(total(f('1m20', ''), f('1', 'mètre'))).toBe('2,20 m');
+    expect(total(f('250', 'g'), f('1', 'kg'))).toBe('1,25 kg');
+    expect(total(f('3', 'm'), f('250', 'g'), f('2', 'paires'))).toBe('3 m + 250 g + 2 paires');
+    expect(total(f('2', 'coupons'), f('1', 'Coupons'))).toBe('3 coupons');
+    expect(total(f('30', 'cm'))).toBe('30 cm');
+  });
+
   it('lit les quantités écrites à la main', () => {
     expect(quantiteNombre('1m20')).toBeCloseTo(1.2);
     expect(quantiteNombre('1,5')).toBe(1.5);
