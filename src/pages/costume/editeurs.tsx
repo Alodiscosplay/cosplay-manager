@@ -54,8 +54,8 @@ export function EditeurEtape({ id, onFermer }: { id: string; onFermer: () => voi
             onChange={v => faire(deplacerEtape(d, id, v, etapesDePiste(d, v).length))} />
         </Champ>
       )}
-      <ChoixAttentes table="Etapes" l={e} candidats={[...candidatsAttente(d, piece, e.piste_id), ...etapesCandidates(d, e)]}
-        aide="La sous-étape attend la fin d'une autre étape de la pièce, ou une sous-étape précise." />
+      <ChoixAttentes table="Etapes" l={e} candidats={candidatsAttente(d, piece, e.piste_id)}
+        aide="La sous-étape attend la fin d'une autre étape de la pièce. L'ordre entre sous-étapes se règle sur l'étape (dans l'ordre ou libre)." />
     </Feuille>
   );
 }
@@ -135,14 +135,6 @@ export function EditeurPiste({ id, onFermer }: { id: string; onFermer: () => voi
   );
 }
 
-/** Les autres étapes de la même pièce, qu'une étape peut attendre précisément. */
-function etapesCandidates(d: typeof donnees.value, e: Ligne): { id: string; nom: string; groupe?: string }[] {
-  return pistesDe(d, e.piece_id).flatMap(p => etapesDePiste(d, p.id)
-    .filter(x => x.id !== e.id)
-    .map(x => ({ id: x.id, nom: `${x.titre}${p.nom ? ` (${p.nom})` : ''}`, groupe: 'Sous-étapes de cette pièce' })));
-}
-
-/** Ce qu'on peut attendre : les autres pistes de la pièce, et les autres pièces du costume. */
 /**
  * Ce qu'une étape (ou une sous-étape) peut attendre : les AUTRES étapes de sa pièce.
  * Attendre une autre pièce se règle au niveau de la pièce, pas de l'étape.
