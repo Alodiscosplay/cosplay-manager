@@ -1,8 +1,8 @@
 import { useState } from 'preact/hooks';
 import { donnees, jour, faire } from '../store/store';
-import { ligne, costumes, tous } from '../logique/acces';
+import { ligne, costumes, tous, piecesDe } from '../logique/acces';
 import { avancementCostume } from '../logique/avancement';
-import { statutCostume } from '../logique/disponibilite';
+import { statutCostume, pieceTerminee } from '../logique/disponibilite';
 import { deadlineCostume } from '../logique/planning';
 import { relatif, jourCourt, ajouterJours } from '../logique/dates';
 import { STATUTS_COSTUME, bool, txtBool, type NomTable } from '../modele/schema';
@@ -34,6 +34,8 @@ export function PageCostume({ id, onglet = 'pieces' }: { id: string; onglet?: st
   if (c.statut === 'archivé') aller('/archives');
 
   const a = avancementCostume(d, id);
+  const piecesCostume = piecesDe(d, id);
+  const nbTerminees = piecesCostume.filter(p => pieceTerminee(d, p.id)).length;
   const sc = statutCostume(c, jour.value);
   const dl = deadlineCostume(d, c);
   const ev = ligne(d, 'Evenements', c.evenement_id);
@@ -85,7 +87,7 @@ export function PageCostume({ id, onglet = 'pieces' }: { id: string; onglet?: st
             {c.statut === 'en attente' && c.attend_costume_id && <Puce ton="gris">attend {ligne(d, 'Costumes', c.attend_costume_id)?.nom ?? '?'}</Puce>}
             {dl && <Puce ton={dl < jour.value ? 'rouge' : 'accent'}><Icone nom="drapeau" taille={12} />{ev ? `${ev.nom} · ` : ''}{jourCourt(dl)} ({relatif(dl, jour.value)})</Puce>}
             {c.debut && c.statut === 'projet' && <Puce ton="gris">début {jourCourt(c.debut)}</Puce>}
-            <Puce ton="gris">{a.nbFait}/{a.nb} sous-étapes</Puce>
+            <Puce ton="gris">{nbTerminees}/{piecesCostume.length} pièce{piecesCostume.length > 1 ? 's' : ''} terminée{piecesCostume.length > 1 ? 's' : ''}</Puce>
           </div>
         </div>
       </header>
