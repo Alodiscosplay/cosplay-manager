@@ -1,12 +1,12 @@
 import { useState } from 'preact/hooks';
 import { donnees, mode, sync, synchroniser, faire, demarrer, quitter, reinitialiserDemo, emplacement } from '../store/store';
 import { tous, ordreSuivant, ligne } from '../logique/acces';
-import { analyserListe, compter } from '../logique/collerListe';
-import { NOMS_TABLES, type NomTable, type Ligne } from '../modele/schema';
+import { analyserListe, compter, modeleVersTexte, texteVersModele, type PisteTexte } from '../logique/collerListe';
+import { NOMS_TABLES, DUREES, NOMS_DUREES, type NomTable, type Ligne, type Duree } from '../modele/schema';
 import { restaurer, nouvelId, supprimer } from '../store/operations';
 import { connecter, deconnecter, emailConnu, googleConfigure } from '../sync/google';
 import { placePhotos, urlClasseur } from '../sync/drive';
-import { Feuille, Champ, Texte, Confirmer, telechargerBlob } from '../composants/base';
+import { Feuille, Champ, Confirmer, telechargerBlob } from '../composants/base';
 import { Icone } from '../composants/Icone';
 import { jourCourt } from '../logique/dates';
 
@@ -102,19 +102,82 @@ function Modeles() {
   );
 }
 
+/**
+ * Formulaire guidé d'un modèle : des étapes, et dans chacune des sous-étapes avec leur durée.
+ * Enregistré au format texte de « Coller une liste » (partageable), à la fermeture.
+ */
 function EditeurModele({ id, onFermer }: { id: string; onFermer: () => void }) {
   const m = donnees.value.Modeles[id];
-  const maj = (champs: Record<string, string>) => faire([{ table: 'Modeles', id, champs }]);
+  const [nom, setNom] = useState(m.nom);
+  const [etapes, setEtapes] = useState<PisteTexte[]>(() => {
+    const lues = texteVersModele(m.contenu ?? '');
+    return lues.length ? lues : [{ nom: '', etapes: [] }];
+  });
+  const [partage, setPartage] = useState(false);
+  const contenu = modeleVersTexte(etapes);
+
+  const enregistrer = () => {
+    (document.activeElement as HTMLElement | null)?.blur();
+    if (nom.trim() !== m.nom || contenu !== m.contenu) faire([{ table: 'Modeles', id, champs: { nom: nom.trim() || m.nom, contenu } }]);
+    onFermer();
+  };
+  const changerEtape = (i: number, e: PisteTexte) => setEtapes(etapes.map((x, k) => (k === i ? e : x)));
+  const deplacer = <T,>(l: T[], i: number, sens: -1 | 1): T[] => { const c = [...l]; [c[i], c[i + sens]] = [c[i + sens], c[i]]; return c; };
+
   return (
-    <Feuille titre="Modèle" onFermer={onFermer} pied={<>
+    <Feuille titre="Modèle" large onFermer={enregistrer} pied={<>
       <button class="bouton danger" onClick={() => { faire(supprimer('Modeles', id), `Modèle « ${m.nom} » supprimé`); onFermer(); }}>Supprimer</button>
-      <button class="bouton principal" onClick={onFermer}>Terminé</button>
+      <button class="bouton principal" onClick={enregistrer}>Terminé</button>
     </>}>
-      <Champ label="Nom"><Texte valeur={m.nom} onValider={v => v && maj({ nom: v })} /></Champ>
-      <Champ label="Sous-étapes" aide="Une par ligne, durée facultative : (rapide), (long), (très long). « ### Nom » crée plusieurs étapes.">
-        <Texte multiligne class="zone-collage" valeur={m.contenu} onValider={v => maj({ contenu: v })} />
-      </Champ>
-      <p class="petit-texte">Pour partager ce modèle avec un·e ami·e : copie le texte, il suffit de le coller dans un nouveau modèle.</p>
+      <Champ label="Nom du modèle"><input value={nom} onInput={e => setNom((e.target as HTMLInputElement).value)} /></Champ>
+
+      {etapes.map((et, i) => (
+        <fieldset class="modele-etape">
+          <legend class="modele-etape-tete">
+            <input class="modele-etape-nom" value={et.nom} aria-label={`Nom de l'étape ${i + 1}`}
+              placeholder={etapes.length === 1 ? 'Étape (nom facultatif)' : `Étape ${i + 1}`}
+              onInput={e => changerEtape(i, { ...et, nom: (e.target as HTMLInputElement).value })} />
+            {etapes.length > 1 && <>
+              <button type="button" class="bouton-icone petit" disabled={i === 0} aria-label="Monter l'étape" onClick={() => setEtapes(deplacer(etapes, i, -1))}><Icone nom="haut" taille={16} /></button>
+              <button type="button" class="bouton-icone petit" disabled={i === etapes.length - 1} aria-label="Descendre l'étape" onClick={() => setEtapes(deplacer(etapes, i, 1))}><Icone nom="bas" taille={16} /></button>
+              <button type="button" class="bouton-icone petit" aria-label="Supprimer l'étape" onClick={() => setEtapes(etapes.filter((_, k) => k !== i))}><Icone nom="poubelle" taille={16} /></button>
+            </>}
+          </legend>
+          <ul class="modele-sous-etapes">
+            {et.etapes.map((se, k) => (
+              <li>
+                <input value={se.titre} aria-label={`Sous-étape ${k + 1}`}
+                  onInput={e => changerEtape(i, { ...et, etapes: et.etapes.map((x, n) => (n === k ? { ...x, titre: (e.target as HTMLInputElement).value } : x)) })} />
+                <select class="choix-duree" value={se.duree} aria-label={`Durée de la sous-étape ${k + 1}`}
+                  onChange={e => changerEtape(i, { ...et, etapes: et.etapes.map((x, n) => (n === k ? { ...x, duree: (e.target as HTMLSelectElement).value as Duree } : x)) })}>
+                  {NOMS_DUREES.map(dn => <option value={dn}>{dn} ({DUREES[dn]})</option>)}
+                </select>
+                <button type="button" class="bouton-icone petit" disabled={k === 0} aria-label="Monter" onClick={() => changerEtape(i, { ...et, etapes: deplacer(et.etapes, k, -1) })}><Icone nom="haut" taille={16} /></button>
+                <button type="button" class="bouton-icone petit" disabled={k === et.etapes.length - 1} aria-label="Descendre" onClick={() => changerEtape(i, { ...et, etapes: deplacer(et.etapes, k, 1) })}><Icone nom="bas" taille={16} /></button>
+                <button type="button" class="bouton-icone petit" aria-label="Supprimer la sous-étape" onClick={() => changerEtape(i, { ...et, etapes: et.etapes.filter((_, n) => n !== k) })}><Icone nom="croix" taille={16} /></button>
+              </li>
+            ))}
+          </ul>
+          <form class="ajout-etape" onSubmit={e => {
+            e.preventDefault();
+            const champ = (e.target as HTMLFormElement).elements.namedItem('titre') as HTMLInputElement;
+            if (!champ.value.trim()) return;
+            changerEtape(i, { ...et, etapes: [...et.etapes, { titre: champ.value.trim(), duree: 'normal' }] });
+            champ.value = '';
+          }}>
+            <Icone nom="plus" taille={16} />
+            <input name="titre" placeholder="Ajouter une sous-étape" aria-label={`Ajouter une sous-étape à l'étape ${i + 1}`} />
+          </form>
+        </fieldset>
+      ))}
+      <button type="button" class="bouton" onClick={() => setEtapes([...etapes, { nom: '', etapes: [] }])}><Icone nom="plus" />Ajouter une étape</button>
+
+      <details class="partage-modele" open={partage} onToggle={e => setPartage((e.target as HTMLDetailsElement).open)}>
+        <summary>Partager ou importer en texte</summary>
+        <p class="petit-texte">Copie ce texte pour partager le modèle ; colle ici le texte d'un modèle reçu pour le reprendre.</p>
+        <textarea class="zone-collage" rows={6} value={contenu}
+          onChange={e => { const lues = texteVersModele((e.target as HTMLTextAreaElement).value); if (lues.length) setEtapes(lues); }} />
+      </details>
     </Feuille>
   );
 }

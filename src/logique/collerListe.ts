@@ -66,3 +66,19 @@ export function compter(l: ListeTexte): { pieces: number; pistes: number; etapes
     etapes: l.pieces.reduce((s, p) => s + p.pistes.reduce((t, pi) => t + pi.etapes.length, 0), 0),
   };
 }
+
+/**
+ * Texte d'un modèle à partir de ses étapes (format « Coller une liste ») : une seule étape sans nom
+ * → une sous-étape par ligne ; sinon une ligne « ### Nom » avant les sous-étapes de chaque étape.
+ */
+export function modeleVersTexte(pistes: PisteTexte[]): string {
+  const utiles = pistes.filter(p => p.nom.trim() || p.etapes.some(e => e.titre.trim()));
+  const etapes = (p: PisteTexte) => versTexte(p.etapes.filter(e => e.titre.trim()).map(e => ({ titre: e.titre.trim(), duree: e.duree })));
+  if (utiles.length === 1 && !utiles[0].nom.trim()) return etapes(utiles[0]);
+  return utiles.map(p => [`### ${p.nom.trim() || 'Étape'}`, etapes(p)].filter(Boolean).join('\n')).join('\n');
+}
+
+/** Étapes d'un modèle lues depuis son texte (les « ## » éventuels sont ignorés). */
+export function texteVersModele(texte: string): PisteTexte[] {
+  return analyserListe(texte).pieces.flatMap(p => p.pistes);
+}

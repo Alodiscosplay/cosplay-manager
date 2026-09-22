@@ -5,7 +5,7 @@ import { aFaire, etapeDisponible, creeraitBoucle, texteAttente, champsStatutPiec
 import { activationsDuJour } from '../src/logique/activation';
 import { repartirSuite, repartirPiece, repartirCostume, retard } from '../src/logique/planning';
 import { quantiteNombre, budgetCostume, totalCommande, regrouperParNom, texteQuantites } from '../src/logique/budget';
-import { analyserListe, versTexte } from '../src/logique/collerListe';
+import { analyserListe, versTexte, modeleVersTexte, texteVersModele } from '../src/logique/collerListe';
 import { cocherEtape, creerCommandes, changerStatutCommande, appliquerListe, insererModele, deplacerEtape, creerCostume } from '../src/store/operations';
 import { etapesDePiste, pistesDe, piecesDe, etapesDePiece, piecesDeFourniture } from '../src/logique/acces';
 
@@ -304,6 +304,21 @@ couper la robe (rapide)`;
     const { d, ids } = construire({ pieces: [{ nom: 'Jupe', pistes: [{ nom: '', etapes: ['a'] }] }] });
     const d2 = appliquer(d, appliquerListe(d, analyserListe('b\nc (long)'), ids.costume, ids.Jupe));
     expect(etapesDePiece(d2, ids.Jupe).map(e => `${e.titre}:${e.poids}`)).toEqual(['a:1', 'b:2', 'c:4']);
+  });
+
+  it('le formulaire de modèle et son texte font l’aller-retour', () => {
+    const une = [{ nom: '', etapes: [{ titre: 'Modéliser', duree: 'long' as const }, { titre: 'Imprimer', duree: 'normal' as const }] }];
+    expect(modeleVersTexte(une)).toBe('Modéliser (long)\nImprimer');
+    const deux = [
+      { nom: 'Broderie', etapes: [{ titre: 'Motif', duree: 'rapide' as const }] },
+      { nom: 'Couture', etapes: [{ titre: 'Couper', duree: 'normal' as const }, { titre: ' ', duree: 'normal' as const }] },
+    ];
+    const texte = modeleVersTexte(deux);
+    expect(texte).toBe('### Broderie\nMotif (rapide)\n### Couture\nCouper');
+    expect(texteVersModele(texte)).toEqual([
+      { nom: 'Broderie', etapes: [{ titre: 'Motif', duree: 'rapide' }] },
+      { nom: 'Couture', etapes: [{ titre: 'Couper', duree: 'normal' }] },
+    ]);
   });
 
   it('un modèle s’insère comme piste parallèle, et l’aller-retour texte est stable', () => {

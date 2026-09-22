@@ -471,6 +471,14 @@ dialog.feuille::backdrop { background: rgb(20 12 28 / 45%); }
 .choix-segments { border: 0; padding: 0; margin: 0; display: flex; align-items: center; gap: 12px; }
 .choix-segments legend { float: left; margin-right: 12px; font-weight: 600; font-size: .9rem; }
 .choix-segments label { display: inline-flex; align-items: center; gap: 6px; }
+.modele-etape { border: 1px solid var(--bord); border-radius: var(--rayon); padding: 6px 12px 10px; margin: 0; display: flex; flex-direction: column; gap: 6px; }
+.modele-etape-tete { display: flex; align-items: center; gap: 4px; width: 100%; padding: 0 4px; }
+.modele-etape-nom { font-weight: 600; }
+.modele-sous-etapes { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.modele-sous-etapes li { display: flex; align-items: center; gap: 4px; }
+.modele-sous-etapes li > input { flex: 1; min-width: 0; }
+.partage-modele summary { cursor: pointer; color: var(--doux); font-size: .9rem; }
+.partage-modele[open] { display: flex; flex-direction: column; gap: 8px; }
 .carte-reglage { background: var(--surface); border: 1px solid var(--bord); border-radius: var(--rayon); padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
 .carte-reglage p { margin: 0; }
 .carte-costume.archive { box-shadow: none; }

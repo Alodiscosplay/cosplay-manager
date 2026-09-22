@@ -38,7 +38,10 @@ export function Feuille({ titre, onFermer, children, pied, large }: { titre: str
   // en glissant hors de la fenêtre ne doit pas la fermer.
   const appuiSurFond = useRef(false);
   // Avant de fermer, on valide le champ en cours de saisie (les champs n'enregistrent qu'à la sortie).
-  const fermer = () => { (document.activeElement as HTMLElement | null)?.blur(); onFermer(); };
+  // Toujours la dernière version de onFermer (l'écouteur d'Échap est posé une seule fois).
+  const derniereFermeture = useRef(onFermer);
+  derniereFermeture.current = onFermer;
+  const fermer = () => { (document.activeElement as HTMLElement | null)?.blur(); derniereFermeture.current(); };
   useEffect(() => {
     const d = ref.current!;
     if (!d.open) d.showModal();
