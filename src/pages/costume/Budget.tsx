@@ -18,9 +18,9 @@ export function OngletBudget({ costume }: { costume: Ligne }) {
         <TuileBudget nom="budget visé" aide="Le montant que tu te fixes pour ce costume. Clique sur le chiffre pour le modifier.">
           <span class="chiffre saisie-euros"><Texte type="number" class="chiffre-saisie" valeur={costume.budget_prevu ?? ''} placeholder="—" onValider={v => maj('Costumes', costume.id, { budget_prevu: v })} /> €</span>
         </TuileBudget>
-        <TuileBudget nom="budget futur dépensé" aide="Les fournitures encore « à acheter »." chiffre={b.prevu} />
+        <TuileBudget nom="futur budget dépensé" aide="Les fournitures encore « à acheter »." chiffre={b.prevu} />
         <TuileBudget nom="budget actuel dépensé" aide="Les fournitures « commandé » et « reçu »." chiffre={b.recu + b.commande} />
-        <TuileBudget nom="budget réel" aide="Budget futur dépensé + budget actuel dépensé : le coût de toutes les fournitures du costume. Ne sont pas comptés : les fournitures « déjà là », celles sans prix, et les frais de port." chiffre={b.total} />
+        <TuileBudget nom="budget réel" aide="Futur budget dépensé + budget actuel dépensé : le coût de toutes les fournitures du costume. Ne sont pas comptés : les fournitures « déjà là », celles sans prix, et les frais de port." chiffre={b.total} />
         <TuileBudget nom="budget restant" aide="Budget visé − budget réel. Il passe en rouge quand le budget visé est dépassé." depasse={depasse}>
           <span class="chiffre">{b.cible !== null ? euros(b.cible - b.total) : '—'}</span>
         </TuileBudget>
@@ -48,7 +48,7 @@ function BarreBudget({ b }: { b: Budget }) {
       </div>
       <p class="barre-budget-legende">
         <span><i class="pastille actuel" />budget actuel dépensé</span>
-        <span><i class="pastille prevu" />budget futur dépensé</span>
+        <span><i class="pastille prevu" />futur budget dépensé</span>
         {b.cible !== null && <span><i class="pastille cible" />budget visé</span>}
       </p>
     </div>
