@@ -13,7 +13,7 @@ export const TABLES = {
   Etapes: ['piste_id', 'piece_id', 'titre', 'detail', 'duree', 'poids', 'attend', 'fait', 'fait_le',
     'date_prevue', 'deadline', 'ordre', 'urgent'],
   Taches: ['titre', 'costume_id', 'date', 'fait', 'fait_le', 'ordre', 'urgent'],
-  Fournisseurs: ['nom', 'url', 'type', 'frais_port', 'franco', 'notes'],
+  Fournisseurs: ['nom', 'url', 'type', 'notes'],
   Fournitures: ['costume_id', 'piece_id', 'libelle', 'quantite', 'unite', 'prix_unitaire', 'fournisseur_id',
     'statut', 'commande_id', 'lien'],
   Commandes: ['fournisseur_id', 'statut', 'date', 'frais_port', 'notes'],

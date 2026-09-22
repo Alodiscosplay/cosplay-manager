@@ -20,7 +20,7 @@ export function OngletBudget({ costume }: { costume: Ligne }) {
         </TuileBudget>
         <TuileBudget nom="futur budget dépensé" aide="Les fournitures encore « à acheter »." chiffre={b.prevu} />
         <TuileBudget nom="budget actuel dépensé" aide="Les fournitures « commandé » et « reçu »." chiffre={b.recu + b.commande} />
-        <TuileBudget nom="budget réel" aide="Futur budget dépensé + budget actuel dépensé : le coût de toutes les fournitures du costume. Ne sont pas comptés : les fournitures « déjà là », celles sans prix, et les frais de port." chiffre={b.total} />
+        <TuileBudget nom="budget réel" aide="Futur budget dépensé + budget actuel dépensé : le coût de toutes les fournitures du costume. Ne sont pas comptées : les fournitures « déjà là » et celles sans prix." chiffre={b.total} />
         <TuileBudget nom="budget restant" aide="Budget visé − budget réel. Il passe en rouge quand le budget visé est dépassé." depasse={depasse}>
           <span class="chiffre">{b.cible !== null ? euros(b.cible - b.total) : '—'}</span>
         </TuileBudget>

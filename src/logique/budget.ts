@@ -33,14 +33,29 @@ export function budgetCostume(d: Donnees, costumeId: string): Budget {
   if (c && (c.budget_prevu ?? '').trim()) b.cible = num(c.budget_prevu);
   for (const f of fournituresDe(d, costumeId)) {
     if (f.statut === 'déjà là') continue;
-    const m = montant(f);
-    if (m === null) { b.sansPrix++; continue; }
+    const prix = montant(f);
+    if (prix === null) b.sansPrix++;
+    // la part des frais de port de sa commande compte avec la fourniture
+    const m = (prix ?? 0) + partFraisPort(d, f);
+    if (!m) continue;
     b.total += m;
     if ((f.statut || 'à acheter') === 'à acheter') b.prevu += m;
     if (f.statut === 'commandé') b.commande += m;
     if (f.statut === 'reçu') b.recu += m;
   }
   return b;
+}
+
+/**
+ * Les frais de port se saisissent sur la commande et se partagent à parts égales entre ses fournitures
+ * (une commande de 4 fournitures à 6 € de port : 1,50 € chacune, quel que soit leur costume).
+ */
+export function partFraisPort(d: Donnees, f: Ligne): number {
+  const cmd = ligne(d, 'Commandes', f.commande_id);
+  if (!cmd) return 0;
+  const port = num(cmd.frais_port);
+  if (!port) return 0;
+  return port / Math.max(1, lignesCommande(d, cmd.id).length);
 }
 
 export function lignesCommande(d: Donnees, commandeId: string): Ligne[] {

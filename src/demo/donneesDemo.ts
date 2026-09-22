@@ -70,7 +70,7 @@ Couper l'organza (rapide)`), c1, robe.id));
   // Achats : un fournisseur, des fournitures de deux costumes
   const merc = nouvelId(), tissus = nouvelId();
   faire([
-    { table: 'Fournisseurs', id: merc, champs: { nom: 'Mercerie du coin', type: 'mercerie', frais_port: '4,90', franco: '40' } },
+    { table: 'Fournisseurs', id: merc, champs: { nom: 'Mercerie du coin', type: 'mercerie' } },
     { table: 'Fournisseurs', id: tissus, champs: { nom: 'Magasin de tissus', type: 'tissus', url: 'https://exemple.fr' } },
   ]);
   const fourniture = (costume: string, libelle: string, quantite: string, unite: string, prix: string, fournisseur: string, piece = '') =>

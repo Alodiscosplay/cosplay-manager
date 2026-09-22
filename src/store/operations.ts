@@ -183,7 +183,8 @@ export function purger(table: NomTable, ligneActuelle: Ligne): Changement {
 // ---------- Achats ----------
 
 /** Crée une commande par fournisseur à partir d'une sélection de fournitures (qui peuvent venir de plusieurs costumes). */
-export function creerCommandes(d: Donnees, fournitureIds: string[], jour: Jour): Changement[] {
+/** Une commande par fournisseur ; `ports` : frais de port saisis pour chacune (clé = id du fournisseur, '' si aucun). */
+export function creerCommandes(d: Donnees, fournitureIds: string[], jour: Jour, ports: Record<string, string> = {}): Changement[] {
   const parFournisseur = new Map<string, string[]>();
   for (const id of fournitureIds) {
     const f = ligne(d, 'Fournitures', id);
@@ -193,8 +194,7 @@ export function creerCommandes(d: Donnees, fournitureIds: string[], jour: Jour):
   }
   const ch: Changement[] = [];
   for (const [fournisseurId, ids] of parFournisseur) {
-    const port = d.Fournisseurs[fournisseurId]?.frais_port ?? '';
-    const cmd = creer('Commandes', { fournisseur_id: fournisseurId, statut: 'à passer', date: jour, frais_port: port });
+    const cmd = creer('Commandes', { fournisseur_id: fournisseurId, statut: 'à passer', date: jour, frais_port: ports[fournisseurId] ?? '' });
     ch.push(cmd);
     for (const id of ids) ch.push({ table: 'Fournitures', id, champs: { commande_id: cmd.id } });
   }

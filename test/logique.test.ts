@@ -272,17 +272,33 @@ describe('achats et budget', () => {
     let d = vide();
     d.Costumes.A = { id: 'A', maj: '', supprime: '', nom: 'Bridget', statut: 'en cours', suivi_budget: 'oui' };
     d.Costumes.B = { id: 'B', maj: '', supprime: '', nom: 'Furina', statut: 'en cours' };
-    d.Fournisseurs.F = { id: 'F', maj: '', supprime: '', nom: 'Mercerie', frais_port: '4,90' };
+    d.Fournisseurs.F = { id: 'F', maj: '', supprime: '', nom: 'Mercerie' };
     d.Fournitures.x = { id: 'x', maj: '', supprime: '', costume_id: 'A', libelle: 'Zip', quantite: '1', prix_unitaire: '3', fournisseur_id: 'F', statut: 'à acheter' };
     d.Fournitures.y = { id: 'y', maj: '', supprime: '', costume_id: 'B', libelle: 'Biais', quantite: '4m60', prix_unitaire: '1', fournisseur_id: 'F', statut: 'à acheter' };
-    const ch = creerCommandes(d, ['x', 'y'], '2026-10-01');
+    const ch = creerCommandes(d, ['x', 'y'], '2026-10-01', { F: '4,90' });
     d = appliquer(d, ch);
     const cmd = ch.find(c => c.table === 'Commandes')!.id;
     expect(ch.filter(c => c.table === 'Commandes')).toHaveLength(1);
     expect(totalCommande(d, cmd)).toMatchObject({ articles: 7.6, port: 4.9 });
     d = appliquer(d, changerStatutCommande(d, cmd, 'reçue', '2026-10-05'));
     expect([d.Fournitures.x.statut, d.Fournitures.y.statut]).toEqual(['reçu', 'reçu']);
-    expect(budgetCostume(d, 'A')).toMatchObject({ total: 3, prevu: 0, commande: 0, recu: 3 });
+    expect(budgetCostume(d, 'A')).toMatchObject({ total: 5.45, prevu: 0, commande: 0, recu: 5.45 });
+  });
+
+  it('les frais de port d’une commande se partagent à parts égales entre ses fournitures, et comptent dans le budget de leur costume', () => {
+    let d = vide();
+    d.Costumes.A = { id: 'A', maj: '', supprime: '', nom: 'Bridget', statut: 'en cours' };
+    d.Costumes.B = { id: 'B', maj: '', supprime: '', nom: 'Furina', statut: 'en cours' };
+    const f = (id: string, costume_id: string, prix_unitaire: string) => ({ id, maj: '', supprime: '', costume_id, libelle: id, quantite: '1', prix_unitaire, fournisseur_id: 'F', statut: 'à acheter' });
+    d.Fournitures.a1 = f('a1', 'A', '10'); d.Fournitures.a2 = f('a2', 'A', '5'); d.Fournitures.a3 = f('a3', 'A', ''); d.Fournitures.b1 = f('b1', 'B', '20');
+    d = appliquer(d, creerCommandes(d, ['a1', 'a2', 'a3', 'b1'], '2026-10-01', { F: '6' }));
+    // 6 € pour 4 fournitures : 1,50 € chacune, 3 pour Bridget et 1 pour Furina
+    expect(budgetCostume(d, 'A')).toMatchObject({ total: 19.5, prevu: 19.5, sansPrix: 1 });
+    expect(budgetCostume(d, 'B')).toMatchObject({ total: 21.5 });
+    // commande passée : la part de port suit la fourniture dans « commandé »
+    const cmd = d.Fournitures.a1.commande_id;
+    d = appliquer(d, changerStatutCommande(d, cmd, 'passée', '2026-10-02'));
+    expect(budgetCostume(d, 'A')).toMatchObject({ prevu: 0, commande: 19.5 });
   });
 
   it('la liste de courses se groupe par fournisseur ou par costume (dans l’ordre des costumes, « sans » en dernier)', () => {
