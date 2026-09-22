@@ -72,7 +72,7 @@ export function PageAgenda() {
                   aria-label={`${jourCourt(x, j)}, ${liste.length} élément${liste.length > 1 ? 's' : ''}`} onClick={() => setChoisi(x)}>
                   <span class="cal-num">{Number(x.slice(8))}</span>
                   <span class="cal-points">{liste.slice(0, 4).map(i => <span class={`point ${i.type}${i.fait ? ' fait' : ''}`} />)}</span>
-                  <span class="cal-textes">{liste.slice(0, 2).map(i => <span class={`cal-texte ${i.type}`}>{i.titre}</span>)}{liste.length > 2 && <span class="cal-plus">+{liste.length - 2}</span>}</span>
+                  <span class="cal-textes">{liste.slice(0, 2).map(i => <span class={`cal-texte ${i.type}`} title={`${i.titre} · ${i.detail}`}>{i.titre}</span>)}{liste.length > 2 && <span class="cal-plus">+{liste.length - 2}</span>}</span>
                 </button>
               );
             })}

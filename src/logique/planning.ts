@@ -181,8 +181,10 @@ export function agenda(d: Donnees, depuis: Jour, jusqua: Jour, costumeFiltre?: s
     const j = lireJour(ev.date_debut);
     if (!costumeFiltre && dans(j)) res.push({ jour: j, type: 'evenement', titre: ev.nom, detail: ev.lieu || '', fait: false, ref: { table: 'Evenements', id: ev.id } });
   }
+  // Titre toujours préfixé par le costume : « Mary Poppins — Robe » ne se confond pas avec la robe d'un autre projet.
   for (const c of costumes(d)) {
     if (!garder(c.id) || c.statut === 'archivé') continue;
+    const t = (...morceaux: string[]) => `${c.nom} — ${morceaux.filter(Boolean).join(' › ')}`;
     const dc = lireJour(c.deadline);
     if (dans(dc)) res.push({ jour: dc, type: 'deadline', titre: c.nom, detail: 'deadline du costume', costumeId: c.id, fait: c.statut === 'terminé', ref: { table: 'Costumes', id: c.id } });
     const db = lireJour(c.debut);
@@ -190,20 +192,21 @@ export function agenda(d: Donnees, depuis: Jour, jusqua: Jour, costumeFiltre?: s
     for (const p of piecesDe(d, c.id)) {
       const finie = pieceTerminee(d, p.id);
       const dp = lireJour(p.deadline);
-      if (dans(dp)) res.push({ jour: dp, type: 'deadline', titre: p.nom, detail: c.nom, costumeId: c.id, fait: finie, ref: { table: 'Pieces', id: p.id } });
+      if (dans(dp)) res.push({ jour: dp, type: 'deadline', titre: t(p.nom), detail: 'deadline de la pièce', costumeId: c.id, fait: finie, ref: { table: 'Pieces', id: p.id } });
       const bp = lireJour(p.debut);
-      if (dans(bp)) res.push({ jour: bp, type: 'debut', titre: p.nom, detail: `début · ${c.nom}`, costumeId: c.id, fait: false, ref: { table: 'Pieces', id: p.id } });
+      if (dans(bp)) res.push({ jour: bp, type: 'debut', titre: t(p.nom), detail: 'début de la pièce', costumeId: c.id, fait: false, ref: { table: 'Pieces', id: p.id } });
       for (const pi of pistesDe(d, p.id)) {
+        const nomEtape = pi.nom || 'étape principale';
         const bpi = lireJour(pi.debut);
-        if (dans(bpi)) res.push({ jour: bpi, type: 'debut', titre: `${p.nom} · ${pi.nom || 'piste'}`, detail: `début · ${c.nom}`, costumeId: c.id, fait: false, ref: { table: 'Pistes', id: pi.id } });
+        if (dans(bpi)) res.push({ jour: bpi, type: 'debut', titre: t(p.nom, nomEtape), detail: "début de l'étape", costumeId: c.id, fait: false, ref: { table: 'Pistes', id: pi.id } });
         const dpi = lireJour(pi.deadline);
-        if (dans(dpi)) res.push({ jour: dpi, type: 'deadline', titre: `${p.nom} · ${pi.nom || 'piste'}`, detail: c.nom, costumeId: c.id, fait: false, ref: { table: 'Pistes', id: pi.id } });
+        if (dans(dpi)) res.push({ jour: dpi, type: 'deadline', titre: t(p.nom, nomEtape), detail: "deadline de l'étape", costumeId: c.id, fait: false, ref: { table: 'Pistes', id: pi.id } });
         for (const e of etapesDePiste(d, pi.id)) {
           const fait = bool(e.fait);
           const jp = lireJour(e.date_prevue);
-          if (dans(jp)) res.push({ jour: jp, type: 'prevue', titre: e.titre, detail: `${p.nom} · ${c.nom}`, costumeId: c.id, fait, ref: { table: 'Etapes', id: e.id } });
+          if (dans(jp)) res.push({ jour: jp, type: 'prevue', titre: t(p.nom, e.titre), detail: `étape ${nomEtape}`, costumeId: c.id, fait, ref: { table: 'Etapes', id: e.id } });
           const jd = lireJour(e.deadline);
-          if (dans(jd)) res.push({ jour: jd, type: 'deadline', titre: e.titre, detail: `${p.nom} · ${c.nom}`, costumeId: c.id, fait, ref: { table: 'Etapes', id: e.id } });
+          if (dans(jd)) res.push({ jour: jd, type: 'deadline', titre: t(p.nom, e.titre), detail: `étape ${nomEtape}`, costumeId: c.id, fait, ref: { table: 'Etapes', id: e.id } });
         }
       }
     }
@@ -211,7 +214,8 @@ export function agenda(d: Donnees, depuis: Jour, jusqua: Jour, costumeFiltre?: s
   for (const t of Object.values(d.Taches)) {
     if (!vivant(t) || !garder(t.costume_id || undefined)) continue;
     const j = lireJour(t.date);
-    if (dans(j)) res.push({ jour: j, type: 'tache', titre: t.titre, detail: ligne(d, 'Costumes', t.costume_id)?.nom ?? 'tâche', costumeId: t.costume_id || undefined, fait: bool(t.fait), ref: { table: 'Taches', id: t.id } });
+    const c = ligne(d, 'Costumes', t.costume_id);
+    if (dans(j)) res.push({ jour: j, type: 'tache', titre: c ? `${c.nom} — ${t.titre}` : t.titre, detail: 'tâche', costumeId: t.costume_id || undefined, fait: bool(t.fait), ref: { table: 'Taches', id: t.id } });
   }
   const rang: Record<TypeAgenda, number> = { evenement: 0, deadline: 1, debut: 2, tache: 3, prevue: 4 };
   return res.sort((a, b) => a.jour.localeCompare(b.jour) || rang[a.type] - rang[b.type]);
