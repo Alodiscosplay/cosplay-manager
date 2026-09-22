@@ -26,7 +26,7 @@ export function OngletFournitures({ costume }: { costume: Ligne }) {
         <a class="bouton" href="#/achats">Liste d'achats commune</a>
         <span class="petit-texte">{aAcheter} à acheter{bool(costume.suivi_budget) && total ? ` · ${euros(total)} au total` : ''}</span>
       </div>
-      {!liste.length && <Vide icone="achats" titre="Aucune fourniture"><p>Tissus, mercerie, perruque, matériaux… Elles rejoignent la liste d'achats commune à tous tes costumes.</p></Vide>}
+      {!liste.length && <Vide icone="achats" titre="Aucune fourniture"><p>Les fournitures rejoignent la liste d'achats commune à tous tes costumes.</p></Vide>}
       {groupes.filter(([, l]) => l.length).map(([titre, l]) => (
         <div class="groupe">
           <h3 class="groupe-titre">{titre}</h3>

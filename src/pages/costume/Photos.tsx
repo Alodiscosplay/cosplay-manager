@@ -74,7 +74,7 @@ function EditeurPhoto({ id, costume, onFermer }: { id: string; costume: Ligne; o
       <button class="bouton principal" onClick={onFermer}>Terminé</button>
     </>}>
       <div class="photo-grande"><PhotoImg id={p.drive_id} alt={p.legende || 'Photo'} /></div>
-      <Champ label="Légende"><Texte valeur={p.legende ?? ''} placeholder="ex. Premier essayage de la toile" onValider={v => m({ legende: v })} /></Champ>
+      <Champ label="Légende"><Texte valeur={p.legende ?? ''} onValider={v => m({ legende: v })} /></Champ>
       <div class="deux-colonnes">
         <Champ label="Date"><ChoixDate label="date" valeur={p.date ?? ''} onChange={v => m({ date: v })} /></Champ>
         <Champ label="Pièce">

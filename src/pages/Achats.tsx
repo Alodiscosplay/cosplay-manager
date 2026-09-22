@@ -163,7 +163,7 @@ function EditeurCommande({ id, onFermer }: { id: string; onFermer: () => void })
       </Champ>
       <Champ label="Statut"><Selection label="Statut" valeur={c.statut} options={STATUTS_COMMANDE} onChange={v => faire(changerStatutCommande(d, id, v, jour.value))} /></Champ>
       <Champ label="Frais de port (€)"><Texte type="number" valeur={c.frais_port ?? ''} onValider={v => m({ frais_port: v })} /></Champ>
-      <Champ label="Notes"><Texte multiligne valeur={c.notes ?? ''} placeholder="n° de commande, suivi colis…" onValider={v => m({ notes: v })} /></Champ>
+      <Champ label="Notes"><Texte multiligne valeur={c.notes ?? ''} onValider={v => m({ notes: v })} /></Champ>
     </Feuille>
   );
 }
@@ -178,7 +178,7 @@ function Fournisseurs() {
       <div class="barre-outils">
         <button class="bouton principal" onClick={() => { const id = nouvelId(); faire([{ table: 'Fournisseurs', id, champs: { nom: 'Nouveau fournisseur' } }]); setOuvert(id); }}><Icone nom="plus" />Fournisseur</button>
       </div>
-      {!liste.length && <Vide icone="boite" titre="Aucun fournisseur"><p>Tes fournisseurs habituels : merceries, magasins de tissus, boutiques en ligne…</p></Vide>}
+      {!liste.length && <Vide icone="boite" titre="Aucun fournisseur"><p>Ajoute ici tes fournisseurs habituels.</p></Vide>}
       <ul class="liste-simple fournisseurs">
         {liste.map(f => (
           <li>
@@ -204,7 +204,7 @@ function EditeurFournisseur({ id, onFermer }: { id: string; onFermer: () => void
     </>}>
       <Champ label="Nom"><Texte valeur={f.nom} autoFocus={f.nom === 'Nouveau fournisseur'} onValider={v => v && m({ nom: v })} /></Champ>
       <Champ label="Site"><Texte type="url" valeur={f.url ?? ''} placeholder="https://…" onValider={v => m({ url: v })} /></Champ>
-      <Champ label="Type"><Texte valeur={f.type ?? ''} placeholder="tissus, mercerie, perruques…" onValider={v => m({ type: v })} /></Champ>
+      <Champ label="Type"><Texte valeur={f.type ?? ''} onValider={v => m({ type: v })} /></Champ>
       <div class="deux-colonnes">
         <Champ label="Frais de port habituels (€)"><Texte type="number" valeur={f.frais_port ?? ''} onValider={v => m({ frais_port: v })} /></Champ>
         <Champ label="Franco de port à (€)"><Texte type="number" valeur={f.franco ?? ''} onValider={v => m({ franco: v })} /></Champ>

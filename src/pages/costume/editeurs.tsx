@@ -30,7 +30,7 @@ export function EditeurEtape({ id, onFermer }: { id: string; onFermer: () => voi
       <button class="bouton principal" onClick={onFermer}>Terminé</button>
     </>}>
       <Champ label="Titre"><Texte valeur={e.titre} onValider={v => v && m({ titre: v })} /></Champ>
-      <Champ label="Détail (facultatif)"><Texte multiligne valeur={e.detail ?? ''} onValider={v => m({ detail: v })} placeholder="Précisions, mesures, référence de la notice…" /></Champ>
+      <Champ label="Détail (facultatif)"><Texte multiligne valeur={e.detail ?? ''} onValider={v => m({ detail: v })} /></Champ>
       <label class="interrupteur">
         <input type="checkbox" checked={bool(e.fait)} onChange={ev => faire(cocherEtape(d, id, (ev.target as HTMLInputElement).checked, jour.value))} />
         <span>Faite{bool(e.fait) && e.fait_le ? ` le ${jourCourt(e.fait_le)}` : ''}</span>
@@ -55,7 +55,7 @@ export function EditeurEtape({ id, onFermer }: { id: string; onFermer: () => voi
         </Champ>
       )}
       <ChoixAttentes table="Etapes" l={e} candidats={[...etapesCandidates(d, e), ...candidatsAttente(d, piece, e.piste_id)]}
-        aide="ex. « Couper le satin » attend « Vérifier le patron de la jupe ». Une sous-étape peut aussi attendre la fin d'une étape ou d'une pièce." />
+        aide="Une sous-étape peut attendre une autre sous-étape, la fin d'une étape ou celle d'une pièce." />
     </Feuille>
   );
 }
@@ -85,7 +85,7 @@ export function EditeurPiece({ id, onFermer }: { id: string; onFermer: () => voi
         </Champ>
         <Champ label="Deadline (facultative)"><ChoixDate label="deadline" valeur={p.deadline ?? ''} onChange={v => m({ deadline: v })} /></Champ>
       </div>
-      <Champ label="Patron (facultatif)"><Texte valeur={p.patron ?? ''} placeholder="ex. TV341 vue B" onValider={v => m({ patron: v })} /></Champ>
+      <Champ label="Patron (facultatif)"><Texte valeur={p.patron ?? ''} onValider={v => m({ patron: v })} /></Champ>
       <Champ label="Notes"><Texte multiligne valeur={p.notes ?? ''} onValider={v => m({ notes: v })} /></Champ>
       <ChoixAttentes table="Pieces" l={p} candidats={autres} aide="La pièce entière attend que ces pièces soient finies." />
       {dl && <button class="bouton" onClick={() => setRepartir(true)}>Répartir les sous-étapes jusqu'au {jourCourt(dl)}</button>}
@@ -109,12 +109,12 @@ export function EditeurPiste({ id, onFermer }: { id: string; onFermer: () => voi
       <button class="bouton danger" onClick={() => { faire(supprimer('Pistes', id), 'Piste supprimée'); onFermer(); }}>Supprimer</button>
       <button class="bouton principal" onClick={onFermer}>Terminé</button>
     </>}>
-      <p class="petit-texte">Les étapes d'une même pièce avancent en parallèle (ex. Doublure, Tripliure, Broderie).</p>
-      <Champ label="Nom"><Texte valeur={p.nom ?? ''} placeholder="ex. Bijoux" onValider={v => m({ nom: v })} /></Champ>
+      <p class="petit-texte">Les étapes d'une même pièce avancent en parallèle.</p>
+      <Champ label="Nom"><Texte valeur={p.nom ?? ''} onValider={v => m({ nom: v })} /></Champ>
       <fieldset class="choix-segments colonne">
         <legend>Ordre des sous-étapes</legend>
-        <label><input type="radio" name="ordre-piste" checked={!bool(p.libre)} onChange={() => m({ libre: '' })} /><span><strong>Dans l'ordre</strong> — chaque sous-étape attend la précédente (couper avant d'assembler)</span></label>
-        <label><input type="radio" name="ordre-piste" checked={bool(p.libre)} onChange={() => m({ libre: 'oui' })} /><span><strong>Libre</strong> — toutes les sous-étapes sont faisables en même temps (vérifier deux patrons différents)</span></label>
+        <label><input type="radio" name="ordre-piste" checked={!bool(p.libre)} onChange={() => m({ libre: '' })} /><span><strong>Dans l'ordre</strong> — chaque sous-étape attend la précédente</span></label>
+        <label><input type="radio" name="ordre-piste" checked={bool(p.libre)} onChange={() => m({ libre: 'oui' })} /><span><strong>Libre</strong> — toutes les sous-étapes sont faisables en même temps</span></label>
       </fieldset>
       <label class="interrupteur">
         <input type="checkbox" checked={bool(p.active)} onChange={e => m({ active: txtBool((e.target as HTMLInputElement).checked) })} />
@@ -124,7 +124,7 @@ export function EditeurPiste({ id, onFermer }: { id: string; onFermer: () => voi
         <Champ label="Début (facultatif)"><ChoixDate label="date de début" valeur={p.debut ?? ''} onChange={v => m({ debut: v })} /></Champ>
         <Champ label="Deadline (facultative)"><ChoixDate label="deadline" valeur={p.deadline ?? ''} onChange={v => m({ deadline: v })} /></Champ>
       </div>
-      <ChoixAttentes table="Pistes" l={p} candidats={candidatsAttente(d, piece, id)} aide="ex. « Montage du corset » attend « Doublure », « Tripliure » et « Satin rouge »." />
+      <ChoixAttentes table="Pistes" l={p} candidats={candidatsAttente(d, piece, id)} aide="L'étape ne commence qu'une fois ces étapes ou pièces terminées." />
       <div class="ligne-actions">
         <button class="bouton" onClick={() => setAjoutModele(true)}><Icone nom="calques" taille={16} />Ajouter les sous-étapes d'un modèle</button>
         <button class="bouton" onClick={() => setModele(true)}>Enregistrer comme modèle</button>
@@ -208,7 +208,7 @@ export function CollerListe({ costumeId, pieceId, onFermer }: { costumeId: strin
     </>}>
       <p class="petit-texte">Une sous-étape par ligne. <code>## Nom</code> crée une pièce, <code>### Nom</code> une étape (les étapes avancent en parallèle). Une durée entre parenthèses en fin de ligne : <code>(rapide)</code>, <code>(long)</code>, <code>(très long)</code>.</p>
       <textarea class="zone-collage" rows={12} autoFocus value={texte} onInput={e => setTexte((e.target as HTMLTextAreaElement).value)}
-        placeholder={piece ? 'Couper le tissu\nAssembler (long)\nPerles sur le col (très long)' : '## Chapeau\n### Tissu\nPatronner\nCouper\n### Bijoux\nModéliser (long)\nCouler en Fimo\n## Robe\nToile et essayage (long)'} />
+ />
       <p class="apercu" aria-live="polite">
         {n.pieces > 0 && `${n.pieces} pièce${n.pieces > 1 ? 's' : ''} · `}{n.etapes} sous-étape{n.etapes > 1 ? 's' : ''}
         {sansPiece > 0 && !piece && ` · ${sansPiece} sans « ## » iront dans une nouvelle pièce`}

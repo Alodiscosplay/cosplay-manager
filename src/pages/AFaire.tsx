@@ -83,7 +83,7 @@ export function PageAFaire() {
         </ul>
         <form class="ajout-etape" onSubmit={e => { e.preventDefault(); ajouterTache(); }}>
           <Icone nom="plus" taille={16} />
-          <input value={nouvelle} placeholder="Ajouter une tâche (ex. laver le tissu)" aria-label="Nouvelle tâche libre" onInput={e => setNouvelle((e.target as HTMLInputElement).value)} />
+          <input value={nouvelle} placeholder="Ajouter une tâche" aria-label="Nouvelle tâche libre" onInput={e => setNouvelle((e.target as HTMLInputElement).value)} />
         </form>
       </section>
 

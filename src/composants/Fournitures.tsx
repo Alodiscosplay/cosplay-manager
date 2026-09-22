@@ -72,7 +72,7 @@ export function EditeurFourniture({ id, costumeId, onFermer }: { id?: string; co
       <button class="bouton principal" disabled={!v.libelle.trim()} onClick={valider}>Enregistrer</button>
     </>}>
       <form onSubmit={e => { e.preventDefault(); valider(); }}>
-        <Champ label="Quoi"><input value={v.libelle} autoFocus placeholder="ex. Suédine verte" onInput={change('libelle')} /></Champ>
+        <Champ label="Quoi"><input value={v.libelle} autoFocus onInput={change('libelle')} /></Champ>
         <div class="deux-colonnes">
           <Champ label="Pour le costume">
             <Selection label="Costume" valeur={v.costume_id} options={listeCostumes.map(c => [c.id, c.nom] as [string, string])} onChange={x => setV({ ...v, costume_id: x, piece_id: '' })} />
@@ -82,8 +82,8 @@ export function EditeurFourniture({ id, costumeId, onFermer }: { id?: string; co
           </Champ>
         </div>
         <div class="trois-colonnes">
-          <Champ label="Quantité"><input value={v.quantite} placeholder="ex. 1,20" onInput={change('quantite')} /></Champ>
-          <Champ label="Unité"><input value={v.unite} placeholder="m, paires…" onInput={change('unite')} /></Champ>
+          <Champ label="Quantité"><input value={v.quantite} onInput={change('quantite')} /></Champ>
+          <Champ label="Unité"><input value={v.unite} onInput={change('unite')} /></Champ>
           <Champ label="Prix unitaire €"><input value={v.prix_unitaire} inputMode="decimal" placeholder="facultatif" onInput={change('prix_unitaire')} /></Champ>
         </div>
         <Champ label="Fournisseur">

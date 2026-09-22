@@ -49,7 +49,7 @@ export function OngletPieces({ costume }: { costume: Ligne }) {
     <section>
       <div class="barre-outils">
         <form class="ajout-rapide" onSubmit={e => { e.preventDefault(); ajouterPiece(); }}>
-          <input value={nouvelle} placeholder="Nouvelle pièce (ex. Jupe)" aria-label="Nom de la nouvelle pièce" onInput={e => setNouvelle((e.target as HTMLInputElement).value)} />
+          <input value={nouvelle} placeholder="Nouvelle pièce" aria-label="Nom de la nouvelle pièce" onInput={e => setNouvelle((e.target as HTMLInputElement).value)} />
           <button class="bouton principal" disabled={!nouvelle.trim()}><Icone nom="plus" />Pièce</button>
         </form>
         <button class="bouton" onClick={() => setOuvert({ type: 'coller' })}><Icone nom="coller" />Coller une liste</button>
@@ -58,7 +58,7 @@ export function OngletPieces({ costume }: { costume: Ligne }) {
 
       {!pieces.length && (
         <Vide icone="calques" titre="Aucune pièce">
-          <p>Découpe le costume en pièces (jupe, corset, perruque, accessoires…), puis leurs étapes et sous-étapes. Tu peux aussi tout coller d'un coup depuis une liste.</p>
+          <p>Découpe le costume en pièces, puis en étapes et sous-étapes. Tu peux aussi tout coller d'un coup depuis une liste.</p>
         </Vide>
       )}
 
@@ -168,7 +168,7 @@ function CartePiece({ piece, ouvrir }: { piece: Ligne; ouvrir: (o: Ouvert) => vo
           <div class="ajout-piste">
             <form class="ajout-etape" onSubmit={ev => { ev.preventDefault(); ajouterPiste(); }}>
               <Icone nom="calques" taille={16} />
-              <input value={nouvellePiste} placeholder="Ajouter une étape (ex. Doublure, Broderie)" aria-label={`Ajouter une étape à ${piece.nom}`}
+              <input value={nouvellePiste} placeholder="Ajouter une étape" aria-label={`Ajouter une étape à ${piece.nom}`}
                 onInput={ev => setNouvellePiste((ev.target as HTMLInputElement).value)} />
             </form>
             <button class="bouton petit" onClick={() => ouvrir({ type: 'modele', id: piece.id })}><Icone nom="plus" taille={14} />Depuis un modèle</button>

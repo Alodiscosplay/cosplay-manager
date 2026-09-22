@@ -146,7 +146,7 @@ export function FicheCostume({ id, onFermer, nouveau }: { id: string; onFermer: 
       {nouveau && <button class="bouton" onClick={() => { faire(purgerNouveau(id)); onFermer(); }}>Annuler</button>}
       <button class="bouton principal" onClick={fermer}>{nouveau ? 'Créer' : 'Terminé'}</button>
     </>}>
-      <Champ label="Nom"><Texte valeur={c.nom} autoFocus={nouveau} placeholder="ex. Mary Poppins — Jolly Holiday" onValider={v => v && m({ nom: v })} /></Champ>
+      <Champ label="Nom"><Texte valeur={c.nom} autoFocus={nouveau} onValider={v => v && m({ nom: v })} /></Champ>
       <div class="deux-colonnes">
         <Champ label="Personnage"><Texte valeur={c.personnage ?? ''} onValider={v => m({ personnage: v })} /></Champ>
         <Champ label="Œuvre"><Texte valeur={c.oeuvre ?? ''} onValider={v => m({ oeuvre: v })} /></Champ>
@@ -198,7 +198,7 @@ export function EditeurEvenement({ id, onFermer }: { id?: string; onFermer: (id?
       {id && <button class="bouton danger" onClick={() => { faire(supprimer('Evenements', id), 'Événement supprimé'); onFermer(); }}>Supprimer</button>}
       <button class="bouton principal" disabled={!v.nom.trim()} onClick={valider}>Enregistrer</button>
     </>}>
-      <Champ label="Nom"><input value={v.nom} autoFocus placeholder="ex. Japan Expo" onInput={e => setV({ ...v, nom: (e.target as HTMLInputElement).value })} /></Champ>
+      <Champ label="Nom"><input value={v.nom} autoFocus onInput={e => setV({ ...v, nom: (e.target as HTMLInputElement).value })} /></Champ>
       <div class="deux-colonnes">
         <Champ label="Du"><ChoixDate label="date de début" valeur={v.date_debut} onChange={x => setV({ ...v, date_debut: x })} /></Champ>
         <Champ label="Au"><ChoixDate label="date de fin" valeur={v.date_fin} onChange={x => setV({ ...v, date_fin: x })} /></Champ>

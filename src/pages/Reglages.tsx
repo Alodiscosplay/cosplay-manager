@@ -88,7 +88,7 @@ function Modeles() {
   return (
     <section class="carte-reglage">
       <h2>Modèles d'étapes</h2>
-      <p class="petit-texte">Une suite de sous-étapes qui revient toujours dans le même ordre (impression 3D, perruque…). On l'insère comme étape dans n'importe quelle pièce, ou à la suite d'une étape existante.</p>
+      <p class="petit-texte">Une suite de sous-étapes qui revient toujours dans le même ordre. On l'insère comme étape dans n'importe quelle pièce, ou à la suite d'une étape existante.</p>
       <ul class="liste-simple">
         {modeles.map(m => (
           <li><button class="lien-bouton" onClick={() => setOuvert(m.id)}><strong>{m.nom}</strong></button> <span class="petit-texte">{compter(analyserListe(m.contenu)).etapes} sous-étapes</span></li>
