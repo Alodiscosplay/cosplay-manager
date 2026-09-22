@@ -4,7 +4,7 @@ import Sortable from 'sortablejs';
 import { donnees, jour, faire } from '../../store/store';
 import { piecesDe, pistesDe, etapesDePiste } from '../../logique/acces';
 import { avancementPiece, avancementPiste, poids } from '../../logique/avancement';
-import { statutPiece, statutStockePiece, champsStatutPiece, etatPiste, attentes, texteAttente } from '../../logique/disponibilite';
+import { statutPiece, statutStockePiece, champsStatutPiece, pisteEnPause, champsPausePiste, etatPiste, attentes, texteAttente } from '../../logique/disponibilite';
 import { deadlineCostume } from '../../logique/planning';
 import { jourCourt, relatif, lireJour } from '../../logique/dates';
 import { DUREES, NOMS_DUREES, bool, txtBool, type Duree, type Ligne } from '../../modele/schema';
@@ -229,9 +229,10 @@ function BlocPiste({ piste, piece, ouvrir }: { piste: Ligne; piece: Ligne; ouvri
     faire(creerEtape(d, piste.id, t));
     setTexte('');
   };
+  const enPause = pisteEnPause(piste, j);
 
   return (
-    <div class="piste" data-id={piste.id}>
+    <div class={`piste${enPause ? ' en-pause' : ''}`} data-id={piste.id}>
       <div class="piste-tete">
         <button class="bouton-icone petit" onClick={basculer} aria-expanded={!replie}
           aria-label={`${replie ? 'Déplier' : 'Replier'} l'étape ${piste.nom || 'principale'}`}><Icone nom={replie ? 'chevron' : 'bas'} taille={16} /></button>
@@ -242,8 +243,15 @@ function BlocPiste({ piste, piece, ouvrir }: { piste: Ligne; piece: Ligne; ouvri
           title={libre ? 'Libre : toutes les sous-étapes sont faisables en même temps. Cliquer pour imposer l\'ordre.' : 'Dans l\'ordre : chaque sous-étape attend la précédente. Cliquer pour rendre libre.'}>
           {libre ? '⇉ libre' : '→ dans l\'ordre'}
         </button>
+        <button class={`bascule-etat petit${enPause ? ' pause' : ' actif'}`} aria-pressed={!enPause}
+          aria-label={enPause ? `Étape ${piste.nom || 'principale'} en pause, cliquer pour la reprendre` : `Étape ${piste.nom || 'principale'} en cours, cliquer pour la mettre en pause`}
+          title={enPause ? 'Étape en pause — cliquer pour la reprendre' : 'Étape en cours — cliquer pour la mettre en pause'}
+          onClick={() => faire([{ table: 'Pistes', id: piste.id, champs: champsPausePiste(piste, !enPause, j) }], enPause ? `« ${piste.nom || 'Étape'} » reprise` : `« ${piste.nom || 'Étape'} » en pause`)}>
+          {enPause ? <Icone nom="pause" taille={16} /> : <Icone nom="lecture" taille={14} />}
+        </button>
         <button class="bouton-icone petit" aria-label={`Modifier l'étape ${piste.nom}`} onClick={() => ouvrir({ type: 'piste', id: piste.id })}><Icone nom="crayon" taille={16} /></button>
       </div>
+      {enPause && <p class="piste-bloquee"><Icone nom="pause" taille={14} />en pause{lireJour(piste.debut) ? `, reprend le ${jourCourt(piste.debut)}` : ''}</p>}
       {e.bloqueePar.length > 0 && !e.terminee && <p class="piste-bloquee"><Icone nom="cadenas" taille={14} />{texteAttente(e.bloqueePar)}</p>}
       {e.debutFutur && <p class="piste-bloquee"><Icone nom="horloge" taille={14} />commence le {jourCourt(e.debutFutur)}</p>}
       {!replie && (

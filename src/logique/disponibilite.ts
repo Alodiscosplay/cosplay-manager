@@ -7,7 +7,7 @@
 //  - seuls les costumes « en cours » et, dedans, les pièces « en cours » alimentent « À faire » ;
 //  - une date de début atteinte fait passer l'élément en cours tout seul ;
 //  - rien n'est masqué en silence : tout ce qui est écarté est compté dans le « repli ».
-import { type Donnees, type Ligne, bool, vivant } from '../modele/schema';
+import { type Donnees, type Ligne, OUI, bool, vivant } from '../modele/schema';
 import { costumes, piecesDe, pistesDe, etapesDePiste, etapesDePiece, ligne, idsAttendus, nomAttendu, tous } from './acces';
 import { lireJour, type Jour } from './dates';
 import { avancement } from './avancement';
@@ -43,12 +43,25 @@ export function champsStatutPiece(p: Ligne, statut: string, jour: Jour): Record<
 }
 
 /**
- * Une étape est ouverte quand sa date de début (s'il y en a une) est atteinte. La mise en pause se fait
- * sur la pièce ou le costume ; l'ancienne colonne `active` des étapes n'est plus lue.
+ * Une étape est ouverte quand elle n'est pas en pause et que sa date de début (s'il y en a une) est
+ * atteinte. Comme pour une pièce, une date de début atteinte réveille une étape mise en pause.
  */
 export function pisteOuverte(p: Ligne, jour: Jour): boolean {
   const debut = lireJour(p.debut);
+  if (pisteEnPause(p, jour)) return false;
   return !debut || debut <= jour;
+}
+
+/** Étape mise en pause à la main (une date de début atteinte la réveille). */
+export function pisteEnPause(p: Ligne, jour: Jour): boolean {
+  const debut = lireJour(p.debut);
+  return bool(p.pause) && !(debut && debut <= jour);
+}
+
+/** Champs à écrire quand on met une étape en pause : sa date de début passée est effacée. */
+export function champsPausePiste(p: Ligne, pause: boolean, jour: Jour): Record<string, string> {
+  const debut = lireJour(p.debut);
+  return pause && debut && debut <= jour ? { pause: OUI, debut: '' } : { pause: pause ? OUI : '' };
 }
 
 // ---------- Terminé ? ----------
@@ -149,6 +162,7 @@ export interface Repli {
   costumesEnPause: Ligne[];
   costumesSansPieceEnCours: Ligne[];
   piecesEnPause: { costume: Ligne; piece: Ligne; debut: Jour | '' }[];
+  pistesEnPause: { costume: Ligne; piece: Ligne; piste: Ligne }[];
   pistesPlanifiees: { costume: Ligne; piece: Ligne; piste: Ligne; debut: Jour }[];
   bloquees: { costume: Ligne; piece: Ligne; piste: Ligne; etape?: Ligne; attente: Attente[] }[];
 }
@@ -158,7 +172,7 @@ export interface AFaire { elements: ElementAFaire[]; taches: Ligne[]; repli: Rep
 export function aFaire(d: Donnees, jour: Jour): AFaire {
   const repli: Repli = {
     costumesEnAttente: [], costumesProjet: [], costumesEnPause: [], costumesSansPieceEnCours: [],
-    piecesEnPause: [], pistesPlanifiees: [], bloquees: [],
+    piecesEnPause: [], pistesEnPause: [], pistesPlanifiees: [], bloquees: [],
   };
   const elements: ElementAFaire[] = [];
 
@@ -181,6 +195,7 @@ export function aFaire(d: Donnees, jour: Jour): AFaire {
       for (const piste of pistes) {
         const e = etatPiste(d, piste, jour);
         if (e.terminee) continue;
+        if (pisteEnPause(piste, jour)) { repli.pistesEnPause.push({ costume, piece, piste }); continue; }
         if (e.debutFutur) { repli.pistesPlanifiees.push({ costume, piece, piste, debut: e.debutFutur }); continue; }
         const bloque = [...attentePiece, ...e.bloqueePar];
         if (bloque.length) { repli.bloquees.push({ costume, piece, piste, attente: bloque }); continue; }
@@ -202,7 +217,7 @@ export function aFaire(d: Donnees, jour: Jour): AFaire {
 
 export function tailleRepli(r: Repli): number {
   return r.costumesEnAttente.length + r.costumesProjet.length + r.costumesEnPause.length
-    + r.piecesEnPause.length
+    + r.piecesEnPause.length + r.pistesEnPause.length
     + r.pistesPlanifiees.length + r.bloquees.length;
 }
 

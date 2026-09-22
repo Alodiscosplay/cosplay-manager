@@ -70,9 +70,18 @@ describe('À faire : pistes, ordre, focus', () => {
     expect(titres(r)).toEqual(['assembler']);
   });
 
-  it('une ancienne étape marquée inactive remonte quand même : la pause se règle sur la pièce', () => {
+  it('une étape en pause sort de « À faire » et passe dans le repli, les autres avancent', () => {
     const { d, ids } = chapeau();
-    d.Pistes[ids['Chapeau/Bijoux']].active = '';
+    d.Pistes[ids['Chapeau/Bijoux']].pause = 'oui';
+    const r = aFaire(d, '2026-10-01');
+    expect(titres(r)).toEqual(['patronner', 'assembler']);
+    expect(r.repli.pistesEnPause.map(x => x.piste.nom)).toEqual(['Bijoux']);
+  });
+
+  it('une date de début atteinte réveille une étape en pause', () => {
+    const { d, ids } = chapeau();
+    Object.assign(d.Pistes[ids['Chapeau/Bijoux']], { pause: 'oui', debut: '2026-10-01' });
+    expect(titres(aFaire(d, '2026-09-30'))).toEqual(['patronner', 'assembler']);
     expect(titres(aFaire(d, '2026-10-01'))).toEqual(['patronner', 'modéliser', 'assembler']);
   });
 

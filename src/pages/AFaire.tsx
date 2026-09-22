@@ -96,6 +96,7 @@ export function PageAFaire() {
         <details class="repli">
           <summary>Pas dans la liste ({n})</summary>
           <ul>
+            {r.repli.pistesEnPause.map(x => <li><a href={lienCostume(x.costume.id)}>{x.piece.nom}{x.piste.nom ? ` · ${x.piste.nom}` : ''}</a> ({x.costume.nom}) · étape en pause</li>)}
             {r.repli.pistesPlanifiees.map(x => <li><a href={lienCostume(x.costume.id)}>{x.piece.nom} · {x.piste.nom || 'étape'}</a> · commence le {jourCourt(x.debut)}</li>)}
             {r.repli.bloquees.map(x => <li><a href={lienCostume(x.costume.id)}>{x.piece.nom}{x.piste.nom ? ` · ${x.piste.nom}` : ''}</a>{x.etape ? ` (« ${x.etape.titre} »)` : ''} · {texteAttente(x.attente)}</li>)}
             {r.repli.piecesEnPause.map(x => <li><a href={lienCostume(x.costume.id)}>{x.piece.nom}</a> ({x.costume.nom}) · en pause{x.debut ? `, reprend le ${jourCourt(x.debut)}` : ''}</li>)}

@@ -9,7 +9,7 @@ export const TABLES = {
     'suivi_budget', 'budget_prevu', 'image_ref', 'cadrage', 'notes', 'ordre', 'archive_le', 'resume_archive', 'vignette'],
   Evenements: ['nom', 'date_debut', 'date_fin', 'lieu', 'notes'],
   Pieces: ['costume_id', 'nom', 'statut', 'debut', 'deadline', 'attend', 'patron', 'notes', 'ordre'],
-  Pistes: ['piece_id', 'nom', 'active', 'libre', 'debut', 'deadline', 'attend', 'ordre'],
+  Pistes: ['piece_id', 'nom', 'pause', 'libre', 'debut', 'deadline', 'attend', 'ordre'],
   Etapes: ['piste_id', 'piece_id', 'titre', 'detail', 'duree', 'poids', 'attend', 'fait', 'fait_le',
     'date_prevue', 'deadline', 'ordre', 'urgent'],
   Taches: ['titre', 'costume_id', 'date', 'fait', 'fait_le', 'ordre', 'urgent'],
