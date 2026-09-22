@@ -51,7 +51,7 @@ function ListeCourses() {
   };
 
   return (
-    <section>
+    <section class="contenu-onglet">
       <div class="barre-outils">
         <button class="bouton principal" onClick={() => setOuvert('nouveau')}><Icone nom="plus" />Fourniture</button>
         <Selection label="Costume" valeur={costume} options={[['', 'Tous les costumes'], ...costumes(d).filter(c => c.statut !== 'archivé').map(c => [c.id, c.nom] as [string, string])]} onChange={setCostume} />
@@ -101,7 +101,7 @@ function Commandes() {
   const toutes = tous(d, 'Commandes').sort((a, b) => (b.date || '').localeCompare(a.date || ''));
   const liste = toutes.filter(c => voirRecues || c.statut !== 'reçue');
   return (
-    <section>
+    <section class="contenu-onglet">
       <div class="barre-outils">
         <label class="interrupteur"><input type="checkbox" checked={voirRecues} onChange={e => setVoirRecues((e.target as HTMLInputElement).checked)} /><span>Afficher les commandes reçues</span></label>
       </div>
@@ -172,7 +172,7 @@ function Fournisseurs() {
   const liste = tous(d, 'Fournisseurs').sort((a, b) => a.nom.localeCompare(b.nom));
   const nbArticles = (id: string) => tous(d, 'Fournitures').filter(f => f.fournisseur_id === id && (f.statut || 'à acheter') === 'à acheter').length;
   return (
-    <section>
+    <section class="contenu-onglet">
       <div class="barre-outils">
         <button class="bouton principal" onClick={() => { const id = nouvelId(); faire([{ table: 'Fournisseurs', id, champs: { nom: 'Nouveau fournisseur' } }]); setOuvert(id); }}><Icone nom="plus" />Fournisseur</button>
       </div>
