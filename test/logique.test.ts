@@ -282,7 +282,7 @@ describe('achats et budget', () => {
     expect(totalCommande(d, cmd)).toMatchObject({ articles: 7.6, port: 4.9 });
     d = appliquer(d, changerStatutCommande(d, cmd, 'reçue', '2026-10-05'));
     expect([d.Fournitures.x.statut, d.Fournitures.y.statut]).toEqual(['reçu', 'reçu']);
-    expect(budgetCostume(d, 'A')).toMatchObject({ prevu: 3, engage: 3, recu: 3 });
+    expect(budgetCostume(d, 'A')).toMatchObject({ prevu: 3, commande: 0, recu: 3 });
   });
 
   it('la liste de courses se groupe par fournisseur ou par costume (dans l’ordre des costumes, « sans » en dernier)', () => {

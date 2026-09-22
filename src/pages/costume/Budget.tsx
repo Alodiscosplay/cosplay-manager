@@ -25,7 +25,7 @@ export function OngletBudget({ costume }: { costume: Ligne }) {
     <section class="budget">
       <div class="tuiles-chiffres">
         <div class="tuile-chiffre"><span class="chiffre">{euros(b.prevu)}</span><span class="legende">prévu (toutes fournitures)</span></div>
-        <div class="tuile-chiffre"><span class="chiffre">{euros(b.engage)}</span><span class="legende">engagé (commandé ou reçu)</span></div>
+        <div class="tuile-chiffre"><span class="chiffre">{euros(b.commande)}</span><span class="legende">commandé</span></div>
         <div class="tuile-chiffre"><span class="chiffre">{euros(b.recu)}</span><span class="legende">reçu</span></div>
         <div class={`tuile-chiffre${depasse ? ' depasse' : ''}`}>
           <span class="chiffre">{b.cible !== null ? euros(b.cible) : '—'}</span>
