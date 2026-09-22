@@ -86,6 +86,11 @@ function annulerDeplacementDom(evt: Sortable.SortableEvent): void {
 
 const CLE_REPLI = 'cosplay-planner.pieces-repliees';
 function lireReplis(): Record<string, boolean> { try { return JSON.parse(localStorage.getItem(CLE_REPLI) ?? '{}'); } catch { return {}; } }
+/** Mémorise sur l'appareil qu'une pièce ou une étape est repliée (préférence d'affichage, non synchronisée). */
+function memoriserRepli(id: string, replie: boolean): void {
+  const r = lireReplis(); r[id] = replie;
+  try { localStorage.setItem(CLE_REPLI, JSON.stringify(r)); } catch { /* stockage indisponible */ }
+}
 
 function CartePiece({ piece, ouvrir }: { piece: Ligne; ouvrir: (o: Ouvert) => void }) {
   const d = donnees.value;
@@ -99,11 +104,7 @@ function CartePiece({ piece, ouvrir }: { piece: Ligne; ouvrir: (o: Ouvert) => vo
   const att = attentes(d, piece);
   const dl = lireJour(piece.deadline);
   const debutFutur = statutStockePiece(piece) === 'en pause' && lireJour(piece.debut) > j ? lireJour(piece.debut) : '';
-  const basculer = () => {
-    const r = lireReplis(); r[piece.id] = !replie;
-    try { localStorage.setItem(CLE_REPLI, JSON.stringify(r)); } catch { /* stockage indisponible */ }
-    setReplie(!replie);
-  };
+  const basculer = () => { memoriserRepli(piece.id, !replie); setReplie(!replie); };
   const statut = (s: string) => maj('Pieces', piece.id, champsStatutPiece(piece, s, j));
 
   // Réordonner les pistes de la pièce
@@ -190,6 +191,9 @@ function BlocPiste({ piste, piece, ouvrir }: { piste: Ligne; piece: Ligne; ouvri
   const pieceActive = statutPiece(piece, j) === 'en cours';
   const disponibles = new Set(pieceActive && e.ouverte && !e.bloqueePar.length ? e.disponibles.map(x => x.id) : []);
   const libre = bool(piste.libre);
+  // Une étape terminée est repliée par défaut ; le choix de l'utilisateur est ensuite mémorisé.
+  const [replie, setReplie] = useState(() => lireReplis()[piste.id] ?? (e.terminee && etapes.length > 0));
+  const basculer = () => { memoriserRepli(piste.id, !replie); setReplie(!replie); };
 
   useEffect(() => {
     if (!liste.current) return;
@@ -204,7 +208,7 @@ function BlocPiste({ piste, piece, ouvrir }: { piste: Ligne; piece: Ligne; ouvri
       },
     });
     return () => s.destroy();
-  }, [piste.id, piece.id]);
+  }, [piste.id, piece.id, replie]);
 
   const ajouter = () => {
     const t = texte.trim();
@@ -216,6 +220,8 @@ function BlocPiste({ piste, piece, ouvrir }: { piste: Ligne; piece: Ligne; ouvri
   return (
     <div class={`piste${bool(piste.active) ? '' : ' en-pause'}`} data-id={piste.id}>
       <div class="piste-tete">
+        <button class="bouton-icone petit" onClick={basculer} aria-expanded={!replie}
+          aria-label={`${replie ? 'Déplier' : 'Replier'} l'étape ${piste.nom || 'principale'}`}><Icone nom={replie ? 'chevron' : 'bas'} taille={16} /></button>
         <span class="poignee poignee-piste" aria-label="Déplacer l'étape" title="Glisser pour réordonner les étapes"><Icone nom="poignee" taille={16} /></span>
         <button class="piste-nom" onClick={() => ouvrir({ type: 'piste', id: piste.id })}>{piste.nom || 'Étape principale'}</button>
         <span class="piste-compte">{a.nbFait}/{a.nb}</span>
@@ -231,14 +237,18 @@ function BlocPiste({ piste, piece, ouvrir }: { piste: Ligne; piece: Ligne; ouvri
       </div>
       {e.bloqueePar.length > 0 && !e.terminee && <p class="piste-bloquee"><Icone nom="cadenas" taille={14} />{texteAttente(e.bloqueePar)}</p>}
       {e.debutFutur && <p class="piste-bloquee"><Icone nom="horloge" taille={14} />commence le {jourCourt(e.debutFutur)}</p>}
-      <ul class="etapes" ref={liste} data-piste={piste.id}>
-        {etapes.map(et => <LigneEtape key={et.id} etape={et} suivante={disponibles.has(et.id)} ouvrir={() => ouvrir({ type: 'etape', id: et.id })} />)}
-      </ul>
-      <form class="ajout-etape" onSubmit={ev => { ev.preventDefault(); ajouter(); }}>
-        <Icone nom="plus" taille={16} />
-        <input value={texte} placeholder="Ajouter une sous-étape" aria-label={`Ajouter une sous-étape à ${piste.nom || piece.nom}`}
-          onInput={ev => setTexte((ev.target as HTMLInputElement).value)} />
-      </form>
+      {!replie && (
+        <>
+          <ul class="etapes" ref={liste} data-piste={piste.id}>
+            {etapes.map(et => <LigneEtape key={et.id} etape={et} suivante={disponibles.has(et.id)} ouvrir={() => ouvrir({ type: 'etape', id: et.id })} />)}
+          </ul>
+          <form class="ajout-etape" onSubmit={ev => { ev.preventDefault(); ajouter(); }}>
+            <Icone nom="plus" taille={16} />
+            <input value={texte} placeholder="Ajouter une sous-étape" aria-label={`Ajouter une sous-étape à ${piste.nom || piece.nom}`}
+              onInput={ev => setTexte((ev.target as HTMLInputElement).value)} />
+          </form>
+        </>
+      )}
     </div>
   );
 }
