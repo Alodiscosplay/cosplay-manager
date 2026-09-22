@@ -1,7 +1,7 @@
 import { useState } from 'preact/hooks';
 import { donnees, jour, faire } from '../store/store';
 import { costumes, tous, ligne } from '../logique/acces';
-import { regrouperAchats, type GroupementAchats, regrouperParNom, lignesCommande, totalCommande, euros, montant } from '../logique/budget';
+import { regrouperAchats, SANS_FOURNISSEUR, type GroupementAchats, regrouperParNom, lignesCommande, totalCommande, euros, montant } from '../logique/budget';
 import { jourCourt } from '../logique/dates';
 import { STATUTS_FOURNITURE, STATUTS_COMMANDE, num, type Ligne } from '../modele/schema';
 import { creerCommandes, changerStatutCommande, supprimer, retirerDeCommande, nouvelId } from '../store/operations';
@@ -38,11 +38,12 @@ function ListeCourses() {
   const d = donnees.value;
   const [costume, setCostume] = useState('');
   const [statut, setStatut] = useState('à acheter');
+  const [fournisseur, setFournisseur] = useState('');
   const [selection, setSelection] = useState<Set<string>>(new Set());
   const [ouvert, setOuvert] = useState<string | 'nouveau' | null>(null);
   const [par, setParEtat] = useState<GroupementAchats>(() => { try { return localStorage.getItem(CLE_GROUPEMENT) === 'costume' ? 'costume' : 'fournisseur'; } catch { return 'fournisseur'; } });
   const setPar = (v: GroupementAchats) => { setParEtat(v); try { localStorage.setItem(CLE_GROUPEMENT, v); } catch { /* ignoré */ } };
-  const groupes = regrouperAchats(d, { costumeId: costume || undefined, statuts: statut ? [statut] : undefined }, par);
+  const groupes = regrouperAchats(d, { costumeId: costume || undefined, fournisseurId: fournisseur || undefined, statuts: statut ? [statut] : undefined }, par);
   const nb = groupes.reduce((s, g) => s + g.lignes.length, 0);
   const choisirPlusieurs = (ids: string[], v: boolean) => { const s = new Set(selection); for (const id of ids) { if (v) s.add(id); else s.delete(id); } setSelection(s); };
   const selectionnables = (g: Ligne[]) => g.filter(f => !f.commande_id || !ligne(d, 'Commandes', f.commande_id));
@@ -61,6 +62,7 @@ function ListeCourses() {
         <button class="bouton principal" onClick={() => setOuvert('nouveau')}><Icone nom="plus" />Fourniture</button>
         <Selection label="Tri" valeur={par} options={[['fournisseur', 'Tri par fournisseur'], ['costume', 'Tri par costume']]} onChange={v => setPar(v as GroupementAchats)} />
         <Selection label="Costume" valeur={costume} options={[['', 'Tous les costumes'], ...costumes(d).filter(c => c.statut !== 'archivé').map(c => [c.id, c.nom] as [string, string])]} onChange={setCostume} />
+        <Selection label="Fournisseur" valeur={fournisseur} options={[['', 'Tous les fournisseurs'], ...tous(d, 'Fournisseurs').sort((a, b) => a.nom.localeCompare(b.nom)).map(f => [f.id, f.nom] as [string, string]), [SANS_FOURNISSEUR, 'Sans fournisseur']]} onChange={setFournisseur} />
         <Selection label="Statut" valeur={statut} options={[['', 'Tous les statuts'], ...STATUTS_FOURNITURE.map(s => [s, s] as [string, string])]} onChange={setStatut} />
       </div>
       {selection.size > 0 && (

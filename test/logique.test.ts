@@ -296,6 +296,8 @@ describe('achats et budget', () => {
       .toEqual([['Mercerie', 'xz'], ['—', 'wy']]);
     expect(regrouperAchats(d, {}, 'costume').map(g => [g.costume?.nom ?? '—', g.lignes.map(l => l.id).sort().join('')]))
       .toEqual([['Furina', 'y'], ['Bridget', 'wx'], ['—', 'z']]);
+    expect(regrouperAchats(d, { fournisseurId: 'F' }, 'costume').flatMap(g => g.lignes.map(l => l.id)).sort()).toEqual(['x', 'z']);
+    expect(regrouperAchats(d, { fournisseurId: '__aucun', costumeId: 'A' }).flatMap(g => g.lignes.map(l => l.id))).toEqual(['w']);
   });
 });
 

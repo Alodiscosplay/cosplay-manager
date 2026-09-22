@@ -55,6 +55,7 @@ export function totalCommande(d: Donnees, commandeId: string): { articles: numbe
   return { articles, port, total: articles + port, sansPrix };
 }
 
+export const SANS_FOURNISSEUR = '__aucun';
 export type GroupementAchats = 'fournisseur' | 'costume';
 export interface GroupeAchats { cle: string; fournisseur: Ligne | null; costume: Ligne | null; lignes: Ligne[]; total: number }
 
@@ -62,7 +63,7 @@ export interface GroupeAchats { cle: string; fournisseur: Ligne | null; costume:
  * La liste de courses commune, groupée par fournisseur (« Sans fournisseur » en dernier) ou par costume
  * (dans l'ordre des costumes, « Sans costume » en dernier).
  */
-export function regrouperAchats(d: Donnees, filtre: { costumeId?: string; statuts?: string[] } = {}, par: GroupementAchats = 'fournisseur'): GroupeAchats[] {
+export function regrouperAchats(d: Donnees, filtre: { costumeId?: string; fournisseurId?: string; statuts?: string[] } = {}, par: GroupementAchats = 'fournisseur'): GroupeAchats[] {
   const groupes = new Map<string, GroupeAchats>();
   for (const f of tous(d, 'Fournitures')) {
     if (filtre.costumeId && f.costume_id !== filtre.costumeId) continue;
@@ -70,6 +71,8 @@ export function regrouperAchats(d: Donnees, filtre: { costumeId?: string; statut
     const c = ligne(d, 'Costumes', f.costume_id);
     if (c?.statut === 'archivé' || (f.costume_id && !c)) continue; // costume archivé ou supprimé
     const four = vivant(d.Fournisseurs[f.fournisseur_id]) ? d.Fournisseurs[f.fournisseur_id] : null;
+    // fournisseurId : un id, ou SANS_FOURNISSEUR pour les lignes sans fournisseur
+    if (filtre.fournisseurId && (four?.id ?? SANS_FOURNISSEUR) !== filtre.fournisseurId) continue;
     const cle = (par === 'costume' ? c?.id : four?.id) ?? '';
     if (!groupes.has(cle)) groupes.set(cle, { cle, fournisseur: par === 'fournisseur' ? four : null, costume: par === 'costume' ? c ?? null : null, lignes: [], total: 0 });
     const g = groupes.get(cle)!;
