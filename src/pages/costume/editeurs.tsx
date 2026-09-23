@@ -347,26 +347,73 @@ export function Repartir({ pieceId, costumeId, onFermer }: { pieceId?: string; c
  */
 export function EffacerDatesPrevues({ costumeId, pieceId }: { costumeId?: string; pieceId?: string }) {
   const d = donnees.value;
-  const [confirmer, setConfirmer] = useState(false);
+  const [ouvert, setOuvert] = useState(false);
   const etapes = pieceId ? etapesDePiece(d, pieceId) : piecesDe(d, costumeId!).flatMap(p => etapesDePiece(d, p.id));
-  const datees = etapes.filter(e => e.date_prevue);
-  if (!datees.length) return null;
-  const cible = pieceId ? `la pièce « ${d.Pieces[pieceId]?.nom} »` : 'ce costume';
+  if (!etapes.some(e => e.date_prevue)) return null;
   return (
     <>
-      <button type="button" class="bouton" onClick={() => setConfirmer(true)}><Icone nom="croix" taille={16} />Effacer les dates prévues</button>
-      {confirmer && (
-        <Confirmer titre="Effacer les dates prévues ?" bouton={`Effacer ${datees.length} date${datees.length > 1 ? 's' : ''}`} danger
-          onNon={() => setConfirmer(false)}
-          onOui={() => {
-            faire(datees.map(e => ({ table: 'Etapes' as const, id: e.id, champs: { date_prevue: '' } })), 'Dates prévues effacées');
-            setConfirmer(false);
-          }}
-          texte={<>
-            <p>Les {datees.length} sous-étape{datees.length > 1 ? 's' : ''} de {cible} qui ont une date prévue la perdent, qu'elle vienne de « Répartir » ou d'une saisie à la main.</p>
-            <p class="petit-texte">Les deadlines et les dates de début ne sont pas touchées. « Annuler » dans le bandeau revient en arrière.</p>
-          </>} />
-      )}
+      <button type="button" class="bouton" onClick={() => setOuvert(true)}><Icone nom="croix" taille={16} />Effacer les dates prévues</button>
+      {ouvert && (pieceId
+        ? <EffacerDUnePiece pieceId={pieceId} onFermer={() => setOuvert(false)} />
+        : <EffacerDuCostume costumeId={costumeId!} onFermer={() => setOuvert(false)} />)}
     </>
+  );
+}
+
+const effacerDates = (etapes: Ligne[]) =>
+  etapes.map(e => ({ table: 'Etapes' as const, id: e.id, champs: { date_prevue: '' } }));
+
+const PIED_EFFACER = 'Les deadlines et les dates de début ne sont pas touchées. « Annuler » dans le bandeau revient en arrière.';
+
+function EffacerDUnePiece({ pieceId, onFermer }: { pieceId: string; onFermer: () => void }) {
+  const d = donnees.value;
+  const datees = etapesDePiece(d, pieceId).filter(e => e.date_prevue);
+  return (
+    <Confirmer titre="Effacer les dates prévues ?" bouton={`Effacer ${datees.length} date${datees.length > 1 ? 's' : ''}`} danger
+      onNon={onFermer}
+      onOui={() => { faire(effacerDates(datees), 'Dates prévues effacées'); onFermer(); }}
+      texte={<>
+        <p>Les {datees.length} sous-étape{datees.length > 1 ? 's' : ''} de la pièce « {d.Pieces[pieceId]?.nom} » qui ont une date prévue la perdent, qu'elle vienne de « Répartir » ou d'une saisie à la main.</p>
+        <p class="petit-texte">{PIED_EFFACER}</p>
+      </>} />
+  );
+}
+
+/** Tout le costume, ou seulement certaines pièces : chaque pièce datée a sa case, cochée par défaut. */
+function EffacerDuCostume({ costumeId, onFermer }: { costumeId: string; onFermer: () => void }) {
+  const d = donnees.value;
+  const parPiece = piecesDe(d, costumeId)
+    .map(p => ({ piece: p, datees: etapesDePiece(d, p.id).filter(e => e.date_prevue) }))
+    .filter(x => x.datees.length);
+  const [choisies, setChoisies] = useState<Set<string>>(() => new Set(parPiece.map(x => x.piece.id)));
+  const basculer = (id: string, v: boolean) => { const s = new Set(choisies); if (v) s.add(id); else s.delete(id); setChoisies(s); };
+  const retenues = parPiece.filter(x => choisies.has(x.piece.id)).flatMap(x => x.datees);
+  const toutes = choisies.size === parPiece.length;
+  return (
+    <Feuille titre="Effacer les dates prévues ?" onFermer={onFermer} pied={<>
+      <button class="bouton" onClick={onFermer}>Annuler</button>
+      <button class="bouton danger" disabled={!retenues.length}
+        onClick={() => { faire(effacerDates(retenues), 'Dates prévues effacées'); onFermer(); }}>
+        Effacer {retenues.length} date{retenues.length > 1 ? 's' : ''}
+      </button>
+    </>}>
+      <p>Choisis les pièces dont les sous-étapes perdent leur date prévue, qu'elle vienne de « Répartir » ou d'une saisie à la main.</p>
+      <label class="interrupteur">
+        <input type="checkbox" checked={toutes} onChange={e => setChoisies(new Set((e.target as HTMLInputElement).checked ? parPiece.map(x => x.piece.id) : []))} />
+        <span>Tout le costume</span>
+      </label>
+      <ul class="liste-simple">
+        {parPiece.map(x => (
+          <li key={x.piece.id}>
+            <label class="interrupteur">
+              <input type="checkbox" checked={choisies.has(x.piece.id)} onChange={e => basculer(x.piece.id, (e.target as HTMLInputElement).checked)} />
+              <span>{x.piece.nom}</span>
+            </label>
+            <span class="petit-texte">{x.datees.length} date{x.datees.length > 1 ? 's' : ''}</span>
+          </li>
+        ))}
+      </ul>
+      <p class="petit-texte">{PIED_EFFACER}</p>
+    </Feuille>
   );
 }
