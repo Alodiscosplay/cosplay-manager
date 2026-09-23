@@ -55,7 +55,7 @@ export function OngletPieces({ costume }: { costume: Ligne }) {
           <input value={nouvelle} placeholder="Nouvelle pièce" aria-label="Nom de la nouvelle pièce" onInput={e => setNouvelle((e.target as HTMLInputElement).value)} />
           <button class="bouton principal" disabled={!nouvelle.trim()}><Icone nom="plus" />Pièce</button>
         </form>
-        {dl && pieces.length > 0 && <button class="bouton" onClick={() => setOuvert({ type: 'repartir' })}><Icone nom="agenda" />Répartir avant le {jourCourt(dl)}</button>}
+        {dl && pieces.length > 0 && <button class="bouton" onClick={() => setOuvert({ type: 'repartir' })}><Icone nom="agenda" />Répartir les étapes</button>}
         <EffacerDatesPrevues costumeId={costume.id} />
       </div>
 

@@ -92,7 +92,7 @@ export function EditeurPiece({ id, onFermer }: { id: string; onFermer: () => voi
       <ChoixAttentes table="Pieces" l={p} candidats={autres} aide="La pièce entière attend que ces pièces soient finies." />
       <button class="bouton" onClick={() => setRattacher(true)}><Icone nom="achats" taille={16} />Fournitures de la pièce</button>
       {rattacher && <RattacherFournitures pieceId={id} onFermer={() => setRattacher(false)} />}
-      {dl && <button class="bouton" onClick={() => setRepartir(true)}>Répartir les sous-étapes avant le {jourCourt(dl)}</button>}
+      {dl && <button class="bouton" onClick={() => setRepartir(true)}>Répartir les étapes</button>}
       {repartir && <Repartir pieceId={id} onFermer={() => setRepartir(false)} />}
       <EffacerDatesPrevues pieceId={id} />
     </Feuille>
@@ -317,7 +317,7 @@ export function Repartir({ pieceId, costumeId, onFermer }: { pieceId?: string; c
   const deja = (pieceId ? etapesDePiece(d, pieceId) : piecesDe(d, costumeId!).flatMap(p => etapesDePiece(d, p.id)))
     .filter(e => !bool(e.fait) && e.date_prevue).length;
   return (
-    <Feuille titre="Répartir les sous-étapes" onFermer={onFermer} pied={<>
+    <Feuille titre="Répartir les étapes" onFermer={onFermer} pied={<>
       <button class="bouton" onClick={onFermer}>Annuler</button>
       <button class="bouton principal" disabled={!n} onClick={() => { faire(appliquerRepartition(r), 'Sous-étapes planifiées'); onFermer(); }}>
         Planifier {n} sous-étape{n > 1 ? 's' : ''}
