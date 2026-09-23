@@ -146,8 +146,7 @@ function TacheLigne({ t, onOuvrir }: { t: Ligne; onOuvrir: (id: string) => void 
 function ElementLigne({ e, contexte }: { e: ElementAFaire; contexte?: boolean }) {
   const d = donnees.value;
   const j = jour.value;
-  const prevue = lireJour(e.etape.date_prevue);
-  const dl = lireJour(e.etape.deadline);
+  const dl = lireJour(e.piste.deadline);
   return (
     <li class="etape">
       <Case coche={false} label={e.etape.titre} onChange={() => faire([...cocherEtape(d, e.etape.id, true, j), { table: 'Etapes', id: e.etape.id, champs: { urgent: '' } }], `« ${e.etape.titre} » cochée`)} />
@@ -158,7 +157,6 @@ function ElementLigne({ e, contexte }: { e: ElementAFaire; contexte?: boolean })
           {contexte && <span>{e.piece.nom}</span>}
           {e.plusieursPistes && <span class="piste-etiquette">{e.piste.nom || 'étape principale'}</span>}
           {e.etape.duree && e.etape.duree !== 'normal' && <span>{e.etape.duree}</span>}
-          {prevue && <span class={prevue < j ? 'en-retard' : ''}><Icone nom="horloge" taille={12} />{jourCourt(prevue)}</span>}
           {dl && <span class={dl < j ? 'en-retard' : ''}><Icone nom="drapeau" taille={12} />{jourCourt(dl)}</span>}
         </span>
       </a>

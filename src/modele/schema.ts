@@ -6,9 +6,9 @@ export const VERSION_SCHEMA = 1;
 
 export const TABLES = {
   Costumes: ['nom', 'personnage', 'oeuvre', 'statut', 'attend_costume_id', 'debut', 'deadline', 'evenement_id',
-    'suivi_budget', 'budget_prevu', 'image_ref', 'cadrage', 'notes', 'ordre', 'archive_le', 'resume_archive', 'vignette'],
+    'suivi_budget', 'budget_prevu', 'image_ref', 'cadrage', 'notes', 'fin_prevue', 'ordre', 'archive_le', 'resume_archive', 'vignette'],
   Evenements: ['nom', 'date_debut', 'date_fin', 'lieu', 'notes'],
-  Pieces: ['costume_id', 'nom', 'statut', 'debut', 'deadline', 'attend', 'patron', 'notes', 'ordre'],
+  Pieces: ['costume_id', 'nom', 'statut', 'debut', 'deadline', 'attend', 'patron', 'notes', 'ordre', 'ordre_planning'],
   Pistes: ['piece_id', 'nom', 'pause', 'libre', 'debut', 'deadline', 'attend', 'ordre'],
   Etapes: ['piste_id', 'piece_id', 'titre', 'detail', 'duree', 'poids', 'attend', 'fait', 'fait_le',
     'date_prevue', 'deadline', 'ordre', 'urgent'],

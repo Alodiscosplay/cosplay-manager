@@ -1,15 +1,15 @@
 // Feuilles d'édition : étape, pièce, piste, attentes, « Coller une liste », modèles, Répartir.
 import { useState } from 'preact/hooks';
 import { donnees, faire, jour } from '../../store/store';
-import { piecesDe, pistesDe, etapesDePiste, etapesDePiece, ligne, tous, idsAttendus, nomAttendu, ordreSuivant, fournituresDe, piecesDeFourniture } from '../../logique/acces';
+import { piecesDe, pistesDe, etapesDePiste, ligne, tous, idsAttendus, nomAttendu, ordreSuivant, fournituresDe, piecesDeFourniture } from '../../logique/acces';
 import { cleNom } from '../../logique/budget';
-import { creeraitBoucle, statutStockePiece, champsStatutPiece } from '../../logique/disponibilite';
+import { creeraitBoucle, statutStockePiece, champsStatutPiece, pieceTerminee } from '../../logique/disponibilite';
 import { analyserListe, compter, versTexte } from '../../logique/collerListe';
-import { repartirPiece, repartirCostume, deadlinePiece, deadlineCostume, finPlanifiable } from '../../logique/planning';
-import { jourCourt, ecartJours } from '../../logique/dates';
+import { planifierCostume, ordrePlanning, deadlineCostume, deadlinePiece, finPlanifiable } from '../../logique/planning';
+import { jourCourt, lireJour, ecartJours } from '../../logique/dates';
 import { DUREES, NOMS_DUREES, STATUTS_PIECE, bool, liste, txtListe, type Duree, type Ligne, type NomTable } from '../../modele/schema';
-import { supprimer, appliquerListe, insererModele, ajouterModeleDansPiste, deplacerEtape, cocherEtape, appliquerRepartition, nouvelId } from '../../store/operations';
-import { Feuille, Champ, Texte, ChoixDate, Selection, Confirmer } from '../../composants/base';
+import { supprimer, appliquerListe, insererModele, ajouterModeleDansPiste, deplacerEtape, cocherEtape, appliquerPlan, effacerPlanning, nouvelId } from '../../store/operations';
+import { Feuille, Champ, Texte, ChoixDate, Selection } from '../../composants/base';
 import { maj } from '../Costume';
 import { Icone } from '../../composants/Icone';
 
@@ -46,8 +46,6 @@ export function EditeurEtape({ id, onFermer }: { id: string; onFermer: () => voi
         </Champ>
       </div>
       <div class="deux-colonnes">
-        <Champ label="Prévue le"><ChoixDate label="date prévue" valeur={e.date_prevue ?? ''} onChange={v => m({ date_prevue: v })} /></Champ>
-        <Champ label="Deadline"><ChoixDate label="deadline" valeur={e.deadline ?? ''} onChange={v => m({ deadline: v })} /></Champ>
       </div>
       {pistes.length > 1 && (
         <Champ label="Étape">
@@ -66,7 +64,6 @@ export function EditeurEtape({ id, onFermer }: { id: string; onFermer: () => voi
 export function EditeurPiece({ id, onFermer }: { id: string; onFermer: () => void }) {
   const d = donnees.value;
   const p = d.Pieces[id];
-  const [repartir, setRepartir] = useState(false);
   const [rattacher, setRattacher] = useState(false);
   if (!p) return null;
   const m = (champs: Record<string, string>) => maj('Pieces', id, champs);
@@ -92,9 +89,7 @@ export function EditeurPiece({ id, onFermer }: { id: string; onFermer: () => voi
       <ChoixAttentes table="Pieces" l={p} candidats={autres} aide="La pièce entière attend que ces pièces soient finies." />
       <button class="bouton" onClick={() => setRattacher(true)}><Icone nom="achats" taille={16} />Fournitures de la pièce</button>
       {rattacher && <RattacherFournitures pieceId={id} onFermer={() => setRattacher(false)} />}
-      {dl && <button class="bouton" onClick={() => setRepartir(true)}>Répartir les étapes</button>}
-      {repartir && <Repartir pieceId={id} onFermer={() => setRepartir(false)} />}
-      <EffacerDatesPrevues pieceId={id} />
+      {dl && <p class="petit-texte">Deadline effective : {jourCourt(dl)}. « Répartir les étapes », dans l'onglet Planning, pose les fenêtres de toutes les pièces.</p>}
     </Feuille>
   );
 }
@@ -302,120 +297,119 @@ function EnregistrerModele({ pisteId, onFermer }: { pisteId: string; onFermer: (
 
 // ---------- Répartir ----------
 
-export function Repartir({ pieceId, costumeId, onFermer }: { pieceId?: string; costumeId?: string; onFermer: () => void }) {
+export function Repartir({ costumeId, onFermer }: { costumeId: string; onFermer: () => void }) {
   const d = donnees.value;
-  const cible = pieceId ? d.Pieces[pieceId] : d.Costumes[costumeId!];
-  const deadline = pieceId ? deadlinePiece(d, cible) : deadlineCostume(d, cible);
-  // Par défaut, une semaine de marge avant la deadline — mais c'est à elle de fixer sa limite.
-  const [fin, setFin] = useState(() => finPlanifiable(deadline, jour.value));
+  const costume = d.Costumes[costumeId];
+  const deadline = deadlineCostume(d, costume);
+  // La fin prévue du costume : la limite qu'elle se donne, forcément avant (ou à) la deadline.
+  const [fin, setFin] = useState(() => lireJour(costume.fin_prevue) || finPlanifiable(deadline, jour.value));
+  const [remplacer, setRemplacer] = useState(false);
+  const [ordre, setOrdre] = useState<string[]>(() => ordrePlanning(d, costumeId).filter(p => !pieceTerminee(d, p.id)).map(p => p.id));
   const finOk = fin >= jour.value;
   const marge = ecartJours(fin, deadline);
-  const [remplacer, setRemplacer] = useState(false);
-  const r = finOk
-    ? (pieceId ? repartirPiece(d, pieceId, jour.value, fin, {}, remplacer) : repartirCostume(d, costumeId!, jour.value, fin, Math.max(0, marge), remplacer))
-    : {};
-  const n = Object.keys(r).length;
-  const deja = (pieceId ? etapesDePiece(d, pieceId) : piecesDe(d, costumeId!).flatMap(p => etapesDePiece(d, p.id)))
-    .filter(e => !bool(e.fait) && e.date_prevue).length;
-  const texteMarge = (n: number) => n > 0 ? `${n} jour${n > 1 ? 's' : ''} de marge` : n === 0 ? 'aucune marge' : `${-n} jour${-n > 1 ? 's' : ''} APRÈS la deadline`;
+  const plan = finOk ? planifierCostume(d, costumeId, jour.value, fin, { ordre, remplacer }) : { pieces: {}, etapes: {} };
+  const n = Object.keys(plan.pieces).length;
+  const nEtapes = Object.keys(plan.etapes).length;
+  const fixees = ordre.filter(id => !plan.pieces[id]).length;
+  const bouger = (i: number, pas: number) => {
+    const j = i + pas;
+    if (j < 0 || j >= ordre.length) return;
+    const copie = [...ordre];
+    [copie[i], copie[j]] = [copie[j], copie[i]];
+    setOrdre(copie);
+  };
+  const texteMarge = (x: number) => x > 0 ? `${x} jour${x > 1 ? 's' : ''} de marge` : x === 0 ? 'aucune marge' : `${-x} jour${-x > 1 ? 's' : ''} APRÈS la deadline`;
   return (
     <Feuille titre="Répartir les étapes" onFermer={onFermer} pied={<>
       <button class="bouton" onClick={onFermer}>Annuler</button>
-      <button class="bouton principal" disabled={!n} onClick={() => { faire(appliquerRepartition(r), 'Sous-étapes planifiées'); onFermer(); }}>
-        Planifier {n} sous-étape{n > 1 ? 's' : ''}
-      </button>
+      <button class="bouton principal" disabled={!nEtapes && !n}
+        onClick={() => {
+          faire([...appliquerPlan(plan, ordre), { table: 'Costumes' as const, id: costumeId, champs: { fin_prevue: fin } }], 'Planning mis à jour');
+          onFermer();
+        }}>Planifier {n} pièce{n > 1 ? 's' : ''}</button>
     </>}>
-      <p>Les sous-étapes restantes de <strong>{cible.nom}</strong> reçoivent une date prévue entre aujourd'hui et la limite choisie, proportionnellement à leur durée, dans l'ordre de chaque étape.</p>
+      <p>Les pièces se suivent dans l'ordre choisi jusqu'à la fin prévue, chacune pour une part de temps proportionnelle à ce qu'il lui reste. Dans chaque pièce, les étapes qui s'attendent se suivent, les autres avancent ensemble.</p>
       <Champ label="Tout terminer au plus tard le" aide={deadline ? `Deadline : ${jourCourt(deadline)} – ${texteMarge(marge)}` : undefined}>
-        <ChoixDate label="limite de planification" valeur={fin} min={jour.value} onChange={v => setFin(v || finPlanifiable(deadline, jour.value))} />
+        <ChoixDate label="fin prévue du costume" valeur={fin} min={jour.value} onChange={v => setFin(v || finPlanifiable(deadline, jour.value))} />
       </Champ>
-      {deja > 0 && (
-        <label class="interrupteur">
-          <input type="checkbox" checked={remplacer} onChange={e => setRemplacer((e.target as HTMLInputElement).checked)} />
-          <span>Replanifier les {deja} sous-étape{deja > 1 ? 's' : ''} qui ont déjà une date</span>
-        </label>
-      )}
-      {deja > 0 && !remplacer && <p class="petit-texte">Sans cette case, {deja > 1 ? 'elles gardent leur date' : 'elle garde sa date'} et les autres se répartissent autour.</p>}
+      <Champ label="Ordre de fabrication">
+        <ol class="ordre-pieces">
+          {ordre.map((id, i) => (
+            <li key={id}>
+              <span class="rang">{i + 1}</span>
+              <span class="nom">{d.Pieces[id]?.nom}</span>
+              {!plan.pieces[id] && <span class="petit-texte">dates à elle</span>}
+              <button class="bouton-icone petit" disabled={i === 0} aria-label={`Monter ${d.Pieces[id]?.nom}`} onClick={() => bouger(i, -1)}><Icone nom="haut" taille={16} /></button>
+              <button class="bouton-icone petit" disabled={i === ordre.length - 1} aria-label={`Descendre ${d.Pieces[id]?.nom}`} onClick={() => bouger(i, 1)}><Icone nom="bas" taille={16} /></button>
+            </li>
+          ))}
+        </ol>
+      </Champ>
+      {fixees > 0 && !remplacer && <p class="petit-texte">{fixees} pièce{fixees > 1 ? 's gardent leur' : ' garde sa'} fenêtre : elle{fixees > 1 ? 's ont' : ' a'} déjà un début ou une deadline.</p>}
+      <label class="interrupteur">
+        <input type="checkbox" checked={remplacer} onChange={e => setRemplacer((e.target as HTMLInputElement).checked)} />
+        <span>Replanifier aussi les dates déjà posées</span>
+      </label>
+      <p class="petit-texte">{nEtapes} étape{nEtapes > 1 ? 's' : ''} recevront leur deadline. Les sous-étapes ne portent pas de date.</p>
     </Feuille>
   );
 }
 
-
-// ---------- Annuler une répartition ----------
+// ---------- Effacer le planning ----------
 
 /**
- * Bouton « Effacer les dates prévues » (d'une pièce ou de tout le costume), avec confirmation.
- * N'apparaît que s'il y a des dates prévues. Deadlines et dates de début ne sont pas touchées.
+ * Bouton « Effacer le planning » : la fenêtre des pièces choisies (début, deadline) et les deadlines
+ * de leurs étapes. N'apparaît que s'il y a quelque chose à effacer.
  */
-export function EffacerDatesPrevues({ costumeId, pieceId }: { costumeId?: string; pieceId?: string }) {
+export function EffacerDatesPrevues({ costumeId }: { costumeId: string }) {
   const d = donnees.value;
   const [ouvert, setOuvert] = useState(false);
-  const etapes = pieceId ? etapesDePiece(d, pieceId) : piecesDe(d, costumeId!).flatMap(p => etapesDePiece(d, p.id));
-  if (!etapes.some(e => e.date_prevue)) return null;
+  const planifiee = (p: Ligne) => !!(p.debut || p.deadline) || pistesDe(d, p.id).some(x => x.deadline);
+  if (!piecesDe(d, costumeId).some(planifiee)) return null;
   return (
     <>
-      <button type="button" class="bouton" onClick={() => setOuvert(true)}><Icone nom="croix" taille={16} />Effacer les dates prévues</button>
-      {ouvert && (pieceId
-        ? <EffacerDUnePiece pieceId={pieceId} onFermer={() => setOuvert(false)} />
-        : <EffacerDuCostume costumeId={costumeId!} onFermer={() => setOuvert(false)} />)}
+      <button type="button" class="bouton" onClick={() => setOuvert(true)}><Icone nom="croix" taille={16} />Effacer le planning</button>
+      {ouvert && <EffacerDuCostume costumeId={costumeId} onFermer={() => setOuvert(false)} />}
     </>
   );
 }
 
-const effacerDates = (etapes: Ligne[]) =>
-  etapes.map(e => ({ table: 'Etapes' as const, id: e.id, champs: { date_prevue: '' } }));
-
-const PIED_EFFACER = 'Les deadlines et les dates de début ne sont pas touchées. « Annuler » dans le bandeau revient en arrière.';
-
-function EffacerDUnePiece({ pieceId, onFermer }: { pieceId: string; onFermer: () => void }) {
-  const d = donnees.value;
-  const datees = etapesDePiece(d, pieceId).filter(e => e.date_prevue);
-  return (
-    <Confirmer titre="Effacer les dates prévues ?" bouton={`Effacer ${datees.length} date${datees.length > 1 ? 's' : ''}`} danger
-      onNon={onFermer}
-      onOui={() => { faire(effacerDates(datees), 'Dates prévues effacées'); onFermer(); }}
-      texte={<>
-        <p>Les {datees.length} sous-étape{datees.length > 1 ? 's' : ''} de la pièce « {d.Pieces[pieceId]?.nom} » qui ont une date prévue la perdent, qu'elle vienne de « Répartir » ou d'une saisie à la main.</p>
-        <p class="petit-texte">{PIED_EFFACER}</p>
-      </>} />
-  );
-}
-
-/** Tout le costume, ou seulement certaines pièces : chaque pièce datée a sa case, cochée par défaut. */
+/** Tout le costume, ou seulement certaines pièces : chaque pièce planifiée a sa case, cochée par défaut. */
 function EffacerDuCostume({ costumeId, onFermer }: { costumeId: string; onFermer: () => void }) {
   const d = donnees.value;
-  const parPiece = piecesDe(d, costumeId)
-    .map(p => ({ piece: p, datees: etapesDePiece(d, p.id).filter(e => e.date_prevue) }))
-    .filter(x => x.datees.length);
-  const [choisies, setChoisies] = useState<Set<string>>(() => new Set(parPiece.map(x => x.piece.id)));
+  const planifiees = piecesDe(d, costumeId)
+    .map(p => ({ piece: p, dates: (p.debut ? 1 : 0) + (p.deadline ? 1 : 0) + pistesDe(d, p.id).filter(x => x.deadline).length }))
+    .filter(x => x.dates);
+  const [choisies, setChoisies] = useState<Set<string>>(() => new Set(planifiees.map(x => x.piece.id)));
   const basculer = (id: string, v: boolean) => { const s = new Set(choisies); if (v) s.add(id); else s.delete(id); setChoisies(s); };
-  const retenues = parPiece.filter(x => choisies.has(x.piece.id)).flatMap(x => x.datees);
-  const toutes = choisies.size === parPiece.length;
+  const retenues = planifiees.filter(x => choisies.has(x.piece.id));
+  const dates = retenues.reduce((s, x) => s + x.dates, 0);
   return (
-    <Feuille titre="Effacer les dates prévues ?" onFermer={onFermer} pied={<>
+    <Feuille titre="Effacer le planning ?" onFermer={onFermer} pied={<>
       <button class="bouton" onClick={onFermer}>Annuler</button>
       <button class="bouton danger" disabled={!retenues.length}
-        onClick={() => { faire(effacerDates(retenues), 'Dates prévues effacées'); onFermer(); }}>
-        Effacer {retenues.length} date{retenues.length > 1 ? 's' : ''}
+        onClick={() => { faire(effacerPlanning(d, retenues.map(x => x.piece.id)), 'Planning effacé'); onFermer(); }}>
+        Effacer {dates} date{dates > 1 ? 's' : ''}
       </button>
     </>}>
-      <p>Choisis les pièces dont les sous-étapes perdent leur date prévue, qu'elle vienne de « Répartir » ou d'une saisie à la main.</p>
+      <p>Choisis les pièces qui perdent leur fenêtre (début, deadline) et les deadlines de leurs étapes.</p>
       <label class="interrupteur">
-        <input type="checkbox" checked={toutes} onChange={e => setChoisies(new Set((e.target as HTMLInputElement).checked ? parPiece.map(x => x.piece.id) : []))} />
+        <input type="checkbox" checked={choisies.size === planifiees.length}
+          onChange={e => setChoisies(new Set((e.target as HTMLInputElement).checked ? planifiees.map(x => x.piece.id) : []))} />
         <span>Tout le costume</span>
       </label>
       <ul class="liste-simple">
-        {parPiece.map(x => (
+        {planifiees.map(x => (
           <li key={x.piece.id}>
             <label class="interrupteur">
               <input type="checkbox" checked={choisies.has(x.piece.id)} onChange={e => basculer(x.piece.id, (e.target as HTMLInputElement).checked)} />
               <span>{x.piece.nom}</span>
             </label>
-            <span class="petit-texte">{x.datees.length} date{x.datees.length > 1 ? 's' : ''}</span>
+            <span class="petit-texte">{x.dates} date{x.dates > 1 ? 's' : ''}</span>
           </li>
         ))}
       </ul>
-      <p class="petit-texte">{PIED_EFFACER}</p>
+      <p class="petit-texte">La deadline du costume n'est pas touchée. « Annuler » dans le bandeau revient en arrière.</p>
     </Feuille>
   );
 }

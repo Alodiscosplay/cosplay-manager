@@ -1,103 +1,118 @@
-// Vue Planning : les pièces en lignes, les semaines en colonnes (dans l'esprit d'une grille de planning
-// à la main). Une pièce se déplie en ses étapes, et chaque case s'ouvre pour cocher ou redater.
+// Vue Planning : les pièces en lignes, les semaines en colonnes. Une pièce s'étend de son début à sa
+// deadline ; dépliée, chaque étape dessine sa propre barre, de son début calculé à sa deadline.
 import type { ComponentChildren } from 'preact';
 import { useState } from 'preact/hooks';
 import { donnees, jour, faire } from '../../store/store';
-import { piecesDe, pistesDe, etapesDePiece, etapesDePiste } from '../../logique/acces';
-import { deadlineCostume, retard } from '../../logique/planning';
+import { piecesDe, pistesDe, etapesDePiste } from '../../logique/acces';
+import { deadlineCostume, deadlinePiece, debutEtape, retardPiece } from '../../logique/planning';
 import { lundi, ajouterJours, lireJour, jourCourt, ecartJours } from '../../logique/dates';
 import { bool, type Ligne } from '../../modele/schema';
 import { cocherEtape } from '../../store/operations';
-import { Case, Feuille, ChoixDate, Vide } from '../../composants/base';
+import { Case, Feuille, Champ, ChoixDate, Vide } from '../../composants/base';
 import { Icone } from '../../composants/Icone';
 import { Repartir, EffacerDatesPrevues } from './editeurs';
 
-/** Semaine ouverte dans la feuille : quelles sous-étapes, et sous quel titre. */
-interface Ouvert { titre: string; semaine: string; ids: string[] }
+/** Une barre du planning : de `du` à `au`, avec son état et ce qu'elle ouvre au clic. */
+interface Barre { du: string; au: string; ton: string; texte: string; titre: string; ouvre?: string }
 
 export function OngletPlanning({ costume }: { costume: Ligne }) {
   const d = donnees.value;
   const j = jour.value;
   const [repartir, setRepartir] = useState(false);
-  const [ouvert, setOuvert] = useState<Ouvert | null>(null);
+  const [ouverte, setOuverte] = useState<string | null>(null); // étape ouverte dans la feuille
   const [depliees, setDepliees] = useState<Set<string>>(new Set());
   const pieces = piecesDe(d, costume.id);
   const dl = deadlineCostume(d, costume);
 
   const dates: string[] = [j];
   if (dl) dates.push(dl);
+  if (lireJour(costume.fin_prevue)) dates.push(lireJour(costume.fin_prevue));
   for (const p of pieces) {
     for (const x of [p.debut, p.deadline]) if (lireJour(x)) dates.push(lireJour(x));
-    for (const e of etapesDePiece(d, p.id)) for (const x of [e.date_prevue, e.deadline]) if (lireJour(x)) dates.push(lireJour(x));
+    for (const pi of pistesDe(d, p.id)) if (lireJour(pi.deadline)) dates.push(lireJour(pi.deadline));
   }
   const debut = lundi(dates.reduce((a, b) => (a < b ? a : b)));
   const fin = dates.reduce((a, b) => (a > b ? a : b));
-  const nbSemaines = Math.min(52, Math.max(1, Math.floor(ecartJours(debut, fin) / 7) + 1));
+  const nbSemaines = Math.min(80, Math.max(1, Math.floor(ecartJours(debut, fin) / 7) + 1));
   const semaines = Array.from({ length: nbSemaines }, (_, i) => ajouterJours(debut, i * 7));
-  const semaineDe = (x: string) => Math.floor(ecartJours(debut, x) / 7);
+  const semaineDe = (x: string) => Math.max(0, Math.min(nbSemaines - 1, Math.floor(ecartJours(debut, x) / 7)));
   const basculer = (id: string) => { const s = new Set(depliees); if (s.has(id)) s.delete(id); else s.add(id); setDepliees(s); };
 
-  if (dates.length === 1) {
-    return (
-      <Vide icone="tableau" titre="Rien de planifié">
-        <p>Donne une deadline au costume (ou à une pièce), puis « Répartir » place les sous-étapes dans le temps. Tu peux aussi dater chaque sous-étape à la main.</p>
-        {dl && <button class="bouton principal" onClick={() => setRepartir(true)}>Répartir les étapes</button>}
-      </Vide>
-    );
-  }
-
-  /**
-   * Une barre par ligne : elle s'étend de la première à la dernière semaine planifiée, pour montrer
-   * la DURÉE. Chaque case reste cliquable ; le détail des sous-étapes s'ouvre dans la feuille.
-   */
-  const barre = (etapes: Ligne[], titre: string) => {
-    const datees = etapes.filter(e => lireJour(e.date_prevue));
-    if (!datees.length) return null;
-    const semainesOccupees = datees.map(e => semaineDe(lireJour(e.date_prevue)));
-    const de = Math.min(...semainesOccupees);
-    const a = Math.max(...semainesOccupees);
-    const faites = datees.filter(e => bool(e.fait)).length;
-    const enRetard = datees.some(e => !bool(e.fait) && lireJour(e.date_prevue) < j);
-    const ton = faites === datees.length ? 'faite' : enRetard ? 'retard' : 'prevue';
-    return {
-      de, a, ton, titre, ids: datees.map(e => e.id),
-      texte: `${faites}/${datees.length}`,
-      semaines: a - de + 1,
-      deLaSemaine: (i: number) => datees.filter(e => semaineDe(lireJour(e.date_prevue)) === i).map(e => e.id),
-    };
-  };
-
-  /** Les cases d'une ligne, avec la barre posée dessus. */
-  const cases = (b: ReturnType<typeof barre>, marqueurs?: (i: number) => ComponentChildren) =>
-    semaines.map((_, i) => {
-      const dans = b && i >= b.de && i <= b.a;
+  const cases = (b: Barre | null, marqueurs?: (i: number) => ComponentChildren) => {
+    const de = b ? semaineDe(b.du) : -1;
+    const a = b ? semaineDe(b.au) : -2;
+    return semaines.map((_, i) => {
+      const dans = b && i >= de && i <= a;
       const classes = [
         semaineDe(j) === i ? 'cette-semaine' : '',
         dans ? `travee travee-${b!.ton}` : '',
-        dans && i === b!.de ? 'travee-debut' : '',
-        dans && i === b!.a ? 'travee-fin' : '',
+        dans && i === de ? 'travee-debut' : '',
+        dans && i === a ? 'travee-fin' : '',
       ].filter(Boolean).join(' ');
       return (
         <td class={classes}>
           {marqueurs?.(i)}
           {dans && (
-            <button class="case-planning" title={`${b!.titre} · semaine du ${jourCourt(semaines[i])}`}
-              aria-label={`${b!.titre} · semaine du ${jourCourt(semaines[i])} · ${b!.texte} sous-étapes faites`}
-              onClick={() => setOuvert({ titre: b!.titre, semaine: semaines[i], ids: b!.deLaSemaine(i).length ? b!.deLaSemaine(i) : b!.ids })}>
-              {i === b!.de && <span class="compte-case">{b!.texte}</span>}
-              {i === b!.de && b!.semaines > 1 && <span class="duree-case">{b!.semaines} sem.</span>}
+            <button class="case-planning" title={`${b!.titre} · du ${jourCourt(b!.du)} au ${jourCourt(b!.au)}`}
+              aria-label={`${b!.titre} · du ${jourCourt(b!.du)} au ${jourCourt(b!.au)}`}
+              onClick={() => b!.ouvre && setOuverte(b!.ouvre)}>
+              {i === de && <span class="compte-case">{b!.texte}</span>}
+              {i === de && a > de && <span class="duree-case">{a - de + 1} sem.</span>}
             </button>
           )}
         </td>
       );
     });
+  };
+
+  /** Barre d'une étape : de son début calculé à sa deadline. */
+  const barreEtape = (piste: Ligne, piece: Ligne): Barre | null => {
+    const au = lireJour(piste.deadline);
+    if (!au) return null;
+    const sousEtapes = etapesDePiste(d, piste.id);
+    const faites = sousEtapes.filter(e => bool(e.fait)).length;
+    const du = debutEtape(d, piste) || lireJour(piece.debut) || j;
+    return {
+      du: du < au ? du : au, au,
+      ton: sousEtapes.length && faites === sousEtapes.length ? 'faite' : au < j ? 'retard' : 'prevue',
+      texte: `${faites}/${sousEtapes.length}`,
+      titre: `${piece.nom} › ${piste.nom || 'Étape principale'}`,
+      ouvre: piste.id,
+    };
+  };
+
+  /** Barre d'une pièce : sa fenêtre, ou l'étendue de ses étapes planifiées. */
+  const barrePiece = (p: Ligne): Barre | null => {
+    const deadlines = pistesDe(d, p.id).map(x => lireJour(x.deadline)).filter(Boolean);
+    const au = lireJour(p.deadline) || (deadlines.length ? deadlines.reduce((a, b) => (a > b ? a : b)) : '');
+    if (!au) return null;
+    const du = lireJour(p.debut) || j;
+    const sousEtapes = pistesDe(d, p.id).flatMap(x => etapesDePiste(d, x.id));
+    const faites = sousEtapes.filter(e => bool(e.fait)).length;
+    return {
+      du: du < au ? du : au, au,
+      ton: sousEtapes.length && faites === sousEtapes.length ? 'faite' : au < j ? 'retard' : 'prevue',
+      texte: `${faites}/${sousEtapes.length}`,
+      titre: p.nom,
+    };
+  };
+
+  if (!pieces.some(p => p.debut || p.deadline || pistesDe(d, p.id).some(x => x.deadline))) {
+    return (
+      <Vide icone="tableau" titre="Rien de planifié">
+        <p>Donne une deadline au costume, puis « Répartir les étapes » pose la fenêtre de chaque pièce et la deadline de chaque étape.</p>
+        {dl && <button class="bouton principal" onClick={() => setRepartir(true)}>Répartir les étapes</button>}
+        {repartir && <Repartir costumeId={costume.id} onFermer={() => setRepartir(false)} />}
+      </Vide>
+    );
+  }
 
   return (
     <section>
       <div class="barre-outils">
         {dl && <button class="bouton" onClick={() => setRepartir(true)}>Répartir les étapes</button>}
         <EffacerDatesPrevues costumeId={costume.id} />
-        <span class="petit-texte">Chaque barre court de la première à la dernière semaine planifiée. Clique dessus pour cocher ou redater. ⚑ deadline · ▶ début</span>
+        <span class="petit-texte">Chaque barre va du début à la deadline. Déplie une pièce pour voir ses étapes, clique une barre d'étape pour la dater ou cocher.</span>
       </div>
       <div class="planning-defile">
         <table class="planning">
@@ -113,9 +128,7 @@ export function OngletPlanning({ costume }: { costume: Ligne }) {
           </thead>
           <tbody>
             {pieces.map(p => {
-              const etapes = etapesDePiece(d, p.id);
-              const r = retard(etapes, j);
-              const pistes = pistesDe(d, p.id);
+              const r = retardPiece(d, p.id, j);
               const depliee = depliees.has(p.id);
               return (
                 <>
@@ -126,15 +139,15 @@ export function OngletPlanning({ costume }: { costume: Ligne }) {
                       <span>{p.nom}</span>
                       {r.enRetard.length > 0 && <span class="en-retard petit-texte"> · {r.enRetard.length} en retard</span>}
                     </th>
-                    {cases(depliee ? null : barre(etapes, p.nom), i => <>
+                    {cases(depliee ? null : barrePiece(p), i => <>
                       {lireJour(p.debut) && semaineDe(lireJour(p.debut)) === i && <span class="marqueur" title={`Début · ${jourCourt(p.debut)}`}>▶</span>}
                       {lireJour(p.deadline) && semaineDe(lireJour(p.deadline)) === i && <span class="marqueur rouge" title={`Deadline · ${jourCourt(p.deadline)}`}>⚑</span>}
                     </>)}
                   </tr>
-                  {depliee && pistes.map(pi => (
+                  {depliee && pistesDe(d, p.id).map(pi => (
                     <tr class="ligne-piste">
                       <th scope="row"><span class="nom-piste">{pi.nom || 'Étape principale'}</span></th>
-                      {cases(barre(etapesDePiste(d, pi.id), `${p.nom} › ${pi.nom || 'Étape principale'}`))}
+                      {cases(barreEtape(pi, p))}
                     </tr>
                   ))}
                 </>
@@ -144,43 +157,41 @@ export function OngletPlanning({ costume }: { costume: Ligne }) {
         </table>
       </div>
       {repartir && <Repartir costumeId={costume.id} onFermer={() => setRepartir(false)} />}
-      {ouvert && <SemaineOuverte o={ouvert} onFermer={() => setOuvert(null)} />}
+      {ouverte && <EtapeOuverte id={ouverte} onFermer={() => setOuverte(null)} />}
     </section>
   );
 }
 
-/** Les sous-étapes d'une case : cocher, décaler d'une semaine, ou changer la date. */
-function SemaineOuverte({ o, onFermer }: { o: Ouvert; onFermer: () => void }) {
+/** Une étape depuis le planning : sa deadline, et ses sous-étapes à cocher. */
+function EtapeOuverte({ id, onFermer }: { id: string; onFermer: () => void }) {
   const d = donnees.value;
   const j = jour.value;
-  const etapes = o.ids.map(id => d.Etapes[id]).filter(Boolean);
-  const dater = (e: Ligne, date: string) => faire([{ table: 'Etapes', id: e.id, champs: { date_prevue: date } }], `« ${e.titre} » déplacée`);
+  const piste = d.Pistes[id];
+  if (!piste) return null;
+  const piece = d.Pieces[piste.piece_id];
+  const du = debutEtape(d, piste) || lireJour(piece?.debut) || '';
+  const limitePiece = piece ? deadlinePiece(d, piece) : '';
+  const dater = (v: string) => faire([{ table: 'Pistes', id, champs: { deadline: v } }], 'Deadline modifiée');
   return (
-    <Feuille titre={`Semaine du ${jourCourt(o.semaine)}`} onFermer={onFermer} pied={<button class="bouton principal" onClick={onFermer}>Terminé</button>}>
-      <p class="petit-texte">{o.titre}</p>
+    <Feuille titre={piste.nom || 'Étape principale'} onFermer={onFermer} pied={<button class="bouton principal" onClick={onFermer}>Terminé</button>}>
+      <p class="petit-texte">{piece?.nom}{du ? ` · commence le ${jourCourt(du)}` : ''}</p>
+      <Champ label="Deadline de l'étape" aide={limitePiece ? `La pièce est attendue pour le ${jourCourt(limitePiece)}` : undefined}>
+        <ChoixDate label={`deadline de ${piste.nom || 'étape'}`} valeur={piste.deadline ?? ''} min={du || undefined} onChange={dater} />
+      </Champ>
+      <div class="ligne-actions">
+        <button class="bouton" onClick={() => dater(ajouterJours(lireJour(piste.deadline) || j, -7))}><Icone nom="retour" taille={16} />Une semaine plus tôt</button>
+        <button class="bouton" onClick={() => dater(ajouterJours(lireJour(piste.deadline) || j, 7))}>Une semaine plus tard<Icone nom="chevron" taille={16} /></button>
+      </div>
       <ul class="etapes">
-        {etapes.map(e => {
-          const prevue = lireJour(e.date_prevue);
-          return (
-            <li class="etape">
-              <Case coche={bool(e.fait)} label={e.titre} onChange={v => faire(cocherEtape(d, e.id, v, j), v ? `« ${e.titre} » cochée` : `« ${e.titre} » décochée`)} />
-              <div class="etape-texte">
-                <span class="etape-titre">{e.titre}</span>
-                <span class="etape-meta">
-                  {e.duree && e.duree !== 'normal' && <span>{e.duree}</span>}
-                  {prevue && !bool(e.fait) && prevue < j && <span class="en-retard">en retard</span>}
-                </span>
-              </div>
-              <div class="decalage">
-                <button class="bouton-icone petit" aria-label={`Reculer « ${e.titre} » d'une semaine`} title="Une semaine plus tôt"
-                  onClick={() => dater(e, ajouterJours(prevue || j, -7))}><Icone nom="retour" taille={16} /></button>
-                <ChoixDate label={`date prévue de ${e.titre}`} valeur={e.date_prevue ?? ''} onChange={v => dater(e, v)} />
-                <button class="bouton-icone petit" aria-label={`Avancer « ${e.titre} » d'une semaine`} title="Une semaine plus tard"
-                  onClick={() => dater(e, ajouterJours(prevue || j, 7))}><Icone nom="chevron" taille={16} /></button>
-              </div>
-            </li>
-          );
-        })}
+        {etapesDePiste(d, id).map(e => (
+          <li class="etape">
+            <Case coche={bool(e.fait)} label={e.titre} onChange={v => faire(cocherEtape(d, e.id, v, j), v ? `« ${e.titre} » cochée` : `« ${e.titre} » décochée`)} />
+            <div class="etape-texte">
+              <span class="etape-titre">{e.titre}</span>
+              <span class="etape-meta">{e.duree && e.duree !== 'normal' && <span>{e.duree}</span>}</span>
+            </div>
+          </li>
+        ))}
       </ul>
     </Feuille>
   );

@@ -4,7 +4,7 @@ import { type Donnees, type Ligne, type NomTable, type Duree, DUREES, NOMS_TABLE
 import { piecesDe, pistesDe, etapesDePiste, ordreSuivant, ligne, tous, costumes } from '../logique/acces';
 import { statutApresCoche } from '../logique/activation';
 import { type ListeTexte } from '../logique/collerListe';
-import { type Repartition } from '../logique/planning';
+import { type Plan } from '../logique/planning';
 import { type Jour } from '../logique/dates';
 
 export interface Changement { table: NomTable; id: string; champs: Record<string, string>; nouveau?: boolean }
@@ -163,8 +163,23 @@ export function ajouterModeleDansPiste(d: Donnees, pisteId: string, l: ListeText
   return ch;
 }
 
-export function appliquerRepartition(r: Repartition): Changement[] {
-  return Object.entries(r).map(([id, jour]) => ({ table: 'Etapes' as NomTable, id, champs: { date_prevue: jour } }));
+export function appliquerPlan(plan: Plan, ordre?: string[]): Changement[] {
+  const ch: Changement[] = [];
+  for (const [id, f] of Object.entries(plan.pieces)) ch.push({ table: 'Pieces', id, champs: { debut: f.debut, deadline: f.deadline } });
+  for (const [id, deadline] of Object.entries(plan.etapes)) ch.push({ table: 'Pistes', id, champs: { deadline } });
+  // L'ordre de fabrication retenu sert de proposition à la prochaine répartition.
+  ordre?.forEach((id, i) => ch.push({ table: 'Pieces', id, champs: { ordre_planning: String(i + 1) } }));
+  return ch;
+}
+
+/** Efface le planning de pièces entières : leur fenêtre et les deadlines de leurs étapes. */
+export function effacerPlanning(d: Donnees, pieceIds: string[]): Changement[] {
+  const ch: Changement[] = [];
+  for (const id of pieceIds) {
+    ch.push({ table: 'Pieces', id, champs: { debut: '', deadline: '' } });
+    for (const p of pistesDe(d, id)) if (p.deadline) ch.push({ table: 'Pistes', id: p.id, champs: { deadline: '' } });
+  }
+  return ch;
 }
 
 // ---------- Suppression douce, restauration, purge ----------

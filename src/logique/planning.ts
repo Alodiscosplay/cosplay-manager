@@ -33,67 +33,34 @@ export function deadlineEtape(d: Donnees, e: Ligne): Jour | '' {
 
 // ---------- Répartir ----------
 
-export type Repartition = Record<string, Jour>; // id d'étape → date prévue
+/**
+ * Un plan : la fenêtre de chaque pièce (début → deadline) et la deadline de chaque étape.
+ * Les sous-étapes ne portent aucune date — on s'arrête à la maille étape.
+ */
+export interface Plan { pieces: Record<string, { debut: Jour; deadline: Jour }>; etapes: Record<string, Jour> }
 
-/** Marge proposée par défaut avant une deadline quand on répartit : une semaine, modifiable à la répartition. */
+/** Marge proposée par défaut entre la fin planifiée et la deadline du costume. */
 export const MARGE_DEADLINE = 7;
 
-/** Dernier jour planifiable pour une deadline : une semaine avant, mais jamais avant `depuis`. */
+/** Dernier jour planifiable pour une deadline : `marge` jours avant, mais jamais avant `depuis`. */
 export function finPlanifiable(deadline: Jour, depuis: Jour, marge = MARGE_DEADLINE): Jour {
   const fin = ajouterJours(deadline, -marge);
   return fin < depuis ? depuis : fin;
 }
 
-/** Place un bloc d'étapes entre deux dates, proportionnellement à leur poids. */
-function placerBloc(bloc: Ligne[], depuis: Jour, jusqua: Jour, res: Repartition): void {
-  const total = bloc.reduce((s, e) => s + poids(e), 0);
-  const duree = Math.max(0, ecartJours(depuis, jusqua));
-  let cumul = 0;
-  for (const e of bloc) {
-    cumul += poids(e);
-    res[e.id] = ajouterJours(depuis, total ? Math.round((duree * cumul) / total) : duree);
-  }
-}
+/** Poids restant (sous-étapes non cochées) d'une étape, puis d'une pièce. */
+const resteEtape = (d: Donnees, pisteId: string) =>
+  etapesDePiste(d, pisteId).filter(e => !bool(e.fait)).reduce((s, e) => s + poids(e), 0);
+const restePiece = (d: Donnees, pieceId: string) =>
+  etapesDePiece(d, pieceId).filter(e => !bool(e.fait)).reduce((s, e) => s + poids(e), 0);
 
 /**
- * Place des étapes (dans l'ordre) entre deux dates, proportionnellement à leur poids.
- * Une sous-étape qui porte DÉJÀ une date prévue est un point fixe : sa date est gardée telle quelle,
- * et les autres se répartissent autour d'elle. C'est l'outil qui s'adapte au choix de l'utilisateur.
+ * Les vagues d'une pièce : les étapes qui ne s'attendent pas avancent ensemble, celles qui en
+ * attendent d'autres viennent après, en autant de vagues qu'il y a de maillons dans la chaîne.
  */
-export function repartirSuite(etapes: Ligne[], depuis: Jour, jusqua: Jour, res: Repartition = {}, remplacer = false): Repartition {
-  const aFaire = etapes.filter(e => !bool(e.fait));
-  if (remplacer) { placerBloc(aFaire, depuis, jusqua, res); return res; }
-  let curseur = depuis;
-  let i = 0;
-  while (i < aFaire.length) {
-    let j = i;
-    while (j < aFaire.length && !lireJour(aFaire[j].date_prevue)) j++;
-    const ancre = j < aFaire.length ? lireJour(aFaire[j].date_prevue) : '';
-    // le bloc libre court jusqu'au point fixe suivant (jamais avant le curseur), sinon jusqu'à la fin
-    const fin = ancre ? (ancre > curseur ? ancre : curseur) : jusqua;
-    if (j > i) placerBloc(aFaire.slice(i, j), curseur, fin, res);
-    if (!ancre) break;
-    curseur = fin;
-    i = j + 1;
-  }
-  return res;
-}
-
-/**
- * Répartit une pièce. Les étapes qui ne s'attendent pas avancent en parallèle ; celles qui en
- * attendent d'autres viennent après, en autant de vagues qu'il y a de maillons dans la chaîne
- * (Doublure → Montage → Finitions fait trois vagues). Chaque vague reçoit une part de temps
- * proportionnelle à son étape la plus lourde.
- */
-export function repartirPiece(d: Donnees, pieceId: string, depuis: Jour, jusqua: Jour, res: Repartition = {}, remplacer = false): Repartition {
-  // Rien n'est planifié avant la date de début de la pièce.
-  const debutPiece = lireJour(d.Pieces[pieceId]?.debut);
-  if (debutPiece && debutPiece > depuis) depuis = debutPiece < jusqua ? debutPiece : jusqua;
+export function vaguesDePiece(d: Donnees, pieceId: string): Ligne[][] {
   const pistes = pistesDe(d, pieceId);
   const parId = new Map(pistes.map(p => [p.id, p]));
-  const reste = (p: Ligne) => etapesDePiste(d, p.id).filter(e => !bool(e.fait)).reduce((s, e) => s + poids(e), 0);
-
-  // Profondeur d'une étape = longueur de sa chaîne d'attentes dans la pièce (0 = rien à attendre).
   const profondeurs = new Map<string, number>();
   const profondeur = (p: Ligne, vus: Set<string> = new Set()): number => {
     if (profondeurs.has(p.id)) return profondeurs.get(p.id)!;
@@ -104,72 +71,117 @@ export function repartirPiece(d: Donnees, pieceId: string, depuis: Jour, jusqua:
     profondeurs.set(p.id, n);
     return n;
   };
-  for (const p of pistes) profondeur(p);
-
-  // Une vague par profondeur, dans l'ordre ; son poids est celui de son étape la plus lourde.
   const vagues: Ligne[][] = [];
-  for (const p of pistes) (vagues[profondeurs.get(p.id)!] ??= []).push(p);
-  const presentes = vagues.filter(v => v?.length);
-  const poidsVague = presentes.map(v => Math.max(0, ...v.map(reste)));
-  const total = poidsVague.reduce((a, b) => a + b, 0);
-  const duree = Math.max(0, ecartJours(depuis, jusqua));
-
-  let cumul = 0;
-  presentes.forEach((vague, i) => {
-    const debutVague = ajouterJours(depuis, total ? Math.round((duree * cumul) / total) : 0);
-    cumul += poidsVague[i];
-    const finVague = ajouterJours(depuis, total ? Math.round((duree * cumul) / total) : duree);
-    for (const p of vague) {
-      const dp = lireJour(p.debut); // une étape qui commence plus tard aussi
-      const a = dp && dp > debutVague ? (dp < finVague ? dp : finVague) : debutVague;
-      repartirSuite(etapesDePiste(d, p.id), a, finVague, res, remplacer);
-    }
-  });
-  return res;
+  for (const p of pistes) (vagues[profondeur(p)] ??= []).push(p);
+  return vagues.filter(v => v?.length);
 }
 
 /**
- * Répartit un costume : une pièce qui a ses propres dates (début ou deadline) garde sa fenêtre
- * [son début ou aujourd'hui, sa deadline ou celle du costume] ; les autres se suivent dans l'ordre
- * jusqu'à la deadline du costume, chacune pour une part proportionnelle à son poids restant.
+ * Planifie une pièce dans sa fenêtre : chaque vague reçoit une part de temps proportionnelle à son
+ * étape la plus lourde, et toutes les étapes d'une vague partagent la deadline de leur vague.
+ * Une étape qui a DÉJÀ une deadline la garde (sauf `remplacer`) et sert de point de repère.
  */
-export function repartirCostume(d: Donnees, costumeId: string, depuis: Jour, jusqua: Jour, marge = MARGE_DEADLINE, remplacer = false): Repartition {
-  const res: Repartition = {};
-  const pieces = piecesDe(d, costumeId).filter(p => !pieceTerminee(d, p.id));
-  const libres: Ligne[] = [];
-  for (const p of pieces) {
-    const propre = lireJour(p.deadline);
-    // `jusqua` a déjà sa marge ; une deadline propre à la pièce reçoit la sienne.
-    if (propre || lireJour(p.debut)) repartirPiece(d, p.id, depuis, propre ? finPlanifiable(propre, depuis, marge) : jusqua, res, remplacer);
-    else libres.push(p);
+export function planifierPiece(d: Donnees, pieceId: string, depuis: Jour, jusqua: Jour, plan: Plan, remplacer = false): void {
+  const vagues = vaguesDePiece(d, pieceId);
+  const poidsVague = vagues.map(v => Math.max(0, ...v.map(p => resteEtape(d, p.id))));
+  const total = poidsVague.reduce((a, b) => a + b, 0);
+  const duree = Math.max(0, ecartJours(depuis, jusqua));
+  let cumul = 0;
+  vagues.forEach((vague, i) => {
+    cumul += poidsVague[i];
+    const finVague = ajouterJours(depuis, total ? Math.round((duree * cumul) / total) : duree);
+    for (const p of vague) {
+      const propre = lireJour(p.deadline);
+      if (propre && !remplacer) continue; // sa deadline à elle fait foi
+      plan.etapes[p.id] = finVague;
+    }
+  });
+}
+
+/** L'ordre de fabrication des pièces : celui retenu au dernier « Répartir », sinon l'ordre d'affichage. */
+export function ordrePlanning(d: Donnees, costumeId: string): Ligne[] {
+  const pieces = piecesDe(d, costumeId);
+  const rang = (p: Ligne) => (p.ordre_planning ?? '').trim();
+  return [...pieces].sort((a, b) => {
+    const ra = rang(a), rb = rang(b);
+    if (ra && rb) return Number(ra) - Number(rb);
+    if (ra) return -1;
+    if (rb) return 1;
+    return 0;
+  });
+}
+
+/**
+ * Planifie un costume entre aujourd'hui et la fin choisie : les pièces se suivent dans l'ordre donné,
+ * chacune pour une part de temps proportionnelle à son poids restant, puis chaque pièce répartit ses
+ * étapes. Une pièce qui porte déjà un début ou une deadline garde sa fenêtre (sauf `remplacer`).
+ */
+export function planifierCostume(d: Donnees, costumeId: string, depuis: Jour, jusqua: Jour,
+                                 options: { ordre?: string[]; remplacer?: boolean } = {}): Plan {
+  const plan: Plan = { pieces: {}, etapes: {} };
+  const remplacer = !!options.remplacer;
+  const toutes = piecesDe(d, costumeId).filter(p => !pieceTerminee(d, p.id));
+  const rang = new Map((options.ordre ?? ordrePlanning(d, costumeId).map(p => p.id)).map((id, i) => [id, i]));
+  const pieces = [...toutes].sort((a, b) => (rang.get(a.id) ?? 0) - (rang.get(b.id) ?? 0));
+
+  // Les pièces qui ont déjà leur fenêtre la gardent ; les autres se partagent le temps restant.
+  const libres = pieces.filter(p => remplacer || (!lireJour(p.debut) && !lireJour(p.deadline)));
+  const fixees = pieces.filter(p => !libres.includes(p));
+  for (const p of fixees) {
+    const debut = lireJour(p.debut) || depuis;
+    const fin = lireJour(p.deadline) || jusqua;
+    planifierPiece(d, p.id, debut < fin ? debut : fin, fin, plan, remplacer);
   }
-  const reste = (p: Ligne) => etapesDePiece(d, p.id).filter(e => !bool(e.fait)).reduce((s, e) => s + poids(e), 0);
-  const total = libres.reduce((s, p) => s + reste(p), 0);
+  const total = libres.reduce((s, p) => s + restePiece(d, p.id), 0);
   const duree = Math.max(0, ecartJours(depuis, jusqua));
   let cumul = 0;
   for (const p of libres) {
     const debut = ajouterJours(depuis, total ? Math.round((duree * cumul) / total) : 0);
-    cumul += reste(p);
+    cumul += restePiece(d, p.id);
     const fin = ajouterJours(depuis, total ? Math.round((duree * cumul) / total) : duree);
-    repartirPiece(d, p.id, debut, fin, res, remplacer);
+    plan.pieces[p.id] = { debut, deadline: fin };
+    planifierPiece(d, p.id, debut, fin, plan, remplacer);
   }
-  return res;
+  return plan;
+}
+
+/**
+ * Début affiché d'une étape : sa pièce commence, ou la dernière deadline des étapes qu'elle attend.
+ * Rien n'est stocké — une étape ne porte que sa deadline.
+ */
+export function debutEtape(d: Donnees, piste: Ligne): Jour | '' {
+  const piece = ligne(d, 'Pieces', piste.piece_id);
+  const base = (piece && lireJour(piece.debut)) || '';
+  const avant = idsAttendus(piste)
+    .map(id => ligne(d, 'Pistes', id))
+    .filter((x): x is Ligne => !!x && x.piece_id === piste.piece_id)
+    .map(x => lireJour(x.deadline))
+    .filter(Boolean);
+  const apres = avant.length ? avant.reduce((a, b) => (a > b ? a : b)) : '';
+  if (apres && base) return apres > base ? apres : base;
+  return apres || base;
 }
 
 // ---------- Retard ----------
 
 export interface Retard { enRetard: Ligne[]; pctAttendu: number | null; pctReel: number | null }
 
-/** Une étape est en retard si sa date prévue est passée et qu'elle n'est pas cochée. */
-export function retard(etapes: Ligne[], jour: Jour): Retard {
-  const planifiees = etapes.filter(e => lireJour(e.date_prevue));
-  const enRetard = planifiees.filter(e => !bool(e.fait) && lireJour(e.date_prevue) < jour);
+/**
+ * Le retard se mesure à la maille étape : une étape dont la deadline est passée et qui n'est pas
+ * finie est en retard. Le % attendu est le poids des étapes qui devraient être finies aujourd'hui.
+ */
+export function retardPiece(d: Donnees, pieceId: string, jour: Jour): Retard {
+  const pistes = pistesDe(d, pieceId);
+  const finie = (p: Ligne) => etapesDePiste(d, p.id).every(e => bool(e.fait));
+  const datees = pistes.filter(p => lireJour(p.deadline));
+  const enRetard = datees.filter(p => lireJour(p.deadline) < jour && !finie(p));
+  const etapes = etapesDePiece(d, pieceId);
   const total = etapes.reduce((s, e) => s + poids(e), 0);
-  const attendu = etapes.filter(e => { const j = lireJour(e.date_prevue); return j && j <= jour; })
-    .reduce((s, e) => s + poids(e), 0);
+  const attendu = datees.filter(p => lireJour(p.deadline) <= jour)
+    .reduce((s, p) => s + etapesDePiste(d, p.id).reduce((x, e) => x + poids(e), 0), 0);
   return {
     enRetard,
-    pctAttendu: planifiees.length && total ? (100 * attendu) / total : null,
+    pctAttendu: datees.length && total ? (100 * attendu) / total : null,
     pctReel: avancement(etapes).pct,
   };
 }
@@ -197,19 +209,15 @@ export function alertes(d: Donnees, jour: Jour, joursAvant = 14): Alerte[] {
       const dp = lireJour(p.deadline);
       if (dp && proche(dp)) res.push({ niveau: niveau(dp), costumeId: c.id,
         texte: dp < jour ? `${p.nom} (${c.nom}) : deadline dépassée` : `${p.nom} (${c.nom}) : à finir pour le ${dp}` });
-      const etapes = etapesDePiece(d, p.id);
-      const r = retard(etapes, jour);
+      const r = retardPiece(d, p.id, jour);
       if (r.enRetard.length) res.push({ niveau: 'orange', costumeId: c.id,
-        texte: `${p.nom} (${c.nom}) : ${r.enRetard.length} sous-étape${r.enRetard.length > 1 ? 's' : ''} en retard sur le planning` });
-      for (const e of etapes) {
-        if (bool(e.fait)) continue;
-        const prevue = lireJour(e.date_prevue);
-        const limite = deadlineEtape(d, e);
-        if (prevue && limite && prevue > limite) res.push({ niveau: 'orange', costumeId: c.id,
-          texte: `« ${e.titre} » (${p.nom}) est prévue après sa deadline` });
-        const de = lireJour(e.deadline);
-        if (de && proche(de)) res.push({ niveau: niveau(de), costumeId: c.id,
-          texte: de < jour ? `« ${e.titre} » (${p.nom}) : deadline dépassée` : `« ${e.titre} » (${p.nom}) : pour le ${de}` });
+        texte: `${p.nom} (${c.nom}) : ${r.enRetard.length} étape${r.enRetard.length > 1 ? 's' : ''} en retard sur le planning` });
+      for (const pi of pistesDe(d, p.id)) {
+        if (etapesDePiste(d, pi.id).every(e => bool(e.fait))) continue;
+        const de = lireJour(pi.deadline);
+        const nom = pi.nom || 'étape principale';
+        if (de && proche(de) && de >= jour) res.push({ niveau: niveau(de), costumeId: c.id,
+          texte: `« ${nom} » (${p.nom}) : pour le ${de}` });
       }
     }
   }
@@ -251,17 +259,9 @@ export function agenda(d: Donnees, depuis: Jour, jusqua: Jour, costumeFiltre?: s
       if (dans(bp)) res.push({ jour: bp, type: 'debut', titre: t(p.nom), detail: 'début de la pièce', costumeId: c.id, fait: false, ref: { table: 'Pieces', id: p.id } });
       for (const pi of pistesDe(d, p.id)) {
         const nomEtape = pi.nom || 'étape principale';
-        const bpi = lireJour(pi.debut);
-        if (dans(bpi)) res.push({ jour: bpi, type: 'debut', titre: t(p.nom, nomEtape), detail: "début de l'étape", costumeId: c.id, fait: false, ref: { table: 'Pistes', id: pi.id } });
         const dpi = lireJour(pi.deadline);
-        if (dans(dpi)) res.push({ jour: dpi, type: 'deadline', titre: t(p.nom, nomEtape), detail: "deadline de l'étape", costumeId: c.id, fait: false, ref: { table: 'Pistes', id: pi.id } });
-        for (const e of etapesDePiste(d, pi.id)) {
-          const fait = bool(e.fait);
-          const jp = lireJour(e.date_prevue);
-          if (dans(jp)) res.push({ jour: jp, type: 'prevue', titre: t(p.nom, e.titre), detail: `étape ${nomEtape}`, costumeId: c.id, fait, ref: { table: 'Etapes', id: e.id } });
-          const jd = lireJour(e.deadline);
-          if (dans(jd)) res.push({ jour: jd, type: 'deadline', titre: t(p.nom, e.titre), detail: `étape ${nomEtape}`, costumeId: c.id, fait, ref: { table: 'Etapes', id: e.id } });
-        }
+        const finie = etapesDePiste(d, pi.id).every(e => bool(e.fait));
+        if (dans(dpi)) res.push({ jour: dpi, type: 'deadline', titre: t(p.nom, nomEtape), detail: "deadline de l'étape", costumeId: c.id, fait: finie, ref: { table: 'Pistes', id: pi.id } });
       }
     }
   }

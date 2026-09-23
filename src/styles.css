@@ -444,6 +444,10 @@ dialog.feuille::backdrop { background: rgb(20 12 28 / 45%); }
 .planning td.travee-debut { border-top-left-radius: 10px; border-bottom-left-radius: 10px; }
 .planning td.travee-fin { border-top-right-radius: 10px; border-bottom-right-radius: 10px; }
 .duree-case { font-size: .72rem; opacity: .75; }
+.ordre-pieces { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; width: 100%; }
+.ordre-pieces li { display: flex; align-items: center; gap: 8px; padding: 4px 6px; border: 1px solid var(--bord); border-radius: 10px; background: var(--surface); }
+.ordre-pieces .rang { min-width: 1.6em; text-align: center; color: var(--doux); font-variant-numeric: tabular-nums; }
+.ordre-pieces .nom { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .planning td { vertical-align: top; padding: 4px; }
 .planning tbody th { display: flex; align-items: center; gap: 4px; }
 .planning .ligne-piste th { padding-left: 26px; font-weight: 500; color: var(--doux); }

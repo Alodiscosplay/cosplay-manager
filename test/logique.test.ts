@@ -4,7 +4,7 @@ import { lireJourSaisi, jourSaisi } from '../src/logique/dates';
 import { avancement, avancementPiece, formatPct } from '../src/logique/avancement';
 import { aFaire, etapeDisponible, creeraitBoucle, texteAttente, champsStatutPiece } from '../src/logique/disponibilite';
 import { activationsDuJour } from '../src/logique/activation';
-import { repartirSuite, repartirPiece, repartirCostume, retard, finPlanifiable } from '../src/logique/planning';
+import { planifierCostume, debutEtape, retardPiece, finPlanifiable } from '../src/logique/planning';
 import { quantiteNombre, regrouperAchats, budgetCostume, totalCommande, regrouperParNom, texteQuantites } from '../src/logique/budget';
 import { analyserListe, versTexte, modeleVersTexte, texteVersModele } from '../src/logique/collerListe';
 import { changementsImport, enchainerPistes, cocherEtape, creerCommandes, changerStatutCommande, appliquerListe, insererModele, deplacerEtape, creerCostume } from '../src/store/operations';
@@ -186,81 +186,74 @@ describe('cocher : statut de la pièce', () => {
   });
 });
 
-describe('Répartir', () => {
-  it('proportionnel aux poids avant la deadline', () => {
-    const { d, ids } = construire({ pieces: [{ nom: 'Jupe', pistes: [{ nom: '', etapes: [['a', 1], ['b', 2], ['c', 1]] }] }] });
-    const r = repartirSuite(etapesDePiste(d, `${ids.Jupe}T0`), '2026-10-01', '2026-10-09');
-    expect(Object.values(r)).toEqual(['2026-10-03', '2026-10-07', '2026-10-09']);
-  });
-  it('les étapes déjà faites ne sont pas replanifiées', () => {
-    const { d, ids } = construire({ pieces: [{ nom: 'Jupe', pistes: [{ nom: '', etapes: [['a', 1, true], ['b', 1]] }] }] });
-    const r = repartirSuite(etapesDePiste(d, `${ids.Jupe}T0`), '2026-10-01', '2026-10-09');
-    expect(r).toEqual({ [ids['Jupe//b']]: '2026-10-09' });
-  });
-  it('une sous-étape déjà datée garde sa date : les autres se répartissent autour', () => {
-    const { d, ids } = construire({ pieces: [{ nom: 'Jupe', pistes: [{ nom: '', etapes: [['a', 1], ['b', 1], ['c', 1], ['d', 1]] }] }] });
-    d.Etapes[ids['Jupe//c']].date_prevue = '2026-10-05';
-    const r = repartirSuite(etapesDePiste(d, `${ids.Jupe}T0`), '2026-10-01', '2026-10-09');
-    expect(r[ids['Jupe//c']]).toBeUndefined();           // sa date n'est pas touchée
-    expect(r[ids['Jupe//a']] <= '2026-10-05').toBe(true); // a et b tiennent avant elle
-    expect(r[ids['Jupe//b']]).toBe('2026-10-05');
-    expect(r[ids['Jupe//d']]).toBe('2026-10-09');        // d suit après
+describe('Planifier', () => {
+  it('les pièces se suivent dans l’ordre donné, proportionnellement à ce qu’il leur reste', () => {
+    const { d, ids } = construire({ pieces: [
+      { nom: 'Robe', pistes: [{ nom: '', etapes: [['a', 1], ['b', 1]] }] },
+      { nom: 'Perruque', pistes: [{ nom: '', etapes: [['c', 1]] }] },
+    ] });
+    const plan = planifierCostume(d, ids.costume, '2026-10-01', '2026-10-31', { ordre: [ids.Perruque, ids.Robe] });
+    expect(plan.pieces[ids.Perruque].debut).toBe('2026-10-01');
+    expect(plan.pieces[ids.Perruque].deadline < plan.pieces[ids.Robe].debut
+      || plan.pieces[ids.Perruque].deadline === plan.pieces[ids.Robe].debut).toBe(true);
+    expect(plan.pieces[ids.Robe].deadline).toBe('2026-10-31');
   });
 
-  it('une chaîne d’étapes se répartit en autant de vagues qu’il y a de maillons', () => {
+  it('une chaîne d’étapes reçoit une deadline par vague', () => {
     const { d, ids } = construire({ pieces: [{ nom: 'Corset', pistes: [
       { nom: 'Patron', etapes: [['tracer', 2]] },
       { nom: 'Coupe', etapes: [['couper', 2]] },
       { nom: 'Montage', etapes: [['assembler', 2]] },
     ] }] });
     const d2 = appliquer(d, enchainerPistes(d, ids.Corset));
-    const r = repartirPiece(d2, ids.Corset, '2026-10-01', '2026-10-30');
-    const [a, b, c] = [r[ids['Corset/Patron/tracer']], r[ids['Corset/Coupe/couper']], r[ids['Corset/Montage/assembler']]];
+    const plan = planifierCostume(d2, ids.costume, '2026-10-01', '2026-10-30');
+    const [a, b, c] = [plan.etapes[ids['Corset/Patron']], plan.etapes[ids['Corset/Coupe']], plan.etapes[ids['Corset/Montage']]];
     expect(a < b && b < c).toBe(true);
-    // rendues parallèles, les trois retombent sur la même fenêtre
+    expect(c).toBe('2026-10-30');
+    // rendues parallèles, les trois partagent la même deadline
     const d3 = appliquer(d2, enchainerPistes(d2, ids.Corset, false));
-    const r2 = repartirPiece(d3, ids.Corset, '2026-10-01', '2026-10-30');
-    expect(new Set(Object.values(r2)).size).toBe(1);
+    const plan2 = planifierCostume(d3, ids.costume, '2026-10-01', '2026-10-30');
+    expect(new Set(Object.values(plan2.etapes)).size).toBe(1);
   });
 
-  it('les pistes parallèles partagent la même fenêtre, le montage vient après', () => {
-    const { d, ids } = construire({ pieces: [{ nom: 'Chapeau', pistes: [
-      { nom: 'Tissu', etapes: [['couper', 2], ['coudre', 2]] },
-      { nom: 'Bijoux', etapes: [['modéliser', 2]] },
-      { nom: 'Montage', etapes: [['assembler', 4]] },
-    ] }] });
-    d.Pistes[ids['Chapeau/Montage']].attend = `${ids['Chapeau/Tissu']},${ids['Chapeau/Bijoux']}`;
-    const r = repartirPiece(d, ids.Chapeau, '2026-10-01', '2026-10-09');
-    expect(r[ids['Chapeau/Tissu/coudre']]).toBe('2026-10-05');
-    expect(r[ids['Chapeau/Bijoux/modéliser']]).toBe('2026-10-05');
-    expect(r[ids['Chapeau/Montage/assembler']]).toBe('2026-10-09');
+  it('une pièce qui a déjà sa fenêtre la garde, sauf si on replanifie tout', () => {
+    const { d, ids } = construire({ pieces: [
+      { nom: 'Robe', champs: { debut: '2026-10-02', deadline: '2026-10-10' }, pistes: [{ nom: '', etapes: [['a', 1]] }] },
+      { nom: 'Perruque', pistes: [{ nom: '', etapes: [['c', 1]] }] },
+    ] });
+    const plan = planifierCostume(d, ids.costume, '2026-10-01', '2026-10-31');
+    expect(plan.pieces[ids.Robe]).toBeUndefined();               // sa fenêtre n'est pas touchée
+    expect(plan.etapes[ids['Robe/']]).toBe('2026-10-10');        // son étape finit avec elle
+    expect(plan.pieces[ids.Perruque].deadline).toBe('2026-10-31');
+    const force = planifierCostume(d, ids.costume, '2026-10-01', '2026-10-31', { remplacer: true });
+    expect(force.pieces[ids.Robe]).toBeDefined();
   });
-  it('ne planifie rien avant la date de début de la pièce', () => {
-    const { d, ids } = construire({
-      costume: { deadline: '2026-11-21' },
-      pieces: [
-        { nom: 'Robe', statut: 'en pause', champs: { debut: '2026-10-02' }, pistes: [{ nom: '', etapes: [['a', 1], ['b', 1]] }] },
-        { nom: 'Perruque', pistes: [{ nom: '', etapes: [['c', 1]] }] },
-      ],
-    });
-    const r = repartirCostume(d, ids.costume, '2026-09-22', '2026-11-21');
-    expect(r[ids['Robe//a']] >= '2026-10-02').toBe(true);
-    expect(r[ids['Robe//b']]).toBe('2026-11-21');
-    expect(r[ids['Perruque//c']]).toBe('2026-11-21');
-  });
-  it('laisse une semaine entre la dernière sous-étape et la deadline', () => {
+
+  it('laisse la marge voulue entre la fin prévue et la deadline', () => {
     expect(finPlanifiable('2026-11-21', '2026-09-22')).toBe('2026-11-14');
-    expect(finPlanifiable('2026-09-25', '2026-09-22')).toBe('2026-09-22'); // deadline trop proche : pas avant aujourd'hui
-    const { d, ids } = construire({ pieces: [{ nom: 'Robe', champs: { deadline: '2026-10-31' }, pistes: [{ nom: '', etapes: [['a', 1], ['b', 1]] }] }] });
-    const r = repartirCostume(d, ids.costume, '2026-10-01', '2026-11-14');
-    expect(r[ids['Robe//b']]).toBe('2026-10-24'); // deadline propre de la pièce, moins 7 jours
+    expect(finPlanifiable('2026-09-25', '2026-09-22')).toBe('2026-09-22'); // deadline trop proche
+    expect(finPlanifiable('2026-11-21', '2026-09-22', 21)).toBe('2026-10-31');
   });
 
-  it('retard : une étape prévue hier et non cochée', () => {
-    const { d, ids } = construire({ pieces: [{ nom: 'Jupe', pistes: [{ nom: '', etapes: ['a', 'b'] }] }] });
-    d.Etapes[ids['Jupe//a']].date_prevue = '2026-09-30';
-    d.Etapes[ids['Jupe//b']].date_prevue = '2026-10-05';
-    expect(retard(etapesDePiece(d, ids.Jupe), '2026-10-01').enRetard.map(e => e.titre)).toEqual(['a']);
+  it('le début d’une étape se déduit de la pièce et de ce qu’elle attend', () => {
+    const { d, ids } = construire({ pieces: [{ nom: 'Corset', champs: { debut: '2026-10-01' }, pistes: [
+      { nom: 'Patron', etapes: [['tracer', 1]] },
+      { nom: 'Coupe', etapes: [['couper', 1]] },
+    ] }] });
+    const d2 = appliquer(d, enchainerPistes(d, ids.Corset));
+    d2.Pistes[ids['Corset/Patron']].deadline = '2026-10-08';
+    expect(debutEtape(d2, d2.Pistes[ids['Corset/Patron']])).toBe('2026-10-01');
+    expect(debutEtape(d2, d2.Pistes[ids['Corset/Coupe']])).toBe('2026-10-08');
+  });
+
+  it('retard : une étape dont la deadline est passée et qui n’est pas finie', () => {
+    const { d, ids } = construire({ pieces: [{ nom: 'Jupe', pistes: [
+      { nom: 'Coupe', etapes: ['a'] },
+      { nom: 'Montage', etapes: ['b'] },
+    ] }] });
+    d.Pistes[ids['Jupe/Coupe']].deadline = '2026-09-30';
+    d.Pistes[ids['Jupe/Montage']].deadline = '2026-10-05';
+    expect(retardPiece(d, ids.Jupe, '2026-10-01').enRetard.map(p => p.nom)).toEqual(['Coupe']);
   });
 });
 

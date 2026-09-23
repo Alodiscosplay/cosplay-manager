@@ -296,8 +296,7 @@ function LigneEtape({ etape, suivante, ouvrir }: { etape: Ligne; suivante: boole
   const j = jour.value;
   const fait = bool(etape.fait);
   const att = fait ? [] : attentes(d, etape);
-  const prevue = lireJour(etape.date_prevue);
-  const dl = lireJour(etape.deadline);
+
   return (
     <li class={`etape${fait ? ' faite' : ''}${suivante ? ' suivante' : ''}`} data-id={etape.id}>
       <span class="poignee" aria-label="Déplacer la sous-étape" title="Glisser pour réordonner ou changer d'étape"><Icone nom="poignee" taille={16} /></span>
@@ -306,8 +305,6 @@ function LigneEtape({ etape, suivante, ouvrir }: { etape: Ligne; suivante: boole
         <span class="etape-titre">{etape.titre}</span>
         <span class="etape-meta">
           {suivante && <span class="marque-suivante">à faire</span>}
-          {prevue && !fait && <span class={prevue < j ? 'en-retard' : ''}><Icone nom="horloge" taille={12} />{jourCourt(prevue)}</span>}
-          {dl && !fait && <span class={dl < j ? 'en-retard' : ''}><Icone nom="drapeau" taille={12} />{jourCourt(dl)}</span>}
           {att.length > 0 && <span class="attente"><Icone nom="cadenas" taille={12} />{att.map(x => x.nom).join(', ')}</span>}
           {etape.detail && <span class="a-detail" title={etape.detail}>note</span>}
         </span>
