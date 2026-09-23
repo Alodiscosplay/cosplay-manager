@@ -303,9 +303,11 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
 dialog.feuille { padding: 0; border: 0; background: transparent; max-width: 100vw; max-height: 100vh; width: 100%; margin: auto 0 0; color: var(--encre); }
 dialog.feuille::backdrop { background: rgb(20 12 28 / 45%); }
 .feuille-corps { text-align: start; background: var(--surface); border-radius: 18px 18px 0 0; max-height: 92vh; display: flex; flex-direction: column; padding-bottom: env(safe-area-inset-bottom); }
-.feuille-tete { display: flex; align-items: center; gap: 8px; padding: 12px 8px 4px 20px; }
-.feuille-tete h2 { flex: 1; }
-.feuille-contenu { padding: 8px 20px 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; }
+.feuille-tete { position: relative; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 52px 4px; }
+.feuille-tete h2 { text-align: center; text-wrap: balance; }
+.feuille-tete > .bouton-icone { position: absolute; inset-inline-end: 8px; top: 8px; }
+.feuille-contenu { padding: 8px 20px 16px; overflow-y: auto; scrollbar-gutter: stable both-edges; display: flex; flex-direction: column; gap: 14px; }
+.texte-centre { text-align: center; margin: 0; text-wrap: balance; }
 .feuille-contenu form { display: flex; flex-direction: column; gap: 14px; }
 .feuille-pied { display: flex; gap: 8px; justify-content: flex-end; padding: 12px 20px 16px; border-top: 1px solid var(--bord); flex-wrap: wrap; }
 .feuille-pied .bouton.danger { margin-right: auto; }

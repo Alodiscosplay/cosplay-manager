@@ -338,7 +338,7 @@ export function Repartir({ costumeId, onFermer }: { costumeId: string; onFermer:
           onFermer();
         }}>Planifier {n} pièce{n > 1 ? 's' : ''}</button>
     </>}>
-      <p>Les étapes restantes de <strong>{costume.nom}</strong> reçoivent une deadline entre aujourd'hui et la fin prévue, proportionnellement à leur durée.</p>
+      <p class="texte-centre">Les étapes restantes de <strong>{costume.nom}</strong> reçoivent une deadline entre aujourd'hui et la fin prévue, proportionnellement à leur durée.</p>
       <Champ label="Tout terminer au plus tard le" aide={deadline ? `Deadline : ${jourCourt(deadline)} – ${texteMarge(marge)}` : undefined}>
         <ChoixDate label="fin prévue du costume" valeur={fin} min={jour.value} onChange={v => setFin(v || finPlanifiable(deadline, jour.value))} />
       </Champ>
@@ -355,7 +355,7 @@ export function Repartir({ costumeId, onFermer }: { costumeId: string; onFermer:
         </ol>
       </Champ>
       {fixees > 0 && <p class="petit-texte">{fixees} pièce{fixees > 1 ? 's gardent leur' : ' garde sa'} fenêtre : elle{fixees > 1 ? 's ont' : ' a'} déjà un début ou une deadline. « Effacer le planning » les libère.</p>}
-      <p class="petit-texte">{nEtapes > 1 ? `${nEtapes} étapes recevront leur deadline` : nEtapes === 1 ? '1 étape recevra sa deadline' : 'Aucune étape à dater'}. Les sous-étapes ne portent pas de date.</p>
+      <p class="petit-texte">{nEtapes > 1 ? `${nEtapes} étapes recevront leur deadline` : nEtapes === 1 ? '1 étape recevra sa deadline' : 'Aucune étape à dater'}</p>
     </Feuille>
   );
 }
