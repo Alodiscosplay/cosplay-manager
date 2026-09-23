@@ -5,7 +5,7 @@ import { useState } from 'preact/hooks';
 import { donnees, jour, faire } from '../../store/store';
 import { piecesDe, pistesDe, etapesDePiste } from '../../logique/acces';
 import { deadlineCostume, deadlinePiece, debutEtape, retardPiece } from '../../logique/planning';
-import { lundi, ajouterJours, lireJour, jourCourt, ecartJours } from '../../logique/dates';
+import { lundi, ajouterJours, lireJour, jourCourt, jourAvecNom, ecartJours } from '../../logique/dates';
 import { bool, type Ligne } from '../../modele/schema';
 import { cocherEtape } from '../../store/operations';
 import { Case, Feuille, Champ, ChoixDate, Vide } from '../../composants/base';
@@ -135,7 +135,9 @@ export function OngletPlanning({ costume }: { costume: Ligne }) {
               <th scope="col">Pièce</th>
               {semaines.map((s, i) => (
                 <th scope="col" class={`${semaineDe(j) === i ? 'cette-semaine' : ''}${dl && semaineDe(dl) === i ? ' semaine-deadline' : ''}`}>
-                  {semaineDe(j) === i ? 'cette sem.' : jourCourt(s)}
+                  <span class="semaine">{semaineDe(j) === i ? 'cette sem.' : jourCourt(s)}</span>
+                  {/* La deadline tombe souvent un week-end : on donne le jour exact, pas la semaine. */}
+                  {dl && semaineDe(dl) === i && <span class="jour-deadline" title={`Deadline du costume · ${jourAvecNom(dl)}`}>⚑ {jourAvecNom(dl)}</span>}
                 </th>
               ))}
             </tr>

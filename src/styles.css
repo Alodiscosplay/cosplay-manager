@@ -436,6 +436,9 @@ dialog.feuille::backdrop { background: rgb(20 12 28 / 45%); }
 .planning tbody th { text-align: left; font-weight: 600; position: sticky; left: 0; background: var(--surface); z-index: 1; min-width: 110px; vertical-align: middle; }
 .planning .cette-semaine { background: color-mix(in srgb, var(--accent-fond) 60%, transparent); }
 .planning .semaine-deadline { color: var(--rouge); font-weight: 700; }
+.planning thead th { white-space: nowrap; }
+.planning .semaine { display: block; }
+.planning .jour-deadline { display: block; font-size: .75rem; font-weight: 700; color: var(--rouge); }
 .planning td.case-prevue { background: var(--accent-fond); color: var(--accent); font-weight: 600; }
 .planning td.case-faite { background: var(--vert-fond); color: var(--vert); font-weight: 600; }
 .planning td.case-retard { background: var(--rouge-fond); color: var(--rouge); font-weight: 600; }

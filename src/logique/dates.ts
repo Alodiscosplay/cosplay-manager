@@ -51,6 +51,12 @@ export function jourCourt(j: Jour, reference: Jour = aujourdhui()): string {
   return `${d} ${MOIS_COURTS[m - 1]}${annee}`;
 }
 
+/** « dim. 22 nov. » : le jour de la semaine compte pour une deadline (souvent un week-end). */
+export function jourAvecNom(j: Jour, reference: Jour = aujourdhui()): string {
+  if (!j) return '';
+  return `${JOURS_COURTS[(versDate(j).getDay() + 6) % 7]} ${jourCourt(j, reference)}`;
+}
+
 /** « dans 12 j », « demain », « aujourd'hui », « il y a 3 j ». */
 export function relatif(j: Jour, reference: Jour = aujourdhui()): string {
   const n = ecartJours(reference, j);
