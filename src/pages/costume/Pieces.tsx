@@ -23,6 +23,7 @@ export function OngletPieces({ costume }: { costume: Ligne }) {
   const [nouvelle, setNouvelle] = useState('');
   const liste = useRef<HTMLDivElement>(null);
   const dl = deadlineCostume(d, costume);
+  const planifie = bool(costume.suivi_planning);
 
   useEffect(() => {
     if (!liste.current) return;
@@ -55,8 +56,8 @@ export function OngletPieces({ costume }: { costume: Ligne }) {
           <input value={nouvelle} placeholder="Nouvelle pièce" aria-label="Nom de la nouvelle pièce" onInput={e => setNouvelle((e.target as HTMLInputElement).value)} />
           <button class="bouton principal" disabled={!nouvelle.trim()}><Icone nom="plus" />Pièce</button>
         </form>
-        {dl && pieces.length > 0 && <button class="bouton" onClick={() => setOuvert({ type: 'repartir' })}><Icone nom="agenda" />Répartir les étapes</button>}
-        <EffacerDatesPrevues costumeId={costume.id} />
+        {planifie && dl && pieces.length > 0 && <button class="bouton" onClick={() => setOuvert({ type: 'repartir' })}><Icone nom="agenda" />Répartir les étapes</button>}
+        {planifie && <EffacerDatesPrevues costumeId={costume.id} />}
       </div>
 
       {!pieces.length && (

@@ -40,12 +40,17 @@ export function PageCostume({ id, onglet = 'pieces' }: { id: string; onglet?: st
   const dl = deadlineCostume(d, c);
   const ev = ligne(d, 'Evenements', c.evenement_id);
   const suivi = bool(c.suivi_budget);
+  const planifie = bool(c.suivi_planning);
   const onglets: [string, string][] = [
     ['pieces', 'Pièces'], ['fournitures', 'Fournitures'], ['photos', 'Photos'],
     ...(suivi ? [['budget', 'Budget'] as [string, string]] : []),
-    ['planning', 'Planning'], ['wip', 'Dossier WIP'],
+    ...(planifie ? [['planning', 'Planning'] as [string, string]] : []),
+    ['wip', 'Dossier WIP'],
     ...(sc === 'terminé' ? [['archiver', 'Archiver'] as [string, string]] : []),
   ];
+
+  // Onglet demandé mais masqué (planning non suivi, par exemple) : on retombe sur les pièces.
+  const vu = onglets.some(([cle]) => cle === onglet) ? onglet : 'pieces';
 
   const changerImage = async (f?: File) => {
     if (!f) return;
@@ -94,17 +99,17 @@ export function PageCostume({ id, onglet = 'pieces' }: { id: string; onglet?: st
 
       <nav class="onglets" aria-label="Sections du costume">
         {onglets.map(([cle, texte]) => (
-          <a href={lienCostume(id, cle)} class={`onglet${onglet === cle ? ' actif' : ''}`} aria-current={onglet === cle ? 'page' : undefined}>{texte}</a>
+          <a href={lienCostume(id, cle)} class={`onglet${vu === cle ? ' actif' : ''}`} aria-current={vu === cle ? 'page' : undefined}>{texte}</a>
         ))}
       </nav>
 
-      {onglet === 'pieces' && <OngletPieces costume={c} />}
-      {onglet === 'fournitures' && <OngletFournitures costume={c} />}
-      {onglet === 'photos' && <OngletPhotos costume={c} />}
-      {onglet === 'budget' && <OngletBudget costume={c} />}
-      {onglet === 'planning' && <OngletPlanning costume={c} />}
-      {onglet === 'wip' && <OngletWip costume={c} />}
-      {onglet === 'archiver' && <OngletArchiver costume={c} />}
+      {vu === 'pieces' && <OngletPieces costume={c} />}
+      {vu === 'fournitures' && <OngletFournitures costume={c} />}
+      {vu === 'photos' && <OngletPhotos costume={c} />}
+      {vu === 'budget' && <OngletBudget costume={c} />}
+      {vu === 'planning' && <OngletPlanning costume={c} />}
+      {vu === 'wip' && <OngletWip costume={c} />}
+      {vu === 'archiver' && <OngletArchiver costume={c} />}
 
       {fiche && <FicheCostume id={id} onFermer={() => setFiche(false)} />}
       {menuImage && (
@@ -178,6 +183,10 @@ export function FicheCostume({ id, onFermer, nouveau }: { id: string; onFermer: 
       <label class="interrupteur">
         <input type="checkbox" checked={bool(c.suivi_budget)} onChange={e => m({ suivi_budget: txtBool((e.target as HTMLInputElement).checked) })} />
         <span>Suivre le budget de ce costume</span>
+      </label>
+      <label class="interrupteur">
+        <input type="checkbox" checked={bool(c.suivi_planning)} onChange={e => m({ suivi_planning: txtBool((e.target as HTMLInputElement).checked) })} />
+        <span>Suivre le planning de ce costume</span>
       </label>
       {bool(c.suivi_budget) && <Champ label="Budget prévu (€, facultatif)"><Texte type="number" valeur={c.budget_prevu ?? ''} onValider={v => m({ budget_prevu: v })} /></Champ>}
       <Champ label="Notes"><Texte multiligne valeur={c.notes ?? ''} onValider={v => m({ notes: v })} /></Champ>
