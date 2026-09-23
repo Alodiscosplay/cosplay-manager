@@ -304,11 +304,10 @@ export function Repartir({ costumeId, onFermer }: { costumeId: string; onFermer:
   const deadline = deadlineCostume(d, costume);
   // La fin prévue du costume : la limite qu'elle se donne, forcément avant (ou à) la deadline.
   const [fin, setFin] = useState(() => lireJour(costume.fin_prevue) || finPlanifiable(deadline, jour.value));
-  const [remplacer, setRemplacer] = useState(false);
   const [ordre, setOrdre] = useState<string[]>(() => ordrePlanning(d, costumeId).filter(p => !pieceTerminee(d, p.id)).map(p => p.id));
   const finOk = fin >= jour.value;
   const marge = ecartJours(fin, deadline);
-  const plan = finOk ? planifierCostume(d, costumeId, jour.value, fin, { ordre, remplacer }) : { pieces: {}, etapes: {} };
+  const plan = finOk ? planifierCostume(d, costumeId, jour.value, fin, { ordre }) : { pieces: {}, etapes: {} };
   const n = Object.keys(plan.pieces).length;
   const nEtapes = Object.keys(plan.etapes).length;
   const fixees = ordre.filter(id => !plan.pieces[id]).length;
@@ -355,12 +354,8 @@ export function Repartir({ costumeId, onFermer }: { costumeId: string; onFermer:
           ))}
         </ol>
       </Champ>
-      {fixees > 0 && !remplacer && <p class="petit-texte">{fixees} pièce{fixees > 1 ? 's gardent leur' : ' garde sa'} fenêtre : elle{fixees > 1 ? 's ont' : ' a'} déjà un début ou une deadline.</p>}
-      <label class="interrupteur">
-        <input type="checkbox" checked={remplacer} onChange={e => setRemplacer((e.target as HTMLInputElement).checked)} />
-        <span>Replanifier aussi les dates déjà posées</span>
-      </label>
-      <p class="petit-texte">{nEtapes} étape{nEtapes > 1 ? 's' : ''} recevront leur deadline. Les sous-étapes ne portent pas de date.</p>
+      {fixees > 0 && <p class="petit-texte">{fixees} pièce{fixees > 1 ? 's gardent leur' : ' garde sa'} fenêtre : elle{fixees > 1 ? 's ont' : ' a'} déjà un début ou une deadline. « Effacer le planning » les libère.</p>}
+      <p class="petit-texte">{nEtapes > 1 ? `${nEtapes} étapes recevront leur deadline` : nEtapes === 1 ? '1 étape recevra sa deadline' : 'Aucune étape à dater'}. Les sous-étapes ne portent pas de date.</p>
     </Feuille>
   );
 }

@@ -98,12 +98,15 @@ export function OngletPlanning({ costume }: { costume: Ligne }) {
   };
 
   if (!pieces.some(p => p.debut || p.deadline || pistesDe(d, p.id).some(x => x.deadline))) {
+    // La feuille reste HORS du bloc « Vide », qui centre son contenu.
     return (
-      <Vide icone="tableau" titre="Rien de planifié">
-        <p>Donne une deadline au costume, puis « Répartir les étapes » pose la fenêtre de chaque pièce et la deadline de chaque étape.</p>
-        {dl && <button class="bouton principal" onClick={() => setRepartir(true)}>Répartir les étapes</button>}
+      <section>
+        <Vide icone="tableau" titre="Rien de planifié">
+          <p>Donne une deadline au costume, puis « Répartir les étapes » pose la fenêtre de chaque pièce et la deadline de chaque étape.</p>
+          {dl && <button class="bouton principal" onClick={() => setRepartir(true)}>Répartir les étapes</button>}
+        </Vide>
         {repartir && <Repartir costumeId={costume.id} onFermer={() => setRepartir(false)} />}
-      </Vide>
+      </section>
     );
   }
 
