@@ -7,7 +7,7 @@ import { activationsDuJour } from '../src/logique/activation';
 import { repartirSuite, repartirPiece, repartirCostume, retard, finPlanifiable } from '../src/logique/planning';
 import { quantiteNombre, regrouperAchats, budgetCostume, totalCommande, regrouperParNom, texteQuantites } from '../src/logique/budget';
 import { analyserListe, versTexte, modeleVersTexte, texteVersModele } from '../src/logique/collerListe';
-import { cocherEtape, creerCommandes, changerStatutCommande, appliquerListe, insererModele, deplacerEtape, creerCostume } from '../src/store/operations';
+import { changementsImport, cocherEtape, creerCommandes, changerStatutCommande, appliquerListe, insererModele, deplacerEtape, creerCostume } from '../src/store/operations';
 import { etapesDePiste, pistesDe, piecesDe, etapesDePiece, piecesDeFourniture } from '../src/logique/acces';
 
 const titres = (r: ReturnType<typeof aFaire>) => r.elements.map(e => e.etape.titre);
@@ -323,6 +323,27 @@ describe('achats et budget', () => {
       .toEqual([['Furina', 'y'], ['Bridget', 'wx'], ['—', 'z']]);
     expect(regrouperAchats(d, { fournisseurId: 'F' }, 'costume').flatMap(g => g.lignes.map(l => l.id)).sort()).toEqual(['x', 'z']);
     expect(regrouperAchats(d, { fournisseurId: '__aucun', costumeId: 'A' }).flatMap(g => g.lignes.map(l => l.id))).toEqual(['w']);
+  });
+});
+
+describe('Import d’une sauvegarde', () => {
+  it('ajoute les lignes inconnues, garde les lignes locales plus récentes', () => {
+    let d = vide();
+    d.Taches.a = { id: 'a', maj: '2026-09-23T12:00:00Z', supprime: '', titre: 'saisi après l’export' };
+    d.Taches.b = { id: 'b', maj: '2026-09-23T09:00:00Z', supprime: '', titre: 'ancien' };
+    const sauvegarde = {
+      Taches: {
+        a: { id: 'a', maj: '2026-09-23T10:00:00Z', supprime: '', titre: 'version de la sauvegarde' },
+        b: { id: 'b', maj: '2026-09-23T11:00:00Z', supprime: '', titre: 'corrigé' },
+        c: { id: 'c', maj: '2026-09-23T11:00:00Z', supprime: '', titre: 'nouvelle' },
+      },
+    };
+    const { changements, bilan } = changementsImport(d, sauvegarde);
+    expect(bilan).toEqual({ ajouts: 1, majs: 1, ignorees: 1 });
+    d = appliquer(d, changements);
+    expect(d.Taches.a.titre).toBe('saisi après l’export');
+    expect(d.Taches.b.titre).toBe('corrigé');
+    expect(d.Taches.c.titre).toBe('nouvelle');
   });
 });
 

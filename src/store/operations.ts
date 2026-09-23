@@ -1,6 +1,6 @@
 // Opérations métier PURES : elles lisent les données et renvoient la liste des lignes à écrire.
 // Le store (store.ts) les applique, les enregistre et les synchronise. Aucune ne modifie `d`.
-import { type Donnees, type Ligne, type NomTable, type Duree, DUREES, OUI, txtBool, entetes, bool, liste, txtListe } from '../modele/schema';
+import { type Donnees, type Ligne, type NomTable, type Duree, DUREES, NOMS_TABLES, OUI, txtBool, entetes, bool, liste, txtListe } from '../modele/schema';
 import { piecesDe, pistesDe, etapesDePiste, ordreSuivant, ligne, tous, costumes } from '../logique/acces';
 import { statutApresCoche } from '../logique/activation';
 import { type ListeTexte } from '../logique/collerListe';
@@ -240,3 +240,31 @@ export function appliquerChangements(d: Donnees, changements: Changement[], maj:
 }
 
 export const estFait = (l: Ligne) => bool(l.fait);
+
+// ---------- Import d'une sauvegarde ----------
+
+export interface BilanImport { ajouts: number; majs: number; ignorees: number }
+
+/**
+ * Fusionne une sauvegarde dans les données en place, ligne par ligne : une ligne inconnue est ajoutée,
+ * une ligne connue n'est remplacée que si la sauvegarde est PLUS RÉCENTE (colonne `maj`). Ce qui a été
+ * modifié depuis l'export est donc conservé.
+ */
+export function changementsImport(d: Donnees, importe: Partial<Record<NomTable, Record<string, Ligne>>>): { changements: Changement[]; bilan: BilanImport } {
+  const changements: Changement[] = [];
+  const bilan: BilanImport = { ajouts: 0, majs: 0, ignorees: 0 };
+  for (const t of NOMS_TABLES) {
+    const lignes = importe[t];
+    if (!lignes) continue;
+    for (const l of Object.values(lignes)) {
+      if (!l?.id) continue;
+      const champs: Record<string, string> = {};
+      for (const c of entetes(t)) if (c !== 'id' && c !== 'maj' && l[c] !== undefined) champs[c] = String(l[c] ?? '');
+      const actuelle = d[t]?.[l.id];
+      if (!actuelle) { changements.push({ table: t, id: l.id, champs, nouveau: true }); bilan.ajouts++; continue; }
+      if ((l.maj ?? '') > (actuelle.maj ?? '')) { changements.push({ table: t, id: l.id, champs }); bilan.majs++; }
+      else bilan.ignorees++;
+    }
+  }
+  return { changements, bilan };
+}

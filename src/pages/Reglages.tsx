@@ -3,7 +3,7 @@ import { donnees, mode, sync, synchroniser, faire, demarrer, quitter, reinitiali
 import { tous, ordreSuivant, ligne } from '../logique/acces';
 import { analyserListe, compter, modeleVersTexte, texteVersModele, type PisteTexte } from '../logique/collerListe';
 import { NOMS_TABLES, DUREES, NOMS_DUREES, type NomTable, type Ligne, type Duree } from '../modele/schema';
-import { restaurer, nouvelId, supprimer } from '../store/operations';
+import { restaurer, nouvelId, supprimer, changementsImport } from '../store/operations';
 import { connecter, deconnecter, emailConnu, googleConfigure } from '../sync/google';
 import { placePhotos, urlClasseur } from '../sync/drive';
 import { Feuille, Champ, Confirmer, telechargerBlob } from '../composants/base';
@@ -226,6 +226,41 @@ function Sauvegarde() {
         const blob = new Blob([JSON.stringify({ format: 'cosplay-planner-sauvegarde', exporte_le: new Date().toISOString(), donnees: donnees.value }, null, 1)], { type: 'application/json' });
         telechargerBlob(blob, `cosplay-planner-sauvegarde-${new Date().toISOString().slice(0, 10)}.json`);
       }}><Icone nom="telecharger" />Exporter mes données</button>
+      <ImportSauvegarde />
     </section>
+  );
+}
+
+/**
+ * Réimporte un fichier exporté : fusion ligne par ligne, la plus récente gagne. Ce qui a été saisi
+ * depuis l'export est conservé ; les lignes absentes de la sauvegarde ne sont jamais supprimées.
+ */
+function ImportSauvegarde() {
+  const [bilan, setBilan] = useState<{ ajouts: number; majs: number; ignorees: number; changements: number } | null>(null);
+  const [erreur, setErreur] = useState('');
+  const lire = async (f: File | undefined) => {
+    setErreur(''); setBilan(null);
+    if (!f) return;
+    try {
+      const lu = JSON.parse(await f.text());
+      if (lu?.format !== 'cosplay-planner-sauvegarde' || !lu.donnees) throw new Error('Ce fichier n’est pas une sauvegarde Cosplay Planner.');
+      const { changements, bilan: b } = changementsImport(donnees.value, lu.donnees);
+      if (!changements.length) { setErreur('Rien à importer : tes données sont déjà à jour.'); return; }
+      faire(changements, `${changements.length} ligne${changements.length > 1 ? 's' : ''} importée${changements.length > 1 ? 's' : ''}`);
+      setBilan({ ...b, changements: changements.length });
+    } catch (e) {
+      setErreur(e instanceof Error ? e.message : 'Fichier illisible.');
+    }
+  };
+  return (
+    <>
+      <label class="bouton">
+        <Icone nom="coller" />Importer une sauvegarde
+        <input type="file" accept="application/json,.json" class="cache" onChange={e => { const i = e.target as HTMLInputElement; void lire(i.files?.[0]); i.value = ''; }} />
+      </label>
+      <p class="petit-texte">La fusion se fait ligne par ligne : la version la plus récente gagne, et rien n’est supprimé.</p>
+      {bilan && <p class="petit-texte">{bilan.ajouts} ajoutée{bilan.ajouts > 1 ? 's' : ''} · {bilan.majs} mise{bilan.majs > 1 ? 's' : ''} à jour · {bilan.ignorees} déjà à jour.</p>}
+      {erreur && <p class="erreur">{erreur}</p>}
+    </>
   );
 }
