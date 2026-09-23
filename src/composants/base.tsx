@@ -43,6 +43,24 @@ export function Feuille({ titre, onFermer, children, pied, large }: { titre: str
   const derniereFermeture = useRef(onFermer);
   derniereFermeture.current = onFermer;
   const fermer = () => { (document.activeElement as HTMLElement | null)?.blur(); derniereFermeture.current(); };
+  /**
+   * Entrée dans un champ d'une ligne : on valide le champ (les champs n'enregistrent qu'à la sortie),
+   * puis on appuie sur le bouton principal du pied — « Terminé », « Créer », « Ajouter ».
+   * Les zones de texte, les formulaires internes et les boutons gardent leur comportement.
+   */
+  const entree = (e: KeyboardEvent) => {
+    if (e.key !== 'Enter' || e.shiftKey || e.ctrlKey || e.altKey || e.metaKey || e.isComposing) return;
+    const cible = e.target as HTMLElement;
+    if (cible.tagName !== 'INPUT') return;
+    const type = (cible as HTMLInputElement).type;
+    if (['checkbox', 'radio', 'file', 'button', 'submit', 'reset'].includes(type)) return;
+    if (cible.closest('form')) return;
+    const principal = ref.current?.querySelector<HTMLButtonElement>('.feuille-pied .bouton.principal');
+    if (!principal || principal.disabled) return;
+    e.preventDefault();
+    cible.blur();
+    setTimeout(() => principal.click(), 0);
+  };
   useEffect(() => {
     const d = ref.current!;
     if (!d.open) d.showModal();
@@ -51,7 +69,7 @@ export function Feuille({ titre, onFermer, children, pied, large }: { titre: str
     return () => d.removeEventListener('cancel', echap);
   }, []);
   return (
-    <dialog ref={ref} class={`feuille${large ? ' large' : ''}`} onMouseDown={e => { appuiSurFond.current = e.target === ref.current; }}
+    <dialog ref={ref} class={`feuille${large ? ' large' : ''}`} onKeyDown={entree} onMouseDown={e => { appuiSurFond.current = e.target === ref.current; }}
       onClick={e => { if (e.target === ref.current && appuiSurFond.current) fermer(); appuiSurFond.current = false; }} aria-label={titre}>
       <div class="feuille-corps">
         <header class="feuille-tete">
