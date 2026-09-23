@@ -339,7 +339,7 @@ export function Repartir({ costumeId, onFermer }: { costumeId: string; onFermer:
           onFermer();
         }}>Planifier {n} pièce{n > 1 ? 's' : ''}</button>
     </>}>
-      <p>Les pièces se suivent dans l'ordre choisi jusqu'à la fin prévue, chacune pour une part de temps proportionnelle à ce qu'il lui reste. Dans chaque pièce, les étapes qui s'attendent se suivent, les autres avancent ensemble.</p>
+      <p>Les étapes restantes de <strong>{costume.nom}</strong> reçoivent une deadline entre aujourd'hui et la fin prévue, proportionnellement à leur durée.</p>
       <Champ label="Tout terminer au plus tard le" aide={deadline ? `Deadline : ${jourCourt(deadline)} – ${texteMarge(marge)}` : undefined}>
         <ChoixDate label="fin prévue du costume" valeur={fin} min={jour.value} onChange={v => setFin(v || finPlanifiable(deadline, jour.value))} />
       </Champ>
