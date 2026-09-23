@@ -5,6 +5,7 @@ import { avancement, avancementPiece, formatPct } from '../src/logique/avancemen
 import { aFaire, etapeDisponible, creeraitBoucle, texteAttente, champsStatutPiece } from '../src/logique/disponibilite';
 import { activationsDuJour } from '../src/logique/activation';
 import { planifierCostume, debutEtape, retardPiece, finPlanifiable } from '../src/logique/planning';
+import { effacerPlanning } from '../src/store/operations';
 import { quantiteNombre, regrouperAchats, budgetCostume, totalCommande, regrouperParNom, texteQuantites } from '../src/logique/budget';
 import { analyserListe, versTexte, modeleVersTexte, texteVersModele } from '../src/logique/collerListe';
 import { changementsImport, enchainerPistes, cocherEtape, creerCommandes, changerStatutCommande, appliquerListe, insererModele, deplacerEtape, creerCostume } from '../src/store/operations';
@@ -244,6 +245,22 @@ describe('Planifier', () => {
     d2.Pistes[ids['Corset/Patron']].deadline = '2026-10-08';
     expect(debutEtape(d2, d2.Pistes[ids['Corset/Patron']])).toBe('2026-10-01');
     expect(debutEtape(d2, d2.Pistes[ids['Corset/Coupe']])).toBe('2026-10-08');
+  });
+
+  it('une étape finie est figée : ni replanifiée, ni effacée', () => {
+    const { d, ids } = construire({ pieces: [{ nom: 'Corset', pistes: [
+      { nom: 'Patron', etapes: [['tracer', 2, true]] },
+      { nom: 'Coupe', etapes: [['couper', 2]] },
+    ] }] });
+    d.Pistes[ids['Corset/Patron']].deadline = '2026-09-15';
+    d.Pistes[ids['Corset/Coupe']].deadline = '2026-10-20';
+    d.Pieces[ids.Corset].deadline = '2026-10-30';
+    const plan = planifierCostume(d, ids.costume, '2026-10-01', '2026-10-30', { remplacer: true });
+    expect(plan.etapes[ids['Corset/Patron']]).toBeUndefined();  // la faite garde sa date
+    expect(plan.etapes[ids['Corset/Coupe']]).toBe('2026-10-30');
+    const ch = effacerPlanning(d, [ids.Corset]);
+    expect(ch.some(c => c.id === ids['Corset/Patron'])).toBe(false);
+    expect(ch.some(c => c.id === ids['Corset/Coupe'])).toBe(true);
   });
 
   it('retard : une étape dont la deadline est passée et qui n’est pas finie', () => {

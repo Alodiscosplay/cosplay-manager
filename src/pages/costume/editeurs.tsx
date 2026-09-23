@@ -6,9 +6,9 @@ import { piecesDe, pistesDe, etapesDePiste, ligne, tous, idsAttendus, nomAttendu
 import { cleNom } from '../../logique/budget';
 import { creeraitBoucle, statutStockePiece, champsStatutPiece, pieceTerminee } from '../../logique/disponibilite';
 import { analyserListe, compter, versTexte } from '../../logique/collerListe';
-import { planifierCostume, ordrePlanning, deadlineCostume, deadlinePiece, finPlanifiable } from '../../logique/planning';
+import { planifierCostume, ordrePlanning, deadlineCostume, deadlinePiece, etapeFinie, finPlanifiable } from '../../logique/planning';
 import { jourCourt, lireJour, ecartJours } from '../../logique/dates';
-import { DUREES, NOMS_DUREES, STATUTS_PIECE, bool, liste, txtListe, type Duree, type Ligne, type NomTable } from '../../modele/schema';
+import { DUREES, NOMS_DUREES, STATUTS_PIECE, bool, liste, txtListe, type Donnees, type Duree, type Ligne, type NomTable } from '../../modele/schema';
 import { supprimer, appliquerListe, insererModele, ajouterModeleDansPiste, deplacerEtape, cocherEtape, appliquerPlan, effacerPlanning, nouvelId } from '../../store/operations';
 import { Feuille, Champ, Texte, ChoixDate, Selection } from '../../composants/base';
 import { maj } from '../Costume';
@@ -362,6 +362,14 @@ export function Repartir({ costumeId, onFermer }: { costumeId: string; onFermer:
 
 // ---------- Effacer le planning ----------
 
+/** Combien de dates une pièce perdrait : sa fenêtre (sauf si tout est fait) et ses étapes non finies. */
+function datesEffacables(d: Donnees, p: Ligne): number {
+  const pistes = pistesDe(d, p.id);
+  const pieceFinie = pistes.length > 0 && pistes.every(x => etapeFinie(d, x.id));
+  const fenetre = pieceFinie ? 0 : (p.debut ? 1 : 0) + (p.deadline ? 1 : 0);
+  return fenetre + pistes.filter(x => x.deadline && !etapeFinie(d, x.id)).length;
+}
+
 /**
  * Bouton « Effacer le planning » : la fenêtre des pièces choisies (début, deadline) et les deadlines
  * de leurs étapes. N'apparaît que s'il y a quelque chose à effacer.
@@ -369,7 +377,7 @@ export function Repartir({ costumeId, onFermer }: { costumeId: string; onFermer:
 export function EffacerDatesPrevues({ costumeId }: { costumeId: string }) {
   const d = donnees.value;
   const [ouvert, setOuvert] = useState(false);
-  const planifiee = (p: Ligne) => !!(p.debut || p.deadline) || pistesDe(d, p.id).some(x => x.deadline);
+  const planifiee = (p: Ligne) => datesEffacables(d, p) > 0;
   if (!piecesDe(d, costumeId).some(planifiee)) return null;
   return (
     <>
@@ -383,8 +391,9 @@ export function EffacerDatesPrevues({ costumeId }: { costumeId: string }) {
 function EffacerDuCostume({ costumeId, onFermer }: { costumeId: string; onFermer: () => void }) {
   const d = donnees.value;
   const planifiees = piecesDe(d, costumeId)
-    .map(p => ({ piece: p, dates: (p.debut ? 1 : 0) + (p.deadline ? 1 : 0) + pistesDe(d, p.id).filter(x => x.deadline).length }))
+    .map(p => ({ piece: p, dates: datesEffacables(d, p), figees: pistesDe(d, p.id).filter(x => x.deadline && etapeFinie(d, x.id)).length }))
     .filter(x => x.dates);
+  const figees = planifiees.reduce((s, x) => s + x.figees, 0);
   const [choisies, setChoisies] = useState<Set<string>>(() => new Set(planifiees.map(x => x.piece.id)));
   const basculer = (id: string, v: boolean) => { const s = new Set(choisies); if (v) s.add(id); else s.delete(id); setChoisies(s); };
   const retenues = planifiees.filter(x => choisies.has(x.piece.id));
@@ -398,6 +407,7 @@ function EffacerDuCostume({ costumeId, onFermer }: { costumeId: string; onFermer
       </button>
     </>}>
       <p>Choisis les pièces qui perdent leur fenêtre (début, deadline) et les deadlines de leurs étapes.</p>
+      {figees > 0 && <p class="petit-texte">{figees} étape{figees > 1 ? 's déjà faites gardent leur' : ' déjà faite garde sa'} date : ce qui est fait ne bouge plus.</p>}
       <label class="interrupteur">
         <input type="checkbox" checked={choisies.size === planifiees.length}
           onChange={e => setChoisies(new Set((e.target as HTMLInputElement).checked ? planifiees.map(x => x.piece.id) : []))} />

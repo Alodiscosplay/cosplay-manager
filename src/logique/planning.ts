@@ -48,6 +48,15 @@ export function finPlanifiable(deadline: Jour, depuis: Jour, marge = MARGE_DEADL
   return fin < depuis ? depuis : fin;
 }
 
+/**
+ * Une étape FINIE est figée dans le planning : sa deadline garde la trace de ce qui a été fait,
+ * la répartition ne la replace pas et « Effacer le planning » ne la retire pas.
+ */
+export function etapeFinie(d: Donnees, pisteId: string): boolean {
+  const sousEtapes = etapesDePiste(d, pisteId);
+  return sousEtapes.length > 0 && sousEtapes.every(e => bool(e.fait));
+}
+
 /** Poids restant (sous-étapes non cochées) d'une étape, puis d'une pièce. */
 const resteEtape = (d: Donnees, pisteId: string) =>
   etapesDePiste(d, pisteId).filter(e => !bool(e.fait)).reduce((s, e) => s + poids(e), 0);
@@ -91,6 +100,7 @@ export function planifierPiece(d: Donnees, pieceId: string, depuis: Jour, jusqua
     cumul += poidsVague[i];
     const finVague = ajouterJours(depuis, total ? Math.round((duree * cumul) / total) : duree);
     for (const p of vague) {
+      if (etapeFinie(d, p.id)) continue; // déjà faite : sa date ne bouge plus
       const propre = lireJour(p.deadline);
       if (propre && !remplacer) continue; // sa deadline à elle fait foi
       plan.etapes[p.id] = finVague;

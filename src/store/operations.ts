@@ -3,8 +3,9 @@
 import { type Donnees, type Ligne, type NomTable, type Duree, DUREES, NOMS_TABLES, OUI, txtBool, entetes, bool, liste, txtListe } from '../modele/schema';
 import { piecesDe, pistesDe, etapesDePiste, ordreSuivant, ligne, tous, costumes } from '../logique/acces';
 import { statutApresCoche } from '../logique/activation';
+import { etapeFinie, type Plan } from '../logique/planning';
 import { type ListeTexte } from '../logique/collerListe';
-import { type Plan } from '../logique/planning';
+
 import { type Jour } from '../logique/dates';
 
 export interface Changement { table: NomTable; id: string; champs: Record<string, string>; nouveau?: boolean }
@@ -172,12 +173,17 @@ export function appliquerPlan(plan: Plan, ordre?: string[]): Changement[] {
   return ch;
 }
 
-/** Efface le planning de pièces entières : leur fenêtre et les deadlines de leurs étapes. */
+/**
+ * Efface le planning de pièces entières : leur fenêtre et les deadlines de leurs étapes. Ce qui est
+ * FAIT reste en place — une étape finie garde sa date, et une pièce finie garde sa fenêtre.
+ */
 export function effacerPlanning(d: Donnees, pieceIds: string[]): Changement[] {
   const ch: Changement[] = [];
   for (const id of pieceIds) {
-    ch.push({ table: 'Pieces', id, champs: { debut: '', deadline: '' } });
-    for (const p of pistesDe(d, id)) if (p.deadline) ch.push({ table: 'Pistes', id: p.id, champs: { deadline: '' } });
+    const pistes = pistesDe(d, id);
+    const pieceFinie = pistes.length > 0 && pistes.every(p => etapeFinie(d, p.id));
+    if (!pieceFinie) ch.push({ table: 'Pieces', id, champs: { debut: '', deadline: '' } });
+    for (const p of pistes) if (p.deadline && !etapeFinie(d, p.id)) ch.push({ table: 'Pistes', id: p.id, champs: { deadline: '' } });
   }
   return ch;
 }
