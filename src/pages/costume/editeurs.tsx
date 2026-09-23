@@ -310,8 +310,9 @@ export function Repartir({ pieceId, costumeId, onFermer }: { pieceId?: string; c
   const [fin, setFin] = useState(() => finPlanifiable(deadline, jour.value));
   const finOk = fin >= jour.value;
   const marge = ecartJours(fin, deadline);
+  const [remplacer, setRemplacer] = useState(false);
   const r = finOk
-    ? (pieceId ? repartirPiece(d, pieceId, jour.value, fin) : repartirCostume(d, costumeId!, jour.value, fin, Math.max(0, marge)))
+    ? (pieceId ? repartirPiece(d, pieceId, jour.value, fin, {}, remplacer) : repartirCostume(d, costumeId!, jour.value, fin, Math.max(0, marge), remplacer))
     : {};
   const n = Object.keys(r).length;
   const deja = (pieceId ? etapesDePiece(d, pieceId) : piecesDe(d, costumeId!).flatMap(p => etapesDePiece(d, p.id)))
@@ -328,7 +329,13 @@ export function Repartir({ pieceId, costumeId, onFermer }: { pieceId?: string; c
       <Champ label="Tout terminer au plus tard le" aide={deadline ? `Deadline : ${jourCourt(deadline)} – ${texteMarge(marge)}` : undefined}>
         <ChoixDate label="limite de planification" valeur={fin} min={jour.value} onChange={v => setFin(v || finPlanifiable(deadline, jour.value))} />
       </Champ>
-      {deja > 0 && <p class="petit-texte">{deja} sous-étape{deja > 1 ? 's gardent' : ' garde'} la date que tu {deja > 1 ? 'leur as' : 'lui as'} donnée ; les autres se répartissent autour.</p>}
+      {deja > 0 && (
+        <label class="interrupteur">
+          <input type="checkbox" checked={remplacer} onChange={e => setRemplacer((e.target as HTMLInputElement).checked)} />
+          <span>Replanifier les {deja} sous-étape{deja > 1 ? 's' : ''} qui ont déjà une date</span>
+        </label>
+      )}
+      {deja > 0 && !remplacer && <p class="petit-texte">Sans cette case, {deja > 1 ? 'elles gardent leur date' : 'elle garde sa date'} et les autres se répartissent autour.</p>}
     </Feuille>
   );
 }

@@ -7,7 +7,7 @@ import { activationsDuJour } from '../src/logique/activation';
 import { repartirSuite, repartirPiece, repartirCostume, retard, finPlanifiable } from '../src/logique/planning';
 import { quantiteNombre, regrouperAchats, budgetCostume, totalCommande, regrouperParNom, texteQuantites } from '../src/logique/budget';
 import { analyserListe, versTexte, modeleVersTexte, texteVersModele } from '../src/logique/collerListe';
-import { changementsImport, cocherEtape, creerCommandes, changerStatutCommande, appliquerListe, insererModele, deplacerEtape, creerCostume } from '../src/store/operations';
+import { changementsImport, enchainerPistes, cocherEtape, creerCommandes, changerStatutCommande, appliquerListe, insererModele, deplacerEtape, creerCostume } from '../src/store/operations';
 import { etapesDePiste, pistesDe, piecesDe, etapesDePiece, piecesDeFourniture } from '../src/logique/acces';
 
 const titres = (r: ReturnType<typeof aFaire>) => r.elements.map(e => e.etape.titre);
@@ -205,6 +205,22 @@ describe('Répartir', () => {
     expect(r[ids['Jupe//a']] <= '2026-10-05').toBe(true); // a et b tiennent avant elle
     expect(r[ids['Jupe//b']]).toBe('2026-10-05');
     expect(r[ids['Jupe//d']]).toBe('2026-10-09');        // d suit après
+  });
+
+  it('une chaîne d’étapes se répartit en autant de vagues qu’il y a de maillons', () => {
+    const { d, ids } = construire({ pieces: [{ nom: 'Corset', pistes: [
+      { nom: 'Patron', etapes: [['tracer', 2]] },
+      { nom: 'Coupe', etapes: [['couper', 2]] },
+      { nom: 'Montage', etapes: [['assembler', 2]] },
+    ] }] });
+    const d2 = appliquer(d, enchainerPistes(d, ids.Corset));
+    const r = repartirPiece(d2, ids.Corset, '2026-10-01', '2026-10-30');
+    const [a, b, c] = [r[ids['Corset/Patron/tracer']], r[ids['Corset/Coupe/couper']], r[ids['Corset/Montage/assembler']]];
+    expect(a < b && b < c).toBe(true);
+    // rendues parallèles, les trois retombent sur la même fenêtre
+    const d3 = appliquer(d2, enchainerPistes(d2, ids.Corset, false));
+    const r2 = repartirPiece(d3, ids.Corset, '2026-10-01', '2026-10-30');
+    expect(new Set(Object.values(r2)).size).toBe(1);
   });
 
   it('les pistes parallèles partagent la même fenêtre, le montage vient après', () => {

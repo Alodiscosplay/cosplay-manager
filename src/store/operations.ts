@@ -220,6 +220,22 @@ export function retirerDeCommande(fournitureId: string): Changement[] {
   return [{ table: 'Fournitures', id: fournitureId, champs: { commande_id: '', statut: 'à acheter' } }];
 }
 
+/**
+ * Enchaîne les étapes d'une pièce : chacune attend la précédente, dans l'ordre affiché. L'inverse
+ * (`enchainer` à faux) efface ces attentes internes, et les étapes redeviennent parallèles.
+ */
+export function enchainerPistes(d: Donnees, pieceId: string, enchainer = true): Changement[] {
+  const pistes = pistesDe(d, pieceId);
+  const internes = new Set(pistes.map(p => p.id));
+  const ch: Changement[] = [];
+  pistes.forEach((p, i) => {
+    const gardees = liste(p.attend).filter(id => !internes.has(id)); // les attentes vers d'autres pièces restent
+    const voulues = enchainer && i > 0 ? [...gardees, pistes[i - 1].id] : gardees;
+    if (txtListe(voulues) !== (p.attend ?? '')) ch.push({ table: 'Pistes', id: p.id, champs: { attend: txtListe(voulues) } });
+  });
+  return ch;
+}
+
 // ---------- Attentes ----------
 
 export function basculerAttente(l: Ligne, table: NomTable, id: string): Changement[] {

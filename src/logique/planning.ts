@@ -60,8 +60,9 @@ function placerBloc(bloc: Ligne[], depuis: Jour, jusqua: Jour, res: Repartition)
  * Une sous-étape qui porte DÉJÀ une date prévue est un point fixe : sa date est gardée telle quelle,
  * et les autres se répartissent autour d'elle. C'est l'outil qui s'adapte au choix de l'utilisateur.
  */
-export function repartirSuite(etapes: Ligne[], depuis: Jour, jusqua: Jour, res: Repartition = {}): Repartition {
+export function repartirSuite(etapes: Ligne[], depuis: Jour, jusqua: Jour, res: Repartition = {}, remplacer = false): Repartition {
   const aFaire = etapes.filter(e => !bool(e.fait));
+  if (remplacer) { placerBloc(aFaire, depuis, jusqua, res); return res; }
   let curseur = depuis;
   let i = 0;
   while (i < aFaire.length) {
@@ -79,29 +80,51 @@ export function repartirSuite(etapes: Ligne[], depuis: Jour, jusqua: Jour, res: 
 }
 
 /**
- * Répartit une pièce : les pistes sans attente avancent en parallèle (phase 1), puis les pistes
- * qui attendent d'autres pistes de la pièce (phase 2, ex. « Montage »). Chaque phase reçoit une part
- * de temps proportionnelle au poids de sa piste la plus lourde.
+ * Répartit une pièce. Les étapes qui ne s'attendent pas avancent en parallèle ; celles qui en
+ * attendent d'autres viennent après, en autant de vagues qu'il y a de maillons dans la chaîne
+ * (Doublure → Montage → Finitions fait trois vagues). Chaque vague reçoit une part de temps
+ * proportionnelle à son étape la plus lourde.
  */
-export function repartirPiece(d: Donnees, pieceId: string, depuis: Jour, jusqua: Jour, res: Repartition = {}): Repartition {
+export function repartirPiece(d: Donnees, pieceId: string, depuis: Jour, jusqua: Jour, res: Repartition = {}, remplacer = false): Repartition {
   // Rien n'est planifié avant la date de début de la pièce.
   const debutPiece = lireJour(d.Pieces[pieceId]?.debut);
   if (debutPiece && debutPiece > depuis) depuis = debutPiece < jusqua ? debutPiece : jusqua;
   const pistes = pistesDe(d, pieceId);
-  const idsPistes = new Set(pistes.map(p => p.id));
+  const parId = new Map(pistes.map(p => [p.id, p]));
   const reste = (p: Ligne) => etapesDePiste(d, p.id).filter(e => !bool(e.fait)).reduce((s, e) => s + poids(e), 0);
-  const phase2 = pistes.filter(p => idsAttendus(p).some(id => idsPistes.has(id)));
-  const phase1 = pistes.filter(p => !phase2.includes(p));
-  const p1 = Math.max(0, ...phase1.map(reste));
-  const p2 = Math.max(0, ...phase2.map(reste));
-  const duree = Math.max(0, ecartJours(depuis, jusqua));
-  const bascule = ajouterJours(depuis, p1 + p2 > 0 ? Math.round((duree * p1) / (p1 + p2)) : duree);
-  const fenetre = (p: Ligne, a: Jour, b: Jour): [Jour, Jour] => {
-    const dp = lireJour(p.debut);
-    return [dp && dp > a ? (dp < b ? dp : b) : a, b]; // une piste qui commence plus tard aussi
+
+  // Profondeur d'une étape = longueur de sa chaîne d'attentes dans la pièce (0 = rien à attendre).
+  const profondeurs = new Map<string, number>();
+  const profondeur = (p: Ligne, vus: Set<string> = new Set()): number => {
+    if (profondeurs.has(p.id)) return profondeurs.get(p.id)!;
+    if (vus.has(p.id)) return 0; // boucle : on ne s'y enfonce pas
+    vus.add(p.id);
+    const avant = idsAttendus(p).map(id => parId.get(id)).filter((x): x is Ligne => !!x);
+    const n = avant.length ? Math.max(...avant.map(x => profondeur(x, vus))) + 1 : 0;
+    profondeurs.set(p.id, n);
+    return n;
   };
-  for (const p of phase1) repartirSuite(etapesDePiste(d, p.id), ...fenetre(p, depuis, phase2.length ? bascule : jusqua), res);
-  for (const p of phase2) repartirSuite(etapesDePiste(d, p.id), ...fenetre(p, bascule, jusqua), res);
+  for (const p of pistes) profondeur(p);
+
+  // Une vague par profondeur, dans l'ordre ; son poids est celui de son étape la plus lourde.
+  const vagues: Ligne[][] = [];
+  for (const p of pistes) (vagues[profondeurs.get(p.id)!] ??= []).push(p);
+  const presentes = vagues.filter(v => v?.length);
+  const poidsVague = presentes.map(v => Math.max(0, ...v.map(reste)));
+  const total = poidsVague.reduce((a, b) => a + b, 0);
+  const duree = Math.max(0, ecartJours(depuis, jusqua));
+
+  let cumul = 0;
+  presentes.forEach((vague, i) => {
+    const debutVague = ajouterJours(depuis, total ? Math.round((duree * cumul) / total) : 0);
+    cumul += poidsVague[i];
+    const finVague = ajouterJours(depuis, total ? Math.round((duree * cumul) / total) : duree);
+    for (const p of vague) {
+      const dp = lireJour(p.debut); // une étape qui commence plus tard aussi
+      const a = dp && dp > debutVague ? (dp < finVague ? dp : finVague) : debutVague;
+      repartirSuite(etapesDePiste(d, p.id), a, finVague, res, remplacer);
+    }
+  });
   return res;
 }
 
@@ -110,14 +133,14 @@ export function repartirPiece(d: Donnees, pieceId: string, depuis: Jour, jusqua:
  * [son début ou aujourd'hui, sa deadline ou celle du costume] ; les autres se suivent dans l'ordre
  * jusqu'à la deadline du costume, chacune pour une part proportionnelle à son poids restant.
  */
-export function repartirCostume(d: Donnees, costumeId: string, depuis: Jour, jusqua: Jour, marge = MARGE_DEADLINE): Repartition {
+export function repartirCostume(d: Donnees, costumeId: string, depuis: Jour, jusqua: Jour, marge = MARGE_DEADLINE, remplacer = false): Repartition {
   const res: Repartition = {};
   const pieces = piecesDe(d, costumeId).filter(p => !pieceTerminee(d, p.id));
   const libres: Ligne[] = [];
   for (const p of pieces) {
     const propre = lireJour(p.deadline);
     // `jusqua` a déjà sa marge ; une deadline propre à la pièce reçoit la sienne.
-    if (propre || lireJour(p.debut)) repartirPiece(d, p.id, depuis, propre ? finPlanifiable(propre, depuis, marge) : jusqua, res);
+    if (propre || lireJour(p.debut)) repartirPiece(d, p.id, depuis, propre ? finPlanifiable(propre, depuis, marge) : jusqua, res, remplacer);
     else libres.push(p);
   }
   const reste = (p: Ligne) => etapesDePiece(d, p.id).filter(e => !bool(e.fait)).reduce((s, e) => s + poids(e), 0);
@@ -128,7 +151,7 @@ export function repartirCostume(d: Donnees, costumeId: string, depuis: Jour, jus
     const debut = ajouterJours(depuis, total ? Math.round((duree * cumul) / total) : 0);
     cumul += reste(p);
     const fin = ajouterJours(depuis, total ? Math.round((duree * cumul) / total) : duree);
-    repartirPiece(d, p.id, debut, fin, res);
+    repartirPiece(d, p.id, debut, fin, res, remplacer);
   }
   return res;
 }

@@ -2,13 +2,13 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import Sortable from 'sortablejs';
 import { donnees, jour, faire } from '../../store/store';
-import { piecesDe, pistesDe, etapesDePiste } from '../../logique/acces';
+import { piecesDe, pistesDe, etapesDePiste, idsAttendus } from '../../logique/acces';
 import { avancementPiece, avancementPiste, poids } from '../../logique/avancement';
 import { statutPiece, statutStockePiece, champsStatutPiece, pisteEnPause, champsPausePiste, etatPiste, attentes, texteAttente } from '../../logique/disponibilite';
 import { deadlineCostume } from '../../logique/planning';
 import { jourCourt, relatif, lireJour } from '../../logique/dates';
 import { DUREES, NOMS_DUREES, bool, txtBool, type Duree, type Ligne } from '../../modele/schema';
-import { creerPiece, creerPiste, creerEtape, cocherEtape, deplacerEtape, reordonner } from '../../store/operations';
+import { creerPiece, creerPiste, creerEtape, cocherEtape, deplacerEtape, reordonner, enchainerPistes } from '../../store/operations';
 import { Barre, Pct, Puce, Case, Menu, Vide } from '../../composants/base';
 import { Icone } from '../../composants/Icone';
 import { EditeurEtape, EditeurPiece, EditeurPiste, CollerListe, ChoixModele, Repartir, RattacherFournitures, nbFournituresHorsPieces, EffacerDatesPrevues } from './editeurs';
@@ -110,6 +110,8 @@ function CartePiece({ piece, ouvrir }: { piece: Ligne; ouvrir: (o: Ouvert) => vo
   const att = attentes(d, piece);
   const dl = lireJour(piece.deadline);
   const debutFutur = statutStockePiece(piece) === 'en pause' && lireJour(piece.debut) > j ? lireJour(piece.debut) : '';
+  // Étapes enchaînées : chacune (sauf la première) attend celle d'avant.
+  const enchainees = pistes.length > 1 && pistes.slice(1).every((p, i) => idsAttendus(p).includes(pistes[i].id));
   const basculer = () => { memoriserRepli(piece.id, !replie); setReplie(!replie); };
   const statut = (s: string) => maj('Pieces', piece.id, champsStatutPiece(piece, s, j));
 
@@ -159,6 +161,9 @@ function CartePiece({ piece, ouvrir }: { piece: Ligne; ouvrir: (o: Ouvert) => vo
             { texte: 'Fournitures de la pièce', icone: 'achats', faire: () => ouvrir({ type: 'fournitures', id: piece.id }) },
             { texte: 'Ajouter une étape depuis un modèle', icone: 'calques', faire: () => ouvrir({ type: 'modele', id: piece.id }) },
             { texte: 'Coller des sous-étapes', icone: 'coller', faire: () => ouvrir({ type: 'coller', id: piece.id }) },
+            ...(pistes.length > 1 ? [enchainees
+              ? { texte: 'Rendre les étapes parallèles', icone: 'calques', faire: () => faire(enchainerPistes(d, piece.id, false), 'Étapes parallèles') }
+              : { texte: 'Enchaîner les étapes', icone: 'vers', faire: () => faire(enchainerPistes(d, piece.id), 'Étapes enchaînées') }] : []),
           ]} />
         </div>
       </header>
