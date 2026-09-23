@@ -9,13 +9,23 @@ function vivants(table: Record<string, Ligne>): Ligne[] {
   return Object.values(table).filter(vivant);
 }
 
-/** Teintes proposées pour distinguer les projets (agenda, repères). */
-export const TEINTES = [270, 145, 20, 200, 330, 45, 175, 300, 95, 240];
+/** Teintes proposées pour distinguer les projets (agenda, repères), plus un gris. */
+export const GRIS = 'gris';
+export const TEINTES = [0, 18, 35, 52, 95, 130, 160, 185, 205, 230, 255, 275, 300, 320, 340];
+
+/** Ordre des teintes attribuées d'office, choisi pour que deux projets voisins ne se ressemblent pas. */
+const AUTO = [275, 130, 18, 205, 320, 52, 160, 300, 95, 230, 0, 185, 255, 35, 340];
 
 /** Couleur d'un costume : la sienne si elle est choisie, sinon une teinte de la palette selon son rang. */
 export function couleurCostume(c: Ligne, rang = 0): string {
   const teinte = (c.couleur ?? '').trim();
-  return `hsl(${teinte || TEINTES[rang % TEINTES.length]} 60% 48%)`;
+  if (teinte === GRIS) return 'hsl(230 8% 52%)';
+  return `hsl(${teinte || AUTO[rang % AUTO.length]} 62% 48%)`;
+}
+
+/** La couleur d'une pastille de choix. */
+export function teinteCouleur(t: string | number): string {
+  return t === GRIS ? 'hsl(230 8% 52%)' : `hsl(${t} 62% 48%)`;
 }
 
 export function costumes(d: Donnees): Ligne[] {

@@ -1,7 +1,7 @@
 import { useState } from 'preact/hooks';
 import { donnees, jour, faire } from '../store/store';
 import { agenda, type ElementAgenda, type TypeAgenda } from '../logique/planning';
-import { costumes, couleurCostume, TEINTES, tous } from '../logique/acces';
+import { costumes, couleurCostume, teinteCouleur, TEINTES, GRIS, tous } from '../logique/acces';
 import { lundi, ajouterJours, versDate, MOIS, JOURS_COURTS, jourCourt, lireJour } from '../logique/dates';
 import { Feuille, Selection } from '../composants/base';
 import { Icone } from '../composants/Icone';
@@ -158,9 +158,10 @@ function ChoixCouleur({ id, rang, onFermer }: { id: string; rang: number; onFerm
       <div class="choix-couleur">
         <button type="button" class={`pastille-couleur${choisie === '' ? ' actif' : ''}`} title="Automatique"
           aria-label="Couleur automatique" aria-pressed={choisie === ''} onClick={() => poser('')}>auto</button>
-        {TEINTES.map(t => (
-          <button type="button" class={`pastille-couleur${String(t) === choisie ? ' actif' : ''}`} style={{ background: `hsl(${t} 60% 48%)` }}
-            aria-pressed={String(t) === choisie} aria-label={`Teinte ${t}`} onClick={() => poser(String(t))} />
+        {[...TEINTES.map(String), GRIS].map(t => (
+          <button type="button" class={`pastille-couleur${t === choisie ? ' actif' : ''}`} style={{ background: teinteCouleur(t) }}
+            aria-pressed={t === choisie} aria-label={t === GRIS ? 'Gris' : `Teinte ${t}`} title={t === GRIS ? 'Gris' : undefined}
+            onClick={() => poser(t)} />
         ))}
       </div>
       <p class="petit-texte">Aperçu : <span class="cal-texte" style={{ background: `color-mix(in srgb, ${couleurCostume(c, rang)} 18%, var(--surface))`, color: `color-mix(in srgb, ${couleurCostume(c, rang)} 55%, var(--encre))` }}>{c.nom} — deadline</span></p>
