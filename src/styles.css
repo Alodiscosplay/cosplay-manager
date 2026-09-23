@@ -437,15 +437,19 @@ dialog.feuille::backdrop { background: rgb(20 12 28 / 45%); }
 .planning td.case-prevue { background: var(--accent-fond); color: var(--accent); font-weight: 600; }
 .planning td.case-faite { background: var(--vert-fond); color: var(--vert); font-weight: 600; }
 .planning td.case-retard { background: var(--rouge-fond); color: var(--rouge); font-weight: 600; }
+.planning td.travee { background: var(--accent-fond); }
+.planning td.travee-faite { background: var(--vert-fond); color: var(--vert); }
+.planning td.travee-retard { background: var(--rouge-fond); color: var(--rouge); }
+.planning td.travee-prevue { color: var(--accent); }
+.planning td.travee-debut { border-top-left-radius: 10px; border-bottom-left-radius: 10px; }
+.planning td.travee-fin { border-top-right-radius: 10px; border-bottom-right-radius: 10px; }
+.duree-case { font-size: .72rem; opacity: .75; }
 .planning td { vertical-align: top; padding: 4px; }
 .planning tbody th { display: flex; align-items: center; gap: 4px; }
 .planning .ligne-piste th { padding-left: 26px; font-weight: 500; color: var(--doux); }
-.planning .ligne-piste td { min-width: 150px; white-space: normal; }
 .case-planning { display: flex; flex-direction: column; gap: 3px; width: 100%; border: 0; background: none; color: inherit; font: inherit; padding: 2px; border-radius: 8px; cursor: pointer; text-align: left; }
 .case-planning:hover, .case-planning:focus-visible { background: color-mix(in srgb, var(--encre) 8%, transparent); }
 .compte-case { font-weight: 600; text-align: center; }
-.puce-etape { display: block; white-space: normal; line-height: 1.25; font-size: .78rem; }
-.puce-etape.faite { text-decoration: line-through; opacity: .7; }
 .decalage { display: flex; align-items: center; gap: 4px; }
 .decalage input[type="text"] { width: 8.5em; }
 .marqueur { margin: 0 2px; }

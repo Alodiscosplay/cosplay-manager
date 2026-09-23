@@ -1,5 +1,6 @@
 // Vue Planning : les pièces en lignes, les semaines en colonnes (dans l'esprit d'une grille de planning
 // à la main). Une pièce se déplie en ses étapes, et chaque case s'ouvre pour cocher ou redater.
+import type { ComponentChildren } from 'preact';
 import { useState } from 'preact/hooks';
 import { donnees, jour, faire } from '../../store/store';
 import { piecesDe, pistesDe, etapesDePiece, etapesDePiste } from '../../logique/acces';
@@ -45,31 +46,58 @@ export function OngletPlanning({ costume }: { costume: Ligne }) {
     );
   }
 
-  /** Le contenu d'une case : les sous-étapes de cette semaine, en toutes lettres ou en compte. */
-  const contenuCase = (etapes: Ligne[], i: number, titre: string, detaille: boolean) => {
-    const cette = etapes.filter(e => lireJour(e.date_prevue) && semaineDe(lireJour(e.date_prevue)) === i);
-    if (!cette.length) return { classe: '', contenu: null };
-    const faites = cette.filter(e => bool(e.fait)).length;
-    const enRetard = cette.some(e => !bool(e.fait) && lireJour(e.date_prevue) < j);
+  /**
+   * Une barre par ligne : elle s'étend de la première à la dernière semaine planifiée, pour montrer
+   * la DURÉE. Chaque case reste cliquable ; le détail des sous-étapes s'ouvre dans la feuille.
+   */
+  const barre = (etapes: Ligne[], titre: string) => {
+    const datees = etapes.filter(e => lireJour(e.date_prevue));
+    if (!datees.length) return null;
+    const semainesOccupees = datees.map(e => semaineDe(lireJour(e.date_prevue)));
+    const de = Math.min(...semainesOccupees);
+    const a = Math.max(...semainesOccupees);
+    const faites = datees.filter(e => bool(e.fait)).length;
+    const enRetard = datees.some(e => !bool(e.fait) && lireJour(e.date_prevue) < j);
+    const ton = faites === datees.length ? 'faite' : enRetard ? 'retard' : 'prevue';
     return {
-      classe: faites === cette.length ? 'case-faite' : enRetard ? 'case-retard' : 'case-prevue',
-      contenu: (
-        <button class="case-planning" onClick={() => setOuvert({ titre, semaine: semaines[i], ids: cette.map(e => e.id) })}
-          aria-label={`${cette.length} sous-étape${cette.length > 1 ? 's' : ''} · ${titre} · semaine du ${jourCourt(semaines[i])}`}>
-          {detaille
-            ? cette.map(e => <span class={`puce-etape${bool(e.fait) ? ' faite' : ''}`}>{bool(e.fait) ? '✓ ' : ''}{e.titre}</span>)
-            : <span class="compte-case">{faites}/{cette.length}</span>}
-        </button>
-      ),
+      de, a, ton, titre, ids: datees.map(e => e.id),
+      texte: `${faites}/${datees.length}`,
+      semaines: a - de + 1,
+      deLaSemaine: (i: number) => datees.filter(e => semaineDe(lireJour(e.date_prevue)) === i).map(e => e.id),
     };
   };
+
+  /** Les cases d'une ligne, avec la barre posée dessus. */
+  const cases = (b: ReturnType<typeof barre>, marqueurs?: (i: number) => ComponentChildren) =>
+    semaines.map((_, i) => {
+      const dans = b && i >= b.de && i <= b.a;
+      const classes = [
+        semaineDe(j) === i ? 'cette-semaine' : '',
+        dans ? `travee travee-${b!.ton}` : '',
+        dans && i === b!.de ? 'travee-debut' : '',
+        dans && i === b!.a ? 'travee-fin' : '',
+      ].filter(Boolean).join(' ');
+      return (
+        <td class={classes}>
+          {marqueurs?.(i)}
+          {dans && (
+            <button class="case-planning" title={`${b!.titre} · semaine du ${jourCourt(semaines[i])}`}
+              aria-label={`${b!.titre} · semaine du ${jourCourt(semaines[i])} · ${b!.texte} sous-étapes faites`}
+              onClick={() => setOuvert({ titre: b!.titre, semaine: semaines[i], ids: b!.deLaSemaine(i).length ? b!.deLaSemaine(i) : b!.ids })}>
+              {i === b!.de && <span class="compte-case">{b!.texte}</span>}
+              {i === b!.de && b!.semaines > 1 && <span class="duree-case">{b!.semaines} sem.</span>}
+            </button>
+          )}
+        </td>
+      );
+    });
 
   return (
     <section>
       <div class="barre-outils">
         {dl && <button class="bouton" onClick={() => setRepartir(true)}>Répartir les étapes</button>}
         <EffacerDatesPrevues costumeId={costume.id} />
-        <span class="petit-texte">Clique une case pour cocher ou redater ses sous-étapes. ⚑ deadline · ▶ début</span>
+        <span class="petit-texte">Chaque barre court de la première à la dernière semaine planifiée. Clique dessus pour cocher ou redater. ⚑ deadline · ▶ début</span>
       </div>
       <div class="planning-defile">
         <table class="planning">
@@ -98,24 +126,15 @@ export function OngletPlanning({ costume }: { costume: Ligne }) {
                       <span>{p.nom}</span>
                       {r.enRetard.length > 0 && <span class="en-retard petit-texte"> · {r.enRetard.length} en retard</span>}
                     </th>
-                    {semaines.map((_, i) => {
-                      const c = depliee ? { classe: '', contenu: null } : contenuCase(etapes, i, p.nom, false);
-                      return (
-                        <td class={`${c.classe} ${semaineDe(j) === i ? 'cette-semaine' : ''}`}>
-                          {lireJour(p.debut) && semaineDe(lireJour(p.debut)) === i && <span class="marqueur" title={`Début · ${jourCourt(p.debut)}`}>▶</span>}
-                          {c.contenu}
-                          {lireJour(p.deadline) && semaineDe(lireJour(p.deadline)) === i && <span class="marqueur rouge" title={`Deadline · ${jourCourt(p.deadline)}`}>⚑</span>}
-                        </td>
-                      );
-                    })}
+                    {cases(depliee ? null : barre(etapes, p.nom), i => <>
+                      {lireJour(p.debut) && semaineDe(lireJour(p.debut)) === i && <span class="marqueur" title={`Début · ${jourCourt(p.debut)}`}>▶</span>}
+                      {lireJour(p.deadline) && semaineDe(lireJour(p.deadline)) === i && <span class="marqueur rouge" title={`Deadline · ${jourCourt(p.deadline)}`}>⚑</span>}
+                    </>)}
                   </tr>
                   {depliee && pistes.map(pi => (
                     <tr class="ligne-piste">
                       <th scope="row"><span class="nom-piste">{pi.nom || 'Étape principale'}</span></th>
-                      {semaines.map((_, i) => {
-                        const c = contenuCase(etapesDePiste(d, pi.id), i, `${p.nom} › ${pi.nom || 'Étape principale'}`, true);
-                        return <td class={`${c.classe} ${semaineDe(j) === i ? 'cette-semaine' : ''}`}>{c.contenu}</td>;
-                      })}
+                      {cases(barre(etapesDePiste(d, pi.id), `${p.nom} › ${pi.nom || 'Étape principale'}`))}
                     </tr>
                   ))}
                 </>
