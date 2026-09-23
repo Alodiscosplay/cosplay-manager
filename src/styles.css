@@ -433,7 +433,7 @@ dialog.feuille::backdrop { background: rgb(20 12 28 / 45%); }
 .planning { border-collapse: collapse; font-size: .82rem; min-width: 100%; }
 .planning th, .planning td { border-bottom: 1px solid var(--bord); border-right: 1px solid var(--bord); padding: 6px 8px; text-align: center; white-space: nowrap; }
 .planning thead th { font-weight: 500; color: var(--doux); position: sticky; top: 0; background: var(--surface); }
-.planning tbody th { text-align: left; font-weight: 600; position: sticky; left: 0; background: var(--surface); z-index: 1; min-width: 110px; }
+.planning tbody th { text-align: left; font-weight: 600; position: sticky; left: 0; background: var(--surface); z-index: 1; min-width: 110px; vertical-align: middle; }
 .planning .cette-semaine { background: color-mix(in srgb, var(--accent-fond) 60%, transparent); }
 .planning .semaine-deadline { color: var(--rouge); font-weight: 700; }
 .planning td.case-prevue { background: var(--accent-fond); color: var(--accent); font-weight: 600; }
@@ -451,7 +451,7 @@ dialog.feuille::backdrop { background: rgb(20 12 28 / 45%); }
 .ordre-pieces .rang { min-width: 1.6em; text-align: center; color: var(--doux); font-variant-numeric: tabular-nums; }
 .ordre-pieces .nom { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .planning td { vertical-align: top; padding: 4px; }
-.planning tbody th { display: flex; align-items: center; gap: 4px; }
+.planning .tete-ligne { display: flex; align-items: center; gap: 4px; }
 .planning .ligne-piste th { padding-left: 26px; font-weight: 500; color: var(--doux); }
 .case-planning { display: flex; flex-direction: column; gap: 3px; width: 100%; border: 0; background: none; color: inherit; font: inherit; padding: 2px; border-radius: 8px; cursor: pointer; text-align: left; }
 .case-planning:hover, .case-planning:focus-visible { background: color-mix(in srgb, var(--encre) 8%, transparent); }

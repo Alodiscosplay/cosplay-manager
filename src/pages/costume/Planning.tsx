@@ -137,10 +137,12 @@ export function OngletPlanning({ costume }: { costume: Ligne }) {
                 <>
                   <tr class="ligne-piece">
                     <th scope="row">
-                      <button class="bouton-icone petit" aria-expanded={depliee} aria-label={`${depliee ? 'Replier' : 'Déplier'} ${p.nom}`}
-                        onClick={() => basculer(p.id)}><Icone nom={depliee ? 'bas' : 'chevron'} taille={14} /></button>
-                      <span>{p.nom}</span>
-                      {r.enRetard.length > 0 && <span class="en-retard petit-texte"> · {r.enRetard.length} en retard</span>}
+                      <div class="tete-ligne">
+                        <button class="bouton-icone petit" aria-expanded={depliee} aria-label={`${depliee ? 'Replier' : 'Déplier'} ${p.nom}`}
+                          onClick={() => basculer(p.id)}><Icone nom={depliee ? 'bas' : 'chevron'} taille={14} /></button>
+                        <span>{p.nom}</span>
+                        {r.enRetard.length > 0 && <span class="en-retard petit-texte"> · {r.enRetard.length} en retard</span>}
+                      </div>
                     </th>
                     {cases(depliee ? null : barrePiece(p), i => <>
                       {lireJour(p.debut) && semaineDe(lireJour(p.debut)) === i && <span class="marqueur" title={`Début · ${jourCourt(p.debut)}`}>▶</span>}
@@ -149,7 +151,7 @@ export function OngletPlanning({ costume }: { costume: Ligne }) {
                   </tr>
                   {depliee && pistesDe(d, p.id).map(pi => (
                     <tr class="ligne-piste">
-                      <th scope="row"><span class="nom-piste">{pi.nom || 'Étape principale'}</span></th>
+                      <th scope="row"><div class="tete-ligne"><span class="nom-piste">{pi.nom || 'Étape principale'}</span></div></th>
                       {cases(barreEtape(pi, p))}
                     </tr>
                   ))}
