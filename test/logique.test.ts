@@ -197,6 +197,16 @@ describe('Répartir', () => {
     const r = repartirSuite(etapesDePiste(d, `${ids.Jupe}T0`), '2026-10-01', '2026-10-09');
     expect(r).toEqual({ [ids['Jupe//b']]: '2026-10-09' });
   });
+  it('une sous-étape déjà datée garde sa date : les autres se répartissent autour', () => {
+    const { d, ids } = construire({ pieces: [{ nom: 'Jupe', pistes: [{ nom: '', etapes: [['a', 1], ['b', 1], ['c', 1], ['d', 1]] }] }] });
+    d.Etapes[ids['Jupe//c']].date_prevue = '2026-10-05';
+    const r = repartirSuite(etapesDePiste(d, `${ids.Jupe}T0`), '2026-10-01', '2026-10-09');
+    expect(r[ids['Jupe//c']]).toBeUndefined();           // sa date n'est pas touchée
+    expect(r[ids['Jupe//a']] <= '2026-10-05').toBe(true); // a et b tiennent avant elle
+    expect(r[ids['Jupe//b']]).toBe('2026-10-05');
+    expect(r[ids['Jupe//d']]).toBe('2026-10-09');        // d suit après
+  });
+
   it('les pistes parallèles partagent la même fenêtre, le montage vient après', () => {
     const { d, ids } = construire({ pieces: [{ nom: 'Chapeau', pistes: [
       { nom: 'Tissu', etapes: [['couper', 2], ['coudre', 2]] },

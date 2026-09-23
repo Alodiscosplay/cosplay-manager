@@ -316,6 +316,7 @@ export function Repartir({ pieceId, costumeId, onFermer }: { pieceId?: string; c
   const n = Object.keys(r).length;
   const deja = (pieceId ? etapesDePiece(d, pieceId) : piecesDe(d, costumeId!).flatMap(p => etapesDePiece(d, p.id)))
     .filter(e => !bool(e.fait) && e.date_prevue).length;
+  const texteMarge = (n: number) => n > 0 ? `${n} jour${n > 1 ? 's' : ''} de marge` : n === 0 ? 'aucune marge' : `${-n} jour${-n > 1 ? 's' : ''} APRÈS la deadline`;
   return (
     <Feuille titre="Répartir les étapes" onFermer={onFermer} pied={<>
       <button class="bouton" onClick={onFermer}>Annuler</button>
@@ -323,17 +324,11 @@ export function Repartir({ pieceId, costumeId, onFermer }: { pieceId?: string; c
         Planifier {n} sous-étape{n > 1 ? 's' : ''}
       </button>
     </>}>
-      <p>Les sous-étapes restantes de <strong>{cible.nom}</strong> reçoivent une date prévue entre aujourd'hui et la limite choisie, proportionnellement à leur durée, dans l'ordre de chaque étape. Les étapes avancent en parallèle ; une étape qui en attend d'autres vient après.</p>
-      <Champ label="Tout terminer au plus tard le" aide={deadline ? `Deadline : ${jourCourt(deadline)} — garde de la marge en cas de retard` : undefined}>
+      <p>Les sous-étapes restantes de <strong>{cible.nom}</strong> reçoivent une date prévue entre aujourd'hui et la limite choisie, proportionnellement à leur durée, dans l'ordre de chaque étape.</p>
+      <Champ label="Tout terminer au plus tard le" aide={deadline ? `Deadline : ${jourCourt(deadline)} – ${texteMarge(marge)}` : undefined}>
         <ChoixDate label="limite de planification" valeur={fin} min={jour.value} onChange={v => setFin(v || finPlanifiable(deadline, jour.value))} />
       </Champ>
-      {finOk && deadline && (marge > 0
-        ? <p class="petit-texte">{marge} jour{marge > 1 ? 's' : ''} de marge avant la deadline du {jourCourt(deadline)}</p>
-        : marge === 0
-          ? <p class="petit-texte">Aucune marge : la dernière sous-étape tombe le jour de la deadline.</p>
-          : <p class="erreur">Cette limite est {-marge} jour{-marge > 1 ? 's' : ''} APRÈS la deadline du {jourCourt(deadline)}</p>)}
-      {deja > 0 && <p>{deja} sous-étape{deja > 1 ? 's avaient' : ' avait'} déjà une date prévue : elle{deja > 1 ? 's seront remplacées' : ' sera remplacée'}.</p>}
-      <p class="petit-texte">Tu pourras ensuite corriger chaque date à la main. « Annuler » dans le bandeau revient en arrière.</p>
+      {deja > 0 && <p class="petit-texte">{deja} sous-étape{deja > 1 ? 's gardent' : ' garde'} la date que tu {deja > 1 ? 'leur as' : 'lui as'} donnée ; les autres se répartissent autour.</p>}
     </Feuille>
   );
 }

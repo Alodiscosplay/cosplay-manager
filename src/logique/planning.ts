@@ -44,15 +44,36 @@ export function finPlanifiable(deadline: Jour, depuis: Jour, marge = MARGE_DEADL
   return fin < depuis ? depuis : fin;
 }
 
-/** Place des étapes (dans l'ordre) entre deux dates, proportionnellement à leur poids. */
-export function repartirSuite(etapes: Ligne[], depuis: Jour, jusqua: Jour, res: Repartition = {}): Repartition {
-  const aFaire = etapes.filter(e => !bool(e.fait));
-  const total = aFaire.reduce((s, e) => s + poids(e), 0);
+/** Place un bloc d'étapes entre deux dates, proportionnellement à leur poids. */
+function placerBloc(bloc: Ligne[], depuis: Jour, jusqua: Jour, res: Repartition): void {
+  const total = bloc.reduce((s, e) => s + poids(e), 0);
   const duree = Math.max(0, ecartJours(depuis, jusqua));
   let cumul = 0;
-  for (const e of aFaire) {
+  for (const e of bloc) {
     cumul += poids(e);
     res[e.id] = ajouterJours(depuis, total ? Math.round((duree * cumul) / total) : duree);
+  }
+}
+
+/**
+ * Place des étapes (dans l'ordre) entre deux dates, proportionnellement à leur poids.
+ * Une sous-étape qui porte DÉJÀ une date prévue est un point fixe : sa date est gardée telle quelle,
+ * et les autres se répartissent autour d'elle. C'est l'outil qui s'adapte au choix de l'utilisateur.
+ */
+export function repartirSuite(etapes: Ligne[], depuis: Jour, jusqua: Jour, res: Repartition = {}): Repartition {
+  const aFaire = etapes.filter(e => !bool(e.fait));
+  let curseur = depuis;
+  let i = 0;
+  while (i < aFaire.length) {
+    let j = i;
+    while (j < aFaire.length && !lireJour(aFaire[j].date_prevue)) j++;
+    const ancre = j < aFaire.length ? lireJour(aFaire[j].date_prevue) : '';
+    // le bloc libre court jusqu'au point fixe suivant (jamais avant le curseur), sinon jusqu'à la fin
+    const fin = ancre ? (ancre > curseur ? ancre : curseur) : jusqua;
+    if (j > i) placerBloc(aFaire.slice(i, j), curseur, fin, res);
+    if (!ancre) break;
+    curseur = fin;
+    i = j + 1;
   }
   return res;
 }
