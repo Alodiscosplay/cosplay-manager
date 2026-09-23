@@ -264,12 +264,6 @@ export function agenda(d: Donnees, depuis: Jour, jusqua: Jour, costumeFiltre?: s
       const finie = pieceTerminee(d, p.id);
       const dp = lireJour(p.deadline);
       if (dans(dp)) res.push({ jour: dp, type: 'deadline', titre: t(p.nom), detail: 'deadline de la pièce', costumeId: c.id, fait: finie, ref: { table: 'Pieces', id: p.id } });
-      for (const pi of pistesDe(d, p.id)) {
-        const nomEtape = pi.nom || 'étape principale';
-        const dpi = lireJour(pi.deadline);
-        const finie = etapesDePiste(d, pi.id).every(e => bool(e.fait));
-        if (dans(dpi)) res.push({ jour: dpi, type: 'deadline', titre: t(p.nom, nomEtape), detail: "deadline de l'étape", costumeId: c.id, fait: finie, ref: { table: 'Pistes', id: pi.id } });
-      }
     }
   }
   for (const t of Object.values(d.Taches)) {
