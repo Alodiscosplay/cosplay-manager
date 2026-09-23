@@ -5,8 +5,8 @@ import { piecesDe, pistesDe, etapesDePiste, etapesDePiece, ligne, tous, idsAtten
 import { cleNom } from '../../logique/budget';
 import { creeraitBoucle, statutStockePiece, champsStatutPiece } from '../../logique/disponibilite';
 import { analyserListe, compter, versTexte } from '../../logique/collerListe';
-import { repartirPiece, repartirCostume, deadlinePiece, deadlineCostume, finPlanifiable, MARGE_DEADLINE } from '../../logique/planning';
-import { jourCourt, ajouterJours } from '../../logique/dates';
+import { repartirPiece, repartirCostume, deadlinePiece, deadlineCostume, finPlanifiable } from '../../logique/planning';
+import { jourCourt, ecartJours } from '../../logique/dates';
 import { DUREES, NOMS_DUREES, STATUTS_PIECE, bool, liste, txtListe, type Duree, type Ligne, type NomTable } from '../../modele/schema';
 import { supprimer, appliquerListe, insererModele, ajouterModeleDansPiste, deplacerEtape, cocherEtape, appliquerRepartition, nouvelId } from '../../store/operations';
 import { Feuille, Champ, Texte, ChoixDate, Selection, Confirmer } from '../../composants/base';
@@ -306,23 +306,35 @@ export function Repartir({ pieceId, costumeId, onFermer }: { pieceId?: string; c
   const d = donnees.value;
   const cible = pieceId ? d.Pieces[pieceId] : d.Costumes[costumeId!];
   const deadline = pieceId ? deadlinePiece(d, cible) : deadlineCostume(d, cible);
-  const fin = finPlanifiable(deadline, jour.value); // une semaine de marge avant la deadline
-  const serre = ajouterJours(deadline, -MARGE_DEADLINE) < jour.value;
-  const r = pieceId ? repartirPiece(d, pieceId, jour.value, fin) : repartirCostume(d, costumeId!, jour.value, fin);
+  // Par défaut, une semaine de marge avant la deadline — mais c'est à elle de fixer sa limite.
+  const [fin, setFin] = useState(() => finPlanifiable(deadline, jour.value));
+  const finOk = fin >= jour.value;
+  const marge = ecartJours(fin, deadline);
+  const r = finOk
+    ? (pieceId ? repartirPiece(d, pieceId, jour.value, fin) : repartirCostume(d, costumeId!, jour.value, fin, Math.max(0, marge)))
+    : {};
   const n = Object.keys(r).length;
   const deja = (pieceId ? etapesDePiece(d, pieceId) : piecesDe(d, costumeId!).flatMap(p => etapesDePiece(d, p.id)))
     .filter(e => !bool(e.fait) && e.date_prevue).length;
   return (
-    <Confirmer titre="Répartir les sous-étapes" bouton={`Planifier ${n} sous-étape${n > 1 ? 's' : ''}`} onNon={onFermer}
-      onOui={() => { faire(appliquerRepartition(r), 'Sous-étapes planifiées'); onFermer(); }}
-      texte={<>
-        <p>Les sous-étapes restantes de <strong>{cible.nom}</strong> reçoivent une date prévue entre aujourd'hui et le <strong>{jourCourt(fin)}</strong>, proportionnellement à leur durée, dans l'ordre de chaque étape. Les étapes avancent en parallèle ; une étape qui en attend d'autres vient après.</p>
-        <p>{serre
-          ? <>La deadline du {jourCourt(deadline)} est à moins d'une semaine : tout est planifié dès maintenant, sans marge.</>
-          : <>Une semaine de marge est gardée avant la deadline du {jourCourt(deadline)}.</>}</p>
-        {deja > 0 && <p>{deja} sous-étape{deja > 1 ? 's avaient' : ' avait'} déjà une date prévue : elle{deja > 1 ? 's seront remplacées' : ' sera remplacée'}.</p>}
-        <p class="petit-texte">Tu pourras ensuite corriger chaque date à la main. « Annuler » dans le bandeau revient en arrière.</p>
-      </>} />
+    <Feuille titre="Répartir les sous-étapes" onFermer={onFermer} pied={<>
+      <button class="bouton" onClick={onFermer}>Annuler</button>
+      <button class="bouton principal" disabled={!n} onClick={() => { faire(appliquerRepartition(r), 'Sous-étapes planifiées'); onFermer(); }}>
+        Planifier {n} sous-étape{n > 1 ? 's' : ''}
+      </button>
+    </>}>
+      <p>Les sous-étapes restantes de <strong>{cible.nom}</strong> reçoivent une date prévue entre aujourd'hui et la limite choisie, proportionnellement à leur durée, dans l'ordre de chaque étape. Les étapes avancent en parallèle ; une étape qui en attend d'autres vient après.</p>
+      <Champ label="Tout terminer au plus tard le" aide={deadline ? `Deadline : ${jourCourt(deadline)} — garde de la marge en cas de retard` : undefined}>
+        <ChoixDate label="limite de planification" valeur={fin} min={jour.value} onChange={v => setFin(v || finPlanifiable(deadline, jour.value))} />
+      </Champ>
+      {finOk && deadline && (marge > 0
+        ? <p class="petit-texte">{marge} jour{marge > 1 ? 's' : ''} de marge avant la deadline du {jourCourt(deadline)}</p>
+        : marge === 0
+          ? <p class="petit-texte">Aucune marge : la dernière sous-étape tombe le jour de la deadline.</p>
+          : <p class="erreur">Cette limite est {-marge} jour{-marge > 1 ? 's' : ''} APRÈS la deadline du {jourCourt(deadline)}</p>)}
+      {deja > 0 && <p>{deja} sous-étape{deja > 1 ? 's avaient' : ' avait'} déjà une date prévue : elle{deja > 1 ? 's seront remplacées' : ' sera remplacée'}.</p>}
+      <p class="petit-texte">Tu pourras ensuite corriger chaque date à la main. « Annuler » dans le bandeau revient en arrière.</p>
+    </Feuille>
   );
 }
 
