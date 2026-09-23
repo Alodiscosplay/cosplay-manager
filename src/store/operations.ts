@@ -114,7 +114,11 @@ export function appliquerListe(d: Donnees, l: ListeTexte, costumeId: string, pie
       pisteNeuve = true;
     } else {
       idPiece = pieceId;
-      pisteParDefaut = pistesDe(d, idPiece)[0]?.id;
+      const existantes = pistesDe(d, idPiece);
+      pisteParDefaut = existantes[0]?.id;
+      // Une pièce dont la seule étape est vide et sans nom la réutilise, au lieu d'en laisser une orpheline.
+      pisteNeuve = existantes.length === 1 && !existantes[0].nom && !etapesDePiste(d, existantes[0].id).length;
+      if (pisteNeuve) ch.push({ table: 'Pistes', id: existantes[0].id, champs: {} });
     }
     for (const pi of pt.pistes) {
       let idPiste: string;
