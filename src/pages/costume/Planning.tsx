@@ -48,10 +48,12 @@ export function OngletPlanning({ costume }: { costume: Ligne }) {
   const semaineDe = (x: string) => Math.max(0, Math.min(nbSemaines - 1, Math.floor(ecartJours(debut, x) / 7)));
   const basculer = (id: string) => { const s = new Set(depliees); if (s.has(id)) s.delete(id); else s.add(id); setDepliees(s); };
 
+  // Colonne étroite pour la deadline du costume, juste après la semaine qui la contient.
+  const semaineDeadline = dl ? semaineDe(dl) : -1;
   const cases = (b: Barre | null, marqueurs?: (i: number) => ComponentChildren) => {
     const de = b ? semaineDe(b.du) : -1;
     const a = b ? semaineDe(b.au) : -2;
-    return semaines.map((_, i) => {
+    return semaines.flatMap((_, i) => {
       const dans = b && i >= de && i <= a;
       const classes = [
         semaineDe(j) === i ? 'cette-semaine' : '',
@@ -59,7 +61,7 @@ export function OngletPlanning({ costume }: { costume: Ligne }) {
         dans && i === de ? 'travee-debut' : '',
         dans && i === a ? 'travee-fin' : '',
       ].filter(Boolean).join(' ');
-      return (
+      return [
         <td class={classes}>
           {marqueurs?.(i)}
           {dans && (
@@ -70,8 +72,9 @@ export function OngletPlanning({ costume }: { costume: Ligne }) {
               {i === de && a > de && <span class="duree-case">{a - de + 1} sem.</span>}
             </button>
           )}
-        </td>
-      );
+        </td>,
+        ...(i === semaineDeadline ? [<td class="colonne-deadline" />] : []),
+      ];
     });
   };
 
@@ -133,13 +136,15 @@ export function OngletPlanning({ costume }: { costume: Ligne }) {
           <thead>
             <tr>
               <th scope="col">Pièce</th>
-              {semaines.map((s, i) => (
-                <th scope="col" class={`${semaineDe(j) === i ? 'cette-semaine' : ''}${dl && semaineDe(dl) === i ? ' semaine-deadline' : ''}`}>
-                  <span class="semaine">{semaineDe(j) === i ? 'cette sem.' : jourCourt(s)}</span>
-                  {/* La deadline tombe souvent un week-end : on donne le jour exact, pas la semaine. */}
-                  {dl && semaineDe(dl) === i && <span class="jour-deadline" title={`Deadline du costume · ${jourAvecNom(dl)}`}>⚑ {jourAvecNom(dl)}</span>}
-                </th>
-              ))}
+              {semaines.flatMap((s, i) => [
+                <th scope="col" class={semaineDe(j) === i ? 'cette-semaine' : ''}>
+                  {semaineDe(j) === i ? 'cette sem.' : jourCourt(s)}
+                </th>,
+                /* La deadline tombe souvent un week-end : elle a sa colonne, avec le jour exact. */
+                ...(i === semaineDeadline
+                  ? [<th scope="col" class="colonne-deadline" title={`Deadline du costume · ${jourAvecNom(dl)}`}>⚑ {jourAvecNom(dl)}</th>]
+                  : []),
+              ])}
             </tr>
           </thead>
           <tbody>
