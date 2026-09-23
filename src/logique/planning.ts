@@ -237,7 +237,7 @@ export function alertes(d: Donnees, jour: Jour, joursAvant = 14): Alerte[] {
 
 // ---------- Agenda ----------
 
-export type TypeAgenda = 'deadline' | 'debut' | 'prevue' | 'evenement' | 'tache';
+export type TypeAgenda = 'deadline' | 'evenement' | 'tache';
 
 export interface ElementAgenda {
   jour: Jour; type: TypeAgenda; titre: string; detail: string;
@@ -260,14 +260,10 @@ export function agenda(d: Donnees, depuis: Jour, jusqua: Jour, costumeFiltre?: s
     const t = (...morceaux: string[]) => `${c.nom} — ${morceaux.filter(Boolean).join(' › ')}`;
     const dc = lireJour(c.deadline);
     if (dans(dc)) res.push({ jour: dc, type: 'deadline', titre: c.nom, detail: 'deadline du costume', costumeId: c.id, fait: c.statut === 'terminé', ref: { table: 'Costumes', id: c.id } });
-    const db = lireJour(c.debut);
-    if (dans(db)) res.push({ jour: db, type: 'debut', titre: c.nom, detail: 'début du costume', costumeId: c.id, fait: false, ref: { table: 'Costumes', id: c.id } });
     for (const p of piecesDe(d, c.id)) {
       const finie = pieceTerminee(d, p.id);
       const dp = lireJour(p.deadline);
       if (dans(dp)) res.push({ jour: dp, type: 'deadline', titre: t(p.nom), detail: 'deadline de la pièce', costumeId: c.id, fait: finie, ref: { table: 'Pieces', id: p.id } });
-      const bp = lireJour(p.debut);
-      if (dans(bp)) res.push({ jour: bp, type: 'debut', titre: t(p.nom), detail: 'début de la pièce', costumeId: c.id, fait: false, ref: { table: 'Pieces', id: p.id } });
       for (const pi of pistesDe(d, p.id)) {
         const nomEtape = pi.nom || 'étape principale';
         const dpi = lireJour(pi.deadline);
@@ -282,6 +278,6 @@ export function agenda(d: Donnees, depuis: Jour, jusqua: Jour, costumeFiltre?: s
     const c = ligne(d, 'Costumes', t.costume_id);
     if (dans(j)) res.push({ jour: j, type: 'tache', titre: c ? `${c.nom} — ${t.titre}` : t.titre, detail: 'tâche', costumeId: t.costume_id || undefined, fait: bool(t.fait), ref: { table: 'Taches', id: t.id } });
   }
-  const rang: Record<TypeAgenda, number> = { evenement: 0, deadline: 1, debut: 2, tache: 3, prevue: 4 };
+  const rang: Record<TypeAgenda, number> = { evenement: 0, deadline: 1, tache: 2 };
   return res.sort((a, b) => a.jour.localeCompare(b.jour) || rang[a.type] - rang[b.type]);
 }

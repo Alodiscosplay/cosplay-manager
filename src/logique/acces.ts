@@ -9,6 +9,15 @@ function vivants(table: Record<string, Ligne>): Ligne[] {
   return Object.values(table).filter(vivant);
 }
 
+/** Teintes proposées pour distinguer les projets (agenda, repères). */
+export const TEINTES = [270, 145, 20, 200, 330, 45, 175, 300, 95, 240];
+
+/** Couleur d'un costume : la sienne si elle est choisie, sinon une teinte de la palette selon son rang. */
+export function couleurCostume(c: Ligne, rang = 0): string {
+  const teinte = (c.couleur ?? '').trim();
+  return `hsl(${teinte || TEINTES[rang % TEINTES.length]} 60% 48%)`;
+}
+
 export function costumes(d: Donnees): Ligne[] {
   return vivants(d.Costumes).sort(parOrdre);
 }

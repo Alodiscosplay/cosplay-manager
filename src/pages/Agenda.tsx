@@ -1,15 +1,15 @@
 import { useState } from 'preact/hooks';
-import { donnees, jour } from '../store/store';
+import { donnees, jour, faire } from '../store/store';
 import { agenda, type ElementAgenda, type TypeAgenda } from '../logique/planning';
-import { costumes, tous } from '../logique/acces';
+import { costumes, couleurCostume, TEINTES, tous } from '../logique/acces';
 import { lundi, ajouterJours, versDate, MOIS, JOURS_COURTS, jourCourt, lireJour } from '../logique/dates';
-import { Selection } from '../composants/base';
+import { Feuille, Selection } from '../composants/base';
 import { Icone } from '../composants/Icone';
 import { IndicateurSync } from '../app';
 import { lienCostume } from '../routeur';
 import { EditeurEvenement } from './Costume';
 
-const LIBELLES: Record<TypeAgenda, string> = { evenement: 'Événement', deadline: 'Deadline', debut: 'Début', prevue: 'Prévu', tache: 'Tâche' };
+const LIBELLES: Record<TypeAgenda, string> = { evenement: 'Événement', deadline: 'Deadline', tache: 'Tâche' };
 const CLE_VUE = 'cosplay-planner.vue-agenda';
 
 export function PageAgenda() {
@@ -20,6 +20,7 @@ export function PageAgenda() {
   const [choisi, setChoisi] = useState(j);
   const [filtre, setFiltre] = useState('');
   const [evenement, setEvenement] = useState<string | 'nouveau' | null>(null);
+  const [couleurDe, setCouleurDe] = useState<string | null>(null); // costume dont on choisit la couleur
   const setVue = (v: 'mois' | 'semaine') => { setVueEtat(v); try { localStorage.setItem(CLE_VUE, v); } catch { /* ignoré */ } };
 
   const debutMois = `${ancre.slice(0, 7)}-01`;
@@ -27,6 +28,17 @@ export function PageAgenda() {
   const nbJours = vue === 'mois' ? 42 : 7;
   const jours = Array.from({ length: nbJours }, (_, i) => ajouterJours(debutGrille, i));
   const items = agenda(d, jours[0], jours[jours.length - 1], filtre || undefined);
+  // couleur par costume, dans l'ordre d'affichage des costumes
+  const tous_costumes = costumes(d).filter(c => c.statut !== 'archivé');
+  const couleurs = new Map(tous_costumes.map((c, i) => [c.id, couleurCostume(c, i)]));
+  const style = (i: ElementAgenda, fond = false): Record<string, string> | undefined => {
+    const c = i.costumeId ? couleurs.get(i.costumeId) : undefined;
+    if (!c) return undefined;
+    // le texte se mélange à l'encre du thème : lisible en clair comme en sombre
+    return fond
+      ? { background: `color-mix(in srgb, ${c} 18%, var(--surface))`, color: `color-mix(in srgb, ${c} 55%, var(--encre))` }
+      : { background: c };
+  };
   const duJour = (x: string) => items.filter(i => i.jour === x);
 
   const naviguer = (sens: -1 | 1) => {
@@ -71,22 +83,27 @@ export function PageAgenda() {
                 <button role="gridcell" class={`cal-jour${horsMois ? ' hors-mois' : ''}${x === j ? ' aujourdhui' : ''}${x === choisi ? ' choisi' : ''}`}
                   aria-label={`${jourCourt(x, j)}, ${liste.length} élément${liste.length > 1 ? 's' : ''}`} onClick={() => setChoisi(x)}>
                   <span class="cal-num">{Number(x.slice(8))}</span>
-                  <span class="cal-points">{liste.slice(0, 4).map(i => <span class={`point ${i.type}${i.fait ? ' fait' : ''}`} />)}</span>
-                  <span class="cal-textes">{liste.slice(0, 2).map(i => <span class={`cal-texte ${i.type}`} title={`${i.titre} · ${i.detail}`}>{i.titre}</span>)}{liste.length > 2 && <span class="cal-plus">+{liste.length - 2}</span>}</span>
+                  <span class="cal-points">{liste.slice(0, 4).map(i => <span class={`point ${i.type}${i.fait ? ' fait' : ''}`} style={style(i)} />)}</span>
+                  <span class="cal-textes">{liste.slice(0, 2).map(i => <span class={`cal-texte ${i.type}`} style={style(i, true)} title={`${i.titre} · ${i.detail}`}>{i.titre}</span>)}{liste.length > 2 && <span class="cal-plus">+{liste.length - 2}</span>}</span>
                 </button>
               );
             })}
           </div>
-          <JourDetaille jourX={choisi} items={items.filter(i => i.jour === choisi)} ouvrirEvenement={setEvenement} />
+          <JourDetaille jourX={choisi} items={items.filter(i => i.jour === choisi)} ouvrirEvenement={setEvenement} couleur={i => style(i)} />
         </>
       ) : (
         <div class="semaine">
-          {jours.map(x => <JourDetaille jourX={x} items={duJour(x)} ouvrirEvenement={setEvenement} compact />)}
+          {jours.map(x => <JourDetaille jourX={x} items={duJour(x)} ouvrirEvenement={setEvenement} compact couleur={i => style(i)} />)}
         </div>
       )}
 
       <p class="legende-agenda">
-        {(Object.keys(LIBELLES) as TypeAgenda[]).map(t => <span><span class={`point ${t}`} />{LIBELLES[t]}</span>)}
+        <span><span class="point evenement" />Événement</span>
+        {tous_costumes.map((c, i) => (
+          <button class="legende-costume" title="Changer la couleur du projet" onClick={() => setCouleurDe(c.id)}>
+            <span class="point" style={{ background: couleurCostume(c, i) }} />{c.nom}
+          </button>
+        ))}
       </p>
 
       <section class="groupe">
@@ -99,11 +116,15 @@ export function PageAgenda() {
       </section>
 
       {evenement && <EditeurEvenement id={evenement === 'nouveau' ? undefined : evenement} onFermer={() => setEvenement(null)} />}
+      {couleurDe && <ChoixCouleur id={couleurDe} rang={tous_costumes.findIndex(c => c.id === couleurDe)} onFermer={() => setCouleurDe(null)} />}
     </div>
   );
 }
 
-function JourDetaille({ jourX, items, ouvrirEvenement, compact }: { jourX: string; items: ElementAgenda[]; ouvrirEvenement: (id: string) => void; compact?: boolean }) {
+function JourDetaille({ jourX, items, ouvrirEvenement, compact, couleur }: {
+  jourX: string; items: ElementAgenda[]; ouvrirEvenement: (id: string) => void; compact?: boolean;
+  couleur?: (i: ElementAgenda) => Record<string, string> | undefined;
+}) {
   const j = jour.value;
   const nomJour = JOURS_COURTS[(versDate(jourX).getDay() + 6) % 7];
   return (
@@ -113,7 +134,7 @@ function JourDetaille({ jourX, items, ouvrirEvenement, compact }: { jourX: strin
         <ul>
           {items.map(i => (
             <li class={`item-agenda ${i.type}${i.fait ? ' fait' : ''}`}>
-              <span class={`point ${i.type}`} />
+              <span class={`point ${i.type}`} style={couleur?.(i)} />
               {i.type === 'evenement'
                 ? <button class="lien-bouton" onClick={() => ouvrirEvenement(i.ref.id)}>{i.titre}</button>
                 : i.costumeId ? <a href={lienCostume(i.costumeId)}>{i.titre}</a> : <a href="#/afaire">{i.titre}</a>}
@@ -123,5 +144,26 @@ function JourDetaille({ jourX, items, ouvrirEvenement, compact }: { jourX: strin
         </ul>
       )}
     </section>
+  );
+}
+
+/** La couleur d'un projet, choisie depuis la légende de l'agenda. */
+function ChoixCouleur({ id, rang, onFermer }: { id: string; rang: number; onFermer: () => void }) {
+  const c = donnees.value.Costumes[id];
+  if (!c) return null;
+  const choisie = (c.couleur ?? '').trim();
+  const poser = (v: string) => faire([{ table: 'Costumes', id, champs: { couleur: v } }]);
+  return (
+    <Feuille titre={`Couleur de « ${c.nom} »`} onFermer={onFermer} pied={<button class="bouton principal" onClick={onFermer}>Terminé</button>}>
+      <div class="choix-couleur">
+        <button type="button" class={`pastille-couleur${choisie === '' ? ' actif' : ''}`} title="Automatique"
+          aria-label="Couleur automatique" aria-pressed={choisie === ''} onClick={() => poser('')}>auto</button>
+        {TEINTES.map(t => (
+          <button type="button" class={`pastille-couleur${String(t) === choisie ? ' actif' : ''}`} style={{ background: `hsl(${t} 60% 48%)` }}
+            aria-pressed={String(t) === choisie} aria-label={`Teinte ${t}`} onClick={() => poser(String(t))} />
+        ))}
+      </div>
+      <p class="petit-texte">Aperçu : <span class="cal-texte" style={{ background: `color-mix(in srgb, ${couleurCostume(c, rang)} 18%, var(--surface))`, color: `color-mix(in srgb, ${couleurCostume(c, rang)} 55%, var(--encre))` }}>{c.nom} — deadline</span></p>
+    </Feuille>
   );
 }

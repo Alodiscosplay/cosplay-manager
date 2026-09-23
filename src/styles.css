@@ -494,19 +494,20 @@ dialog.feuille::backdrop { background: rgb(20 12 28 / 45%); }
   .cal-texte { font-size: .72rem; padding: 1px 4px; border-radius: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; background: var(--surface-2); }
   .cal-texte.deadline { background: var(--rouge-fond); color: var(--rouge); }
   .cal-texte.evenement { background: var(--accent); color: var(--accent-encre); }
-  .cal-texte.debut { background: var(--vert-fond); color: var(--vert); }
-  .cal-texte.prevue { background: var(--accent-fond); color: var(--accent); }
   .cal-plus { font-size: .7rem; color: var(--doux); }
 }
 .point { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--doux); flex: none; }
 .point.deadline { background: var(--rouge); }
 .point.evenement { background: var(--accent); }
-.point.debut { background: var(--vert); }
-.point.prevue { background: color-mix(in srgb, var(--accent) 55%, var(--fond)); }
 .point.tache { background: var(--orange); }
 .point.fait { opacity: .35; }
+.choix-couleur { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.pastille-couleur { width: 30px; height: 30px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; background: var(--surface-2); color: var(--doux); font-size: .7rem; padding: 0; }
+.pastille-couleur.actif { border-color: var(--encre); box-shadow: 0 0 0 2px var(--surface) inset; }
 .legende-agenda { display: flex; flex-wrap: wrap; gap: 12px; font-size: .8rem; color: var(--doux); margin: 0; }
 .legende-agenda > span { display: inline-flex; align-items: center; gap: 5px; }
+.legende-costume { display: inline-flex; align-items: center; gap: 5px; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; padding: 2px 6px; border-radius: 99px; }
+.legende-costume:hover, .legende-costume:focus-visible { background: var(--surface-2); }
 .jour-detaille { background: var(--surface); border: 1px solid var(--bord); border-radius: var(--rayon); padding: 10px 14px; }
 .jour-detaille h3 { font-size: .9rem; color: var(--doux); text-transform: capitalize; }
 .jour-detaille.aujourdhui h3 { color: var(--accent); }
