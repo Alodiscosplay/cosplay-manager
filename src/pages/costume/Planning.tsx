@@ -25,14 +25,21 @@ export function OngletPlanning({ costume }: { costume: Ligne }) {
   const pieces = piecesDe(d, costume.id);
   const dl = deadlineCostume(d, costume);
 
+  // Toutes les dates du planning, pour savoir jusqu'où va la grille.
   const dates: string[] = [j];
   if (dl) dates.push(dl);
   if (lireJour(costume.fin_prevue)) dates.push(lireJour(costume.fin_prevue));
+  const planifiees: string[] = [];
   for (const p of pieces) {
-    for (const x of [p.debut, p.deadline]) if (lireJour(x)) dates.push(lireJour(x));
-    for (const pi of pistesDe(d, p.id)) if (lireJour(pi.deadline)) dates.push(lireJour(pi.deadline));
+    for (const x of [p.debut, p.deadline]) if (lireJour(x)) planifiees.push(lireJour(x));
+    for (const pi of pistesDe(d, p.id)) if (lireJour(pi.deadline)) planifiees.push(lireJour(pi.deadline));
   }
-  const debut = lundi(dates.reduce((a, b) => (a < b ? a : b)));
+  dates.push(...planifiees);
+  // La grille commence au début du costume (posé à la première répartition), sinon à la première date
+  // planifiée : le passé du planning reste visible au fil des semaines.
+  const depart = lireJour(costume.debut)
+    || (planifiees.length ? planifiees.reduce((a, b) => (a < b ? a : b)) : j);
+  const debut = lundi(depart);
   const fin = dates.reduce((a, b) => (a > b ? a : b));
   const nbSemaines = Math.min(80, Math.max(1, Math.floor(ecartJours(debut, fin) / 7) + 1));
   const semaines = Array.from({ length: nbSemaines }, (_, i) => ajouterJours(debut, i * 7));

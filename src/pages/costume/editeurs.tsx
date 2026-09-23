@@ -334,7 +334,10 @@ export function Repartir({ costumeId, onFermer }: { costumeId: string; onFermer:
       <button class="bouton" onClick={onFermer}>Annuler</button>
       <button class="bouton principal" disabled={!nEtapes && !n}
         onClick={() => {
-          faire([...appliquerPlan(plan, ordre), { table: 'Costumes' as const, id: costumeId, champs: { fin_prevue: fin } }], 'Planning mis à jour');
+          // Le début du costume, s'il est vide, garde la date de création du planning.
+          const champsCostume: Record<string, string> = { fin_prevue: fin };
+          if (!lireJour(costume.debut)) champsCostume.debut = jour.value;
+          faire([...appliquerPlan(plan, ordre), { table: 'Costumes' as const, id: costumeId, champs: champsCostume }], 'Planning mis à jour');
           onFermer();
         }}>Planifier {n} pièce{n > 1 ? 's' : ''}</button>
     </>}>
