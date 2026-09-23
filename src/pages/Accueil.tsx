@@ -1,8 +1,8 @@
 import { useState } from 'preact/hooks';
 import { donnees, jour, faire } from '../store/store';
-import { costumes, ligne } from '../logique/acces';
+import { costumes, piecesDe, ligne } from '../logique/acces';
 import { avancementCostume } from '../logique/avancement';
-import { statutCostume } from '../logique/disponibilite';
+import { statutCostume, pieceTerminee } from '../logique/disponibilite';
 import { deadlineCostume, alertes } from '../logique/planning';
 import { relatif, jourCourt } from '../logique/dates';
 import { creerCostume } from '../store/operations';
@@ -74,6 +74,8 @@ function CarteCostume({ c }: { c: Ligne }) {
   const dl = deadlineCostume(d, c);
   const attend = c.statut === 'en attente' ? ligne(d, 'Costumes', c.attend_costume_id) : undefined;
   const ev = ligne(d, 'Evenements', c.evenement_id);
+  const pieces = piecesDe(d, c.id);
+  const nbTerminees = pieces.filter(p => pieceTerminee(d, p.id)).length;
   return (
     <a class="carte-costume" href={lienCostume(c.id)}>
       <div class="carte-image">{c.image_ref ? <ImageCadree id={c.image_ref} cadrage={c.cadrage} alt={`Référence ${c.nom}`} /> : <div class="photo-vide"><span aria-hidden="true">✂</span></div>}</div>
@@ -84,7 +86,7 @@ function CarteCostume({ c }: { c: Ligne }) {
         <div class="puces">
           {dl && <Puce ton={dl < jour.value ? 'rouge' : 'accent'} titre={jourCourt(dl)}><Icone nom="drapeau" taille={12} />{ev ? `${ev.nom} ` : ''}{relatif(dl, jour.value)}</Puce>}
           {attend && <Puce ton="gris">attend {attend.nom}</Puce>}
-          {a.nb > 0 && <Puce ton="gris">{a.nbFait}/{a.nb} sous-étapes</Puce>}
+          {pieces.length > 0 && <Puce ton="gris">{nbTerminees}/{pieces.length} pièce{pieces.length > 1 ? 's' : ''} terminée{pieces.length > 1 ? 's' : ''}</Puce>}
         </div>
       </div>
     </a>
