@@ -10,7 +10,7 @@ import { DUREES, NOMS_DUREES, bool, txtBool, type Duree, type Ligne } from '../.
 import { creerPiece, creerPiste, creerEtape, cocherEtape, deplacerEtape, reordonner, enchainerPistes } from '../../store/operations';
 import { Barre, Pct, Puce, Case, Menu, Vide } from '../../composants/base';
 import { Icone } from '../../composants/Icone';
-import { EditeurEtape, EditeurPiece, EditeurPiste, CollerListe, ChoixModele, RattacherFournitures, nbFournituresHorsPieces, EffacerDatesPrevues } from './editeurs';
+import { EditeurEtape, EditeurPiece, EditeurPiste, CollerListe, ChoixModele, RattacherFournitures, nbFournituresHorsPieces } from './editeurs';
 import { maj } from '../Costume';
 
 type Ouvert = { type: 'etape' | 'piece' | 'piste' | 'coller' | 'modele' | 'fournitures' | 'fournitures-creation'; id?: string } | null;
@@ -21,7 +21,6 @@ export function OngletPieces({ costume }: { costume: Ligne }) {
   const [ouvert, setOuvert] = useState<Ouvert>(null);
   const [nouvelle, setNouvelle] = useState('');
   const liste = useRef<HTMLDivElement>(null);
-  const planifie = bool(costume.suivi_planning);
 
   useEffect(() => {
     if (!liste.current) return;
@@ -54,7 +53,6 @@ export function OngletPieces({ costume }: { costume: Ligne }) {
           <input value={nouvelle} placeholder="Nouvelle pièce" aria-label="Nom de la nouvelle pièce" onInput={e => setNouvelle((e.target as HTMLInputElement).value)} />
           <button class="bouton principal" disabled={!nouvelle.trim()}><Icone nom="plus" />Pièce</button>
         </form>
-        {planifie && <EffacerDatesPrevues costumeId={costume.id} />}
       </div>
 
       {!pieces.length && (

@@ -1,5 +1,6 @@
 // Feuilles d'édition : étape, pièce, piste, attentes, « Coller une liste », modèles, Répartir.
-import { useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
+import Sortable from 'sortablejs';
 import { donnees, faire, jour } from '../../store/store';
 import { piecesDe, pistesDe, etapesDePiste, ligne, tous, idsAttendus, nomAttendu, ordreSuivant, fournituresDe, piecesDeFourniture } from '../../logique/acces';
 import { cleNom } from '../../logique/budget';
@@ -311,13 +312,23 @@ export function Repartir({ costumeId, onFermer }: { costumeId: string; onFermer:
   const n = Object.keys(plan.pieces).length;
   const nEtapes = Object.keys(plan.etapes).length;
   const fixees = ordre.filter(id => !plan.pieces[id]).length;
-  const bouger = (i: number, pas: number) => {
-    const j = i + pas;
-    if (j < 0 || j >= ordre.length) return;
-    const copie = [...ordre];
-    [copie[i], copie[j]] = [copie[j], copie[i]];
-    setOrdre(copie);
-  };
+  // L'ordre se règle en glissant les pièces (poignée à gauche).
+  const listeOrdre = useRef<HTMLOListElement>(null);
+  useEffect(() => {
+    if (!listeOrdre.current) return;
+    const s = Sortable.create(listeOrdre.current, {
+      handle: '.poignee', animation: 150,
+      onEnd: evt => {
+        // Preact rerend la liste : on remet le DOM d'origine avant de changer l'état.
+        const { item, from, oldIndex, newIndex } = evt;
+        const reste = [...from.children].filter(c => c !== item);
+        from.insertBefore(item, reste[oldIndex!] ?? null);
+        if (oldIndex === newIndex) return;
+        setOrdre(o => { const copie = [...o]; const [bouge] = copie.splice(oldIndex!, 1); copie.splice(newIndex!, 0, bouge); return copie; });
+      },
+    });
+    return () => s.destroy();
+  }, [ordre.length]);
   const texteMarge = (x: number) => x > 0 ? `${x} jour${x > 1 ? 's' : ''} de marge` : x === 0 ? 'aucune marge' : `${-x} jour${-x > 1 ? 's' : ''} APRÈS la deadline`;
   return (
     <Feuille titre="Répartir les étapes" onFermer={onFermer} pied={<>
@@ -333,14 +344,13 @@ export function Repartir({ costumeId, onFermer }: { costumeId: string; onFermer:
         <ChoixDate label="fin prévue du costume" valeur={fin} min={jour.value} onChange={v => setFin(v || finPlanifiable(deadline, jour.value))} />
       </Champ>
       <Champ label="Ordre de fabrication">
-        <ol class="ordre-pieces">
+        <ol class="ordre-pieces" ref={listeOrdre}>
           {ordre.map((id, i) => (
-            <li key={id}>
+            <li key={id} data-id={id}>
+              <span class="poignee" aria-label={`Déplacer ${d.Pieces[id]?.nom}`} title="Glisser pour changer l'ordre"><Icone nom="poignee" taille={16} /></span>
               <span class="rang">{i + 1}</span>
               <span class="nom">{d.Pieces[id]?.nom}</span>
               {!plan.pieces[id] && <span class="petit-texte">dates à elle</span>}
-              <button class="bouton-icone petit" disabled={i === 0} aria-label={`Monter ${d.Pieces[id]?.nom}`} onClick={() => bouger(i, -1)}><Icone nom="haut" taille={16} /></button>
-              <button class="bouton-icone petit" disabled={i === ordre.length - 1} aria-label={`Descendre ${d.Pieces[id]?.nom}`} onClick={() => bouger(i, 1)}><Icone nom="bas" taille={16} /></button>
             </li>
           ))}
         </ol>
