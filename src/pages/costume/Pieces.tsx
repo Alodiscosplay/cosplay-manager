@@ -5,16 +5,15 @@ import { donnees, jour, faire } from '../../store/store';
 import { piecesDe, pistesDe, etapesDePiste, idsAttendus } from '../../logique/acces';
 import { avancementPiece, avancementPiste, poids } from '../../logique/avancement';
 import { statutPiece, statutStockePiece, champsStatutPiece, pisteEnPause, champsPausePiste, etatPiste, attentes, texteAttente } from '../../logique/disponibilite';
-import { deadlineCostume } from '../../logique/planning';
 import { jourCourt, relatif, lireJour } from '../../logique/dates';
 import { DUREES, NOMS_DUREES, bool, txtBool, type Duree, type Ligne } from '../../modele/schema';
 import { creerPiece, creerPiste, creerEtape, cocherEtape, deplacerEtape, reordonner, enchainerPistes } from '../../store/operations';
 import { Barre, Pct, Puce, Case, Menu, Vide } from '../../composants/base';
 import { Icone } from '../../composants/Icone';
-import { EditeurEtape, EditeurPiece, EditeurPiste, CollerListe, ChoixModele, Repartir, RattacherFournitures, nbFournituresHorsPieces, EffacerDatesPrevues } from './editeurs';
+import { EditeurEtape, EditeurPiece, EditeurPiste, CollerListe, ChoixModele, RattacherFournitures, nbFournituresHorsPieces, EffacerDatesPrevues } from './editeurs';
 import { maj } from '../Costume';
 
-type Ouvert = { type: 'etape' | 'piece' | 'piste' | 'coller' | 'modele' | 'repartir' | 'fournitures' | 'fournitures-creation'; id?: string } | null;
+type Ouvert = { type: 'etape' | 'piece' | 'piste' | 'coller' | 'modele' | 'fournitures' | 'fournitures-creation'; id?: string } | null;
 
 export function OngletPieces({ costume }: { costume: Ligne }) {
   const d = donnees.value;
@@ -22,7 +21,6 @@ export function OngletPieces({ costume }: { costume: Ligne }) {
   const [ouvert, setOuvert] = useState<Ouvert>(null);
   const [nouvelle, setNouvelle] = useState('');
   const liste = useRef<HTMLDivElement>(null);
-  const dl = deadlineCostume(d, costume);
   const planifie = bool(costume.suivi_planning);
 
   useEffect(() => {
@@ -56,7 +54,6 @@ export function OngletPieces({ costume }: { costume: Ligne }) {
           <input value={nouvelle} placeholder="Nouvelle pièce" aria-label="Nom de la nouvelle pièce" onInput={e => setNouvelle((e.target as HTMLInputElement).value)} />
           <button class="bouton principal" disabled={!nouvelle.trim()}><Icone nom="plus" />Pièce</button>
         </form>
-        {planifie && dl && pieces.length > 0 && <button class="bouton" onClick={() => setOuvert({ type: 'repartir' })}><Icone nom="agenda" />Répartir les étapes</button>}
         {planifie && <EffacerDatesPrevues costumeId={costume.id} />}
       </div>
 
@@ -75,7 +72,6 @@ export function OngletPieces({ costume }: { costume: Ligne }) {
       {ouvert?.type === 'piste' && <EditeurPiste id={ouvert.id!} onFermer={() => setOuvert(null)} />}
       {ouvert?.type === 'coller' && <CollerListe costumeId={costume.id} pieceId={ouvert.id} onFermer={() => setOuvert(null)} />}
       {ouvert?.type === 'modele' && <ChoixModele pieceId={ouvert.id!} onFermer={() => setOuvert(null)} />}
-      {ouvert?.type === 'repartir' && <Repartir costumeId={costume.id} onFermer={() => setOuvert(null)} />}
       {(ouvert?.type === 'fournitures' || ouvert?.type === 'fournitures-creation') && (
         <RattacherFournitures pieceId={ouvert.id!} apresCreation={ouvert.type === 'fournitures-creation'} onFermer={() => setOuvert(null)} />
       )}
