@@ -19,7 +19,8 @@ export function OngletPlanning({ costume }: { costume: Ligne }) {
   const d = donnees.value;
   const j = jour.value;
   const [repartir, setRepartir] = useState(false);
-  const [ouverte, setOuverte] = useState<string | null>(null); // étape ouverte dans la feuille
+  // Feuille ouverte : « e:<id> » pour une étape, « p:<id> » pour une pièce entière.
+  const [ouverte, setOuverte] = useState<string | null>(null);
   const [depliees, setDepliees] = useState<Set<string>>(new Set());
   const pieces = piecesDe(d, costume.id);
   const dl = deadlineCostume(d, costume);
@@ -77,7 +78,7 @@ export function OngletPlanning({ costume }: { costume: Ligne }) {
       ton: sousEtapes.length && faites === sousEtapes.length ? 'faite' : au < j ? 'retard' : 'prevue',
       texte: `${faites}/${sousEtapes.length}`,
       titre: `${piece.nom} › ${piste.nom || 'Étape principale'}`,
-      ouvre: piste.id,
+      ouvre: `e:${piste.id}`,
     };
   };
 
@@ -94,6 +95,7 @@ export function OngletPlanning({ costume }: { costume: Ligne }) {
       ton: sousEtapes.length && faites === sousEtapes.length ? 'faite' : au < j ? 'retard' : 'prevue',
       texte: `${faites}/${sousEtapes.length}`,
       titre: p.nom,
+      ouvre: `p:${p.id}`,
     };
   };
 
@@ -162,7 +164,8 @@ export function OngletPlanning({ costume }: { costume: Ligne }) {
         </table>
       </div>
       {repartir && <Repartir costumeId={costume.id} onFermer={() => setRepartir(false)} />}
-      {ouverte && <EtapeOuverte id={ouverte} onFermer={() => setOuverte(null)} />}
+      {ouverte?.startsWith('e:') && <EtapeOuverte id={ouverte.slice(2)} onFermer={() => setOuverte(null)} />}
+      {ouverte?.startsWith('p:') && <PieceOuverte id={ouverte.slice(2)} onFermer={() => setOuverte(null)} onEtape={id => setOuverte(`e:${id}`)} />}
     </section>
   );
 }
@@ -197,6 +200,38 @@ function EtapeOuverte({ id, onFermer }: { id: string; onFermer: () => void }) {
             </div>
           </li>
         ))}
+      </ul>
+    </Feuille>
+  );
+}
+
+/** Une pièce depuis le planning : la liste de ses étapes et leur deadline. */
+function PieceOuverte({ id, onFermer, onEtape }: { id: string; onFermer: () => void; onEtape: (id: string) => void }) {
+  const d = donnees.value;
+  const j = jour.value;
+  const piece = d.Pieces[id];
+  if (!piece) return null;
+  const dater = (pisteId: string, v: string) => faire([{ table: 'Pistes', id: pisteId, champs: { deadline: v } }], 'Deadline modifiée');
+  return (
+    <Feuille titre={piece.nom} onFermer={onFermer} pied={<button class="bouton principal" onClick={onFermer}>Terminé</button>}>
+      <p class="petit-texte texte-centre">
+        {lireJour(piece.debut) ? `Du ${jourCourt(piece.debut)}` : 'Sans début'}
+        {lireJour(piece.deadline) ? ` au ${jourCourt(piece.deadline)}` : ''}
+      </p>
+      <ul class="liste-etapes-planning">
+        {pistesDe(d, piece.id).map(pi => {
+          const sousEtapes = etapesDePiste(d, pi.id);
+          const faites = sousEtapes.filter(e => bool(e.fait)).length;
+          const dl = lireJour(pi.deadline);
+          const finie = sousEtapes.length > 0 && faites === sousEtapes.length;
+          return (
+            <li key={pi.id}>
+              <button class="lien-bouton" onClick={() => onEtape(pi.id)}>{pi.nom || 'Étape principale'}</button>
+              <span class={`petit-texte${!finie && dl && dl < j ? ' en-retard' : ''}`}>{faites}/{sousEtapes.length}</span>
+              <ChoixDate label={`deadline de ${pi.nom || 'étape'}`} valeur={pi.deadline ?? ''} onChange={v => dater(pi.id, v)} />
+            </li>
+          );
+        })}
       </ul>
     </Feuille>
   );
