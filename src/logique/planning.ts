@@ -127,10 +127,11 @@ export function ordrePlanning(d: Donnees, costumeId: string): Ligne[] {
  * étapes. Une pièce qui porte déjà un début ou une deadline garde sa fenêtre (sauf `remplacer`).
  */
 export function planifierCostume(d: Donnees, costumeId: string, depuis: Jour, jusqua: Jour,
-                                 options: { ordre?: string[]; remplacer?: boolean } = {}): Plan {
+                                 options: { ordre?: string[]; pieces?: string[]; remplacer?: boolean } = {}): Plan {
   const plan: Plan = { pieces: {}, etapes: {} };
   const remplacer = !!options.remplacer;
-  const toutes = piecesDe(d, costumeId).filter(p => !pieceTerminee(d, p.id));
+  const retenues = options.pieces && new Set(options.pieces);
+  const toutes = piecesDe(d, costumeId).filter(p => !pieceTerminee(d, p.id) && (!retenues || retenues.has(p.id)));
   const rang = new Map((options.ordre ?? ordrePlanning(d, costumeId).map(p => p.id)).map((id, i) => [id, i]));
   const pieces = [...toutes].sort((a, b) => (rang.get(a.id) ?? 0) - (rang.get(b.id) ?? 0));
 

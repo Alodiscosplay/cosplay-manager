@@ -453,7 +453,9 @@ dialog.feuille::backdrop { background: rgb(20 12 28 / 45%); }
 .liste-etapes-planning li { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .liste-etapes-planning .lien-bouton { flex: 1 1 8em; min-width: 0; text-align: left; }
 .liste-etapes-planning .choix-date { flex: 0 0 auto; }
-.ordre-pieces .nom { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ordre-pieces .nom { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; }
+.ordre-pieces .nom span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ordre-pieces li.hors-planning { opacity: .55; }
 .planning td { vertical-align: top; padding: 4px; }
 .planning .tete-ligne { display: flex; align-items: center; gap: 4px; }
 .planning .ligne-piste th { padding-left: 26px; font-weight: 500; color: var(--doux); }

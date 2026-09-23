@@ -305,12 +305,15 @@ export function Repartir({ costumeId, onFermer }: { costumeId: string; onFermer:
   // La fin prévue du costume : la limite qu'elle se donne, forcément avant (ou à) la deadline.
   const [fin, setFin] = useState(() => lireJour(costume.fin_prevue) || finPlanifiable(deadline, jour.value));
   const [ordre, setOrdre] = useState<string[]>(() => ordrePlanning(d, costumeId).filter(p => !pieceTerminee(d, p.id)).map(p => p.id));
+  // Toutes les pièces sont planifiées par défaut ; on peut en laisser de côté.
+  const [retenues, setRetenues] = useState<Set<string>>(() => new Set(ordre));
+  const basculer = (id: string, v: boolean) => { const s = new Set(retenues); if (v) s.add(id); else s.delete(id); setRetenues(s); };
   const finOk = fin >= jour.value;
   const marge = ecartJours(fin, deadline);
-  const plan = finOk ? planifierCostume(d, costumeId, jour.value, fin, { ordre }) : { pieces: {}, etapes: {} };
+  const plan = finOk ? planifierCostume(d, costumeId, jour.value, fin, { ordre, pieces: [...retenues] }) : { pieces: {}, etapes: {} };
   const n = Object.keys(plan.pieces).length;
   const nEtapes = Object.keys(plan.etapes).length;
-  const fixees = ordre.filter(id => !plan.pieces[id]).length;
+  const fixees = ordre.filter(id => retenues.has(id) && !plan.pieces[id]).length;
   // L'ordre se règle en glissant les pièces (poignée à gauche).
   const listeOrdre = useRef<HTMLOListElement>(null);
   useEffect(() => {
@@ -345,14 +348,18 @@ export function Repartir({ costumeId, onFermer }: { costumeId: string; onFermer:
       <Champ label="Tout terminer au plus tard le" aide={deadline ? `Deadline : ${jourCourt(deadline)} – ${texteMarge(marge)}` : undefined}>
         <ChoixDate label="fin prévue du costume" valeur={fin} min={jour.value} onChange={v => setFin(v || finPlanifiable(deadline, jour.value))} />
       </Champ>
-      <Champ label="Ordre de fabrication">
+      <Champ label="Ordre de fabrication" aide="Décoche une pièce pour la laisser hors du planning.">
         <ol class="ordre-pieces" ref={listeOrdre}>
           {ordre.map((id, i) => (
-            <li key={id} data-id={id}>
+            <li key={id} data-id={id} class={retenues.has(id) ? '' : 'hors-planning'}>
               <span class="poignee" aria-label={`Déplacer ${d.Pieces[id]?.nom}`} title="Glisser pour changer l'ordre"><Icone nom="poignee" taille={16} /></span>
               <span class="rang">{i + 1}</span>
-              <span class="nom">{d.Pieces[id]?.nom}</span>
-              {!plan.pieces[id] && <span class="petit-texte">dates à elle</span>}
+              <label class="nom">
+                <input type="checkbox" checked={retenues.has(id)} aria-label={`Planifier ${d.Pieces[id]?.nom}`}
+                  onChange={e => basculer(id, (e.target as HTMLInputElement).checked)} />
+                <span>{d.Pieces[id]?.nom}</span>
+              </label>
+              {retenues.has(id) && !plan.pieces[id] && <span class="petit-texte">dates à elle</span>}
             </li>
           ))}
         </ol>
@@ -409,7 +416,6 @@ function EffacerDuCostume({ costumeId, onFermer }: { costumeId: string; onFermer
         Effacer {dates} date{dates > 1 ? 's' : ''}
       </button>
     </>}>
-      <p>Choisis les pièces qui perdent leur fenêtre (début, deadline) et les deadlines de leurs étapes.</p>
       {figees > 0 && <p class="petit-texte">{figees} étape{figees > 1 ? 's déjà faites gardent leur' : ' déjà faite garde sa'} date : ce qui est fait ne bouge plus.</p>}
       <label class="interrupteur">
         <input type="checkbox" checked={choisies.size === planifiees.length}
@@ -427,7 +433,6 @@ function EffacerDuCostume({ costumeId, onFermer }: { costumeId: string; onFermer
           </li>
         ))}
       </ul>
-      <p class="petit-texte">La deadline du costume n'est pas touchée. « Annuler » dans le bandeau revient en arrière.</p>
     </Feuille>
   );
 }

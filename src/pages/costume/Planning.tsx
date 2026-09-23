@@ -22,7 +22,9 @@ export function OngletPlanning({ costume }: { costume: Ligne }) {
   // Feuille ouverte : « e:<id> » pour une étape, « p:<id> » pour une pièce entière.
   const [ouverte, setOuverte] = useState<string | null>(null);
   const [depliees, setDepliees] = useState<Set<string>>(new Set());
-  const pieces = piecesDe(d, costume.id);
+  // Une pièce sans aucune date (ni fenêtre, ni deadline d'étape) ne figure pas au planning.
+  const datee = (p: Ligne) => !!(p.debut || p.deadline) || pistesDe(d, p.id).some(x => x.deadline);
+  const pieces = piecesDe(d, costume.id).filter(datee);
   const dl = deadlineCostume(d, costume);
 
   // Toutes les dates du planning, pour savoir jusqu'où va la grille.
@@ -106,7 +108,7 @@ export function OngletPlanning({ costume }: { costume: Ligne }) {
     };
   };
 
-  if (!pieces.some(p => p.debut || p.deadline || pistesDe(d, p.id).some(x => x.deadline))) {
+  if (!pieces.length) {
     // La feuille reste HORS du bloc « Vide », qui centre son contenu.
     return (
       <section>
