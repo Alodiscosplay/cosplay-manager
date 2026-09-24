@@ -2,7 +2,7 @@
 import { type Donnees, type Ligne, bool, vivant } from '../modele/schema';
 import { costumes, piecesDe, pistesDe, etapesDePiste, etapesDePiece, ligne, idsAttendus } from './acces';
 import { poids, avancement } from './avancement';
-import { lireJour, ajouterJours, ecartJours, type Jour } from './dates';
+import { lireJour, ajouterJours, ecartJours, jourCourt, type Jour } from './dates';
 import { statutCostume, pieceTerminee } from './disponibilite';
 
 // ---------- Deadlines effectives ----------
@@ -201,10 +201,15 @@ export function retardPiece(d: Donnees, pieceId: string, jour: Jour): Retard {
 
 export interface Alerte { niveau: 'rouge' | 'orange'; texte: string; costumeId: string }
 
-export function alertes(d: Donnees, jour: Jour, joursAvant = 14): Alerte[] {
+/**
+ * Les alertes de l'accueil. Une échéance entre dans la liste à `joursAvant` jours ; elle est ROUGE
+ * quand elle est dépassée ou à moins de `joursRouge` jours, ORANGE au-delà. Chaque texte nomme le
+ * costume, pour qu'on sache à quel projet il se rapporte.
+ */
+export function alertes(d: Donnees, jour: Jour, joursAvant = 14, joursRouge = 3): Alerte[] {
   const res: Alerte[] = [];
   const proche = (j: Jour) => j && ecartJours(jour, j) <= joursAvant;
-  const niveau = (j: Jour): 'rouge' | 'orange' => (j < jour || ecartJours(jour, j) <= 3 ? 'rouge' : 'orange');
+  const niveau = (j: Jour): 'rouge' | 'orange' => (j < jour || ecartJours(jour, j) <= joursRouge ? 'rouge' : 'orange');
 
   for (const c of costumes(d)) {
     const sc = statutCostume(c, jour);
@@ -213,22 +218,22 @@ export function alertes(d: Donnees, jour: Jour, joursAvant = 14): Alerte[] {
     const av = avancement(piecesDe(d, c.id).flatMap(p => etapesDePiece(d, p.id)));
     if (dc && proche(dc) && av.pct !== 100) {
       res.push({ niveau: niveau(dc), costumeId: c.id,
-        texte: dc < jour ? `${c.nom} : deadline dépassée` : `${c.nom} : deadline le ${dc}` });
+        texte: dc < jour ? `${c.nom} : deadline dépassée (${jourCourt(dc, jour)})` : `${c.nom} : deadline le ${jourCourt(dc, jour)}` });
     }
     for (const p of piecesDe(d, c.id)) {
       if (pieceTerminee(d, p.id)) continue;
       const dp = lireJour(p.deadline);
       if (dp && proche(dp)) res.push({ niveau: niveau(dp), costumeId: c.id,
-        texte: dp < jour ? `${p.nom} (${c.nom}) : deadline dépassée` : `${p.nom} (${c.nom}) : à finir pour le ${dp}` });
+        texte: dp < jour ? `${c.nom} › ${p.nom} : deadline dépassée (${jourCourt(dp, jour)})` : `${c.nom} › ${p.nom} : à finir pour le ${jourCourt(dp, jour)}` });
       const r = retardPiece(d, p.id, jour);
       if (r.enRetard.length) res.push({ niveau: 'orange', costumeId: c.id,
-        texte: `${p.nom} (${c.nom}) : ${r.enRetard.length} étape${r.enRetard.length > 1 ? 's' : ''} en retard sur le planning` });
+        texte: `${c.nom} › ${p.nom} : ${r.enRetard.length} étape${r.enRetard.length > 1 ? 's' : ''} en retard sur le planning` });
       for (const pi of pistesDe(d, p.id)) {
-        if (etapesDePiste(d, pi.id).every(e => bool(e.fait))) continue;
+        // Une étape sans nom n'ajoute rien : sa pièce dit déjà la même chose.
+        if (!pi.nom || etapesDePiste(d, pi.id).every(e => bool(e.fait))) continue;
         const de = lireJour(pi.deadline);
-        const nom = pi.nom || 'étape principale';
         if (de && proche(de) && de >= jour) res.push({ niveau: niveau(de), costumeId: c.id,
-          texte: `« ${nom} » (${p.nom}) : pour le ${de}` });
+          texte: `${c.nom} › ${p.nom} › ${pi.nom} : pour le ${jourCourt(de, jour)}` });
       }
     }
   }
