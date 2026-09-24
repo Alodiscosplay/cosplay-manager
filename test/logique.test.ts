@@ -4,7 +4,7 @@ import { lireJourSaisi, jourSaisi } from '../src/logique/dates';
 import { avancement, avancementPiece, formatPct } from '../src/logique/avancement';
 import { aFaire, etapeDisponible, creeraitBoucle, texteAttente, champsStatutPiece } from '../src/logique/disponibilite';
 import { activationsDuJour } from '../src/logique/activation';
-import { planifierCostume, debutEtape, retardPiece, finPlanifiable } from '../src/logique/planning';
+import { planifierCostume, debutEtape, retardPiece, finPlanifiable, alertes } from '../src/logique/planning';
 import { effacerPlanning } from '../src/store/operations';
 import { quantiteNombre, regrouperAchats, budgetCostume, totalCommande, regrouperParNom, texteQuantites } from '../src/logique/budget';
 import { analyserListe, versTexte, modeleVersTexte, texteVersModele } from '../src/logique/collerListe';
@@ -261,6 +261,15 @@ describe('Planifier', () => {
     const ch = effacerPlanning(d, [ids.Corset]);
     expect(ch.some(c => c.id === ids['Corset/Patron'])).toBe(false);
     expect(ch.some(c => c.id === ids['Corset/Coupe'])).toBe(true);
+  });
+
+  it('avertit quand une étape est datée après la deadline de sa pièce', () => {
+    const { d, ids } = construire({ pieces: [{ nom: 'Crinoline', champs: { deadline: '2026-09-24' }, pistes: [
+      { nom: 'Baleines', etapes: [['changer', 2]] },
+    ] }] });
+    d.Pistes[ids['Crinoline/Baleines']].deadline = '2026-10-01';
+    const textes = alertes(d, '2026-09-24').map(a => a.texte);
+    expect(textes.some(t => t.includes('après la deadline de la pièce'))).toBe(true);
   });
 
   it('retard : une étape dont la deadline est passée et qui n’est pas finie', () => {

@@ -229,10 +229,14 @@ export function alertes(d: Donnees, jour: Jour, joursAvant = 14, joursRouge = 3)
       if (r.enRetard.length) res.push({ niveau: 'orange', costumeId: c.id,
         texte: `${c.nom} › ${p.nom} : ${r.enRetard.length} étape${r.enRetard.length > 1 ? 's' : ''} en retard sur le planning` });
       for (const pi of pistesDe(d, p.id)) {
-        // Une étape sans nom n'ajoute rien : sa pièce dit déjà la même chose.
-        if (!pi.nom || etapesDePiste(d, pi.id).every(e => bool(e.fait))) continue;
+        if (etapesDePiste(d, pi.id).every(e => bool(e.fait))) continue;
         const de = lireJour(pi.deadline);
-        if (de && proche(de) && de >= jour) res.push({ niveau: niveau(de), costumeId: c.id,
+        if (!de) continue;
+        // Une étape datée après sa pièce : on avertit, on ne corrige pas.
+        if (dp && de > dp) res.push({ niveau: 'orange', costumeId: c.id,
+          texte: `${c.nom} › ${p.nom}${pi.nom ? ` › ${pi.nom}` : ''} : étape datée au ${jourCourt(de, jour)}, après la deadline de la pièce (${jourCourt(dp, jour)})` });
+        // Une étape sans nom n'annonce rien de plus que sa pièce.
+        if (pi.nom && proche(de) && de >= jour) res.push({ niveau: niveau(de), costumeId: c.id,
           texte: `${c.nom} › ${p.nom} › ${pi.nom} : pour le ${jourCourt(de, jour)}` });
       }
     }
