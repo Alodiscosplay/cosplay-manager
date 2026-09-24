@@ -311,8 +311,14 @@ export function Repartir({ costumeId, onFermer }: { costumeId: string; onFermer:
   const finOk = fin >= jour.value;
   const marge = ecartJours(fin, deadline);
   const plan = finOk ? planifierCostume(d, costumeId, jour.value, fin, { ordre, pieces: [...retenues] }) : { pieces: {}, etapes: {} };
-  const n = Object.keys(plan.pieces).length;
   const nEtapes = Object.keys(plan.etapes).length;
+  // Le compteur suit ce qui va vraiment changer : une pièce compte aussi quand seules ses étapes
+  // reçoivent une deadline (sa fenêtre à elle pouvant être déjà posée).
+  const touchees = new Set([
+    ...Object.keys(plan.pieces),
+    ...Object.keys(plan.etapes).map(id => d.Pistes[id]?.piece_id).filter(Boolean),
+  ]);
+  const n = touchees.size;
   const fixees = ordre.filter(id => retenues.has(id) && !plan.pieces[id]).length;
   // L'ordre se règle en glissant les pièces (poignée à gauche).
   const listeOrdre = useRef<HTMLOListElement>(null);
@@ -335,7 +341,7 @@ export function Repartir({ costumeId, onFermer }: { costumeId: string; onFermer:
   return (
     <Feuille titre="Répartir les étapes" onFermer={onFermer} pied={<>
       <button class="bouton" onClick={onFermer}>Annuler</button>
-      <button class="bouton principal" disabled={!nEtapes && !n}
+      <button class="bouton principal" disabled={!n}
         onClick={() => {
           // Le début du costume, s'il est vide, garde la date de création du planning.
           const champsCostume: Record<string, string> = { fin_prevue: fin };
