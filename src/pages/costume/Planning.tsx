@@ -228,12 +228,21 @@ function PieceOuverte({ id, onFermer, onEtape }: { id: string; onFermer: () => v
   const piece = d.Pieces[id];
   if (!piece) return null;
   const dater = (pisteId: string, v: string) => faire([{ table: 'Pistes', id: pisteId, champs: { deadline: v } }], 'Deadline modifiée');
+  const majPiece = (champs: Record<string, string>) => faire([{ table: 'Pieces', id, champs }], 'Dates de la pièce modifiées');
+  const derniere = pistesDe(d, id).map(x => lireJour(x.deadline)).filter(Boolean).sort().pop();
   return (
     <Feuille titre={piece.nom} onFermer={onFermer} pied={<button class="bouton principal" onClick={onFermer}>Terminé</button>}>
-      <p class="petit-texte texte-centre">
-        {lireJour(piece.debut) ? `Du ${jourCourt(piece.debut)}` : 'Sans début'}
-        {lireJour(piece.deadline) ? ` au ${jourCourt(piece.deadline)}` : ''}
-      </p>
+      <div class="deux-colonnes">
+        <Champ label="Début de la pièce">
+          <ChoixDate label={`début de ${piece.nom}`} valeur={piece.debut ?? ''} onChange={v => majPiece({ debut: v })} />
+        </Champ>
+        <Champ label="Deadline de la pièce" aide={derniere ? `Dernière étape : ${jourCourt(derniere)}` : undefined}>
+          <ChoixDate label={`deadline de ${piece.nom}`} valeur={piece.deadline ?? ''} min={piece.debut || undefined} onChange={v => majPiece({ deadline: v })} />
+        </Champ>
+      </div>
+      {derniere && lireJour(piece.deadline) && derniere > lireJour(piece.deadline) && (
+        <p class="erreur">Une étape est datée après la deadline de la pièce.</p>
+      )}
       <ul class="liste-etapes-planning">
         {pistesDe(d, piece.id).map(pi => {
           const sousEtapes = etapesDePiste(d, pi.id);
