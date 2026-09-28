@@ -501,6 +501,12 @@ dialog.feuille::backdrop { background: rgb(20 12 28 / 45%); }
 .point.evenement { background: var(--accent); }
 .point.tache { background: var(--orange); }
 .point.fait { opacity: .35; }
+.filtre-statuts { display: flex; flex-wrap: wrap; gap: 6px; }
+.puce-filtre { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border: 1px solid var(--bord); border-radius: 99px; font-size: .85rem; color: var(--doux); cursor: pointer; background: var(--surface); }
+.puce-filtre input { position: absolute; opacity: 0; width: 0; height: 0; }
+.puce-filtre.actif { background: var(--accent-fond); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+.puce-filtre:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+.etat-fourniture { font-size: .8rem; color: var(--doux); white-space: nowrap; }
 .choix-couleur { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .pastille-couleur { width: 30px; height: 30px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; background: var(--surface-2); color: var(--doux); font-size: .7rem; padding: 0; }
 .pastille-couleur.actif { border-color: var(--encre); box-shadow: 0 0 0 2px var(--surface) inset; }

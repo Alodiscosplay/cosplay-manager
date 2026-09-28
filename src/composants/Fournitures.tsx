@@ -40,8 +40,9 @@ function memoriserDeplie(cle: string, v: boolean): void {
  * Une fourniture. `detail` : affichée sous son groupe de même nom, la ligne a pour titre
  * « costume · pièce » (le nom est déjà dans l'en-tête du groupe).
  */
-export function LigneFourniture({ f, afficherCostume, afficherFournisseur, selectionnee, onSelection, onOuvrir, detail }: {
-  f: Ligne; afficherCostume?: boolean; afficherFournisseur?: boolean; selectionnee?: boolean; onSelection?: (v: boolean) => void; onOuvrir: () => void; detail?: boolean;
+export function LigneFourniture({ f, afficherCostume, afficherFournisseur, selectionnee, onSelection, onOuvrir, detail, sansStatut }: {
+  f: Ligne; afficherCostume?: boolean; afficherFournisseur?: boolean; selectionnee?: boolean; onSelection?: (v: boolean) => void;
+  onOuvrir: () => void; detail?: boolean; sansStatut?: boolean;
 }) {
   const d = donnees.value;
   const m = montant(f);
@@ -69,7 +70,9 @@ export function LigneFourniture({ f, afficherCostume, afficherFournisseur, selec
       </button>
       {m !== null && <span class="montant">{euros(m)}</span>}
       {f.lien && <a class="bouton-icone petit" href={f.lien} target="_blank" rel="noopener noreferrer" aria-label={`Ouvrir le lien de ${f.libelle}`}><Icone nom="lien" taille={16} /></a>}
-      <ChoixStatut valeur={statut} label={`Statut de ${f.libelle}${detail ? ` (${titre})` : ''}`} onChange={v => changerStatut([f.id], v)} />
+      {sansStatut
+        ? <span class="etat-fourniture">{statut}</span>
+        : <ChoixStatut valeur={statut} label={`Statut de ${f.libelle}${detail ? ` (${titre})` : ''}`} onChange={v => changerStatut([f.id], v)} />}
     </li>
   );
 }
@@ -78,15 +81,16 @@ export function LigneFourniture({ f, afficherCostume, afficherFournisseur, selec
  * Toutes les lignes qui portent le même nom : l'en-tête donne le total, le détail la quantité
  * par costume et par pièce. Une seule ligne : affichée telle quelle.
  */
-export function GroupeFourniture({ g, afficherCostume, afficherFournisseur, selection, onSelection, onOuvrir }: {
-  g: GroupeNom; afficherCostume?: boolean; afficherFournisseur?: boolean; selection?: Set<string>; onSelection?: (ids: string[], v: boolean) => void; onOuvrir: (id: string) => void;
+export function GroupeFourniture({ g, afficherCostume, afficherFournisseur, selection, onSelection, onOuvrir, sansStatut }: {
+  g: GroupeNom; afficherCostume?: boolean; afficherFournisseur?: boolean; selection?: Set<string>;
+  onSelection?: (ids: string[], v: boolean) => void; onOuvrir: (id: string) => void; sansStatut?: boolean;
 }) {
   const d = donnees.value;
   const [deplie, setDeplie] = useState(() => !!lireDeplies()[g.cle]);
   const selectionnables = g.lignes.filter(f => !enCommande(d, f));
   if (g.lignes.length === 1) {
     const f = g.lignes[0];
-    return <LigneFourniture f={f} afficherCostume={afficherCostume} afficherFournisseur={afficherFournisseur} onOuvrir={() => onOuvrir(f.id)}
+    return <LigneFourniture f={f} afficherCostume={afficherCostume} afficherFournisseur={afficherFournisseur} sansStatut={sansStatut} onOuvrir={() => onOuvrir(f.id)}
       selectionnee={selection?.has(f.id)} onSelection={onSelection && selectionnables.length ? v => onSelection([f.id], v) : undefined} />;
   }
   const statuts = [...new Set(g.lignes.map(f => f.statut || 'à acheter'))];
@@ -105,12 +109,14 @@ export function GroupeFourniture({ g, afficherCostume, afficherFournisseur, sele
           <span class="etape-meta"><span class="total-quantite">Total : {texteQuantites(g.quantites)}</span><span>{g.lignes.length} besoins</span></span>
         </div>
         {g.montant > 0 && <span class="montant">{euros(g.montant)}</span>}
-        <ChoixStatut valeur={statuts.length === 1 ? statuts[0] : 'mixte'} label={`Statut de tout « ${g.libelle} »`}
-          onChange={v => changerStatut(g.lignes.map(f => f.id), v)} />
+        {sansStatut
+          ? <span class="etat-fourniture">{statuts.length === 1 ? statuts[0] : 'mixte'}</span>
+          : <ChoixStatut valeur={statuts.length === 1 ? statuts[0] : 'mixte'} label={`Statut de tout « ${g.libelle} »`}
+              onChange={v => changerStatut(g.lignes.map(f => f.id), v)} />}
       </div>
       {deplie && <ul class="details-groupe">
         {g.lignes.map(f => (
-          <LigneFourniture f={f} detail afficherCostume={afficherCostume} afficherFournisseur={afficherFournisseur} onOuvrir={() => onOuvrir(f.id)}
+          <LigneFourniture f={f} detail afficherCostume={afficherCostume} afficherFournisseur={afficherFournisseur} sansStatut={sansStatut} onOuvrir={() => onOuvrir(f.id)}
             selectionnee={selection?.has(f.id)} onSelection={onSelection && !enCommande(d, f) ? v => onSelection([f.id], v) : undefined} />
         ))}
       </ul>}

@@ -37,7 +37,9 @@ export function PageAchats({ onglet = 'liste' }: { onglet?: string }) {
 function ListeCourses() {
   const d = donnees.value;
   const [costume, setCostume] = useState('');
-  const [statut, setStatut] = useState('à acheter');
+  // Plusieurs statuts à la fois ; vide = tous.
+  const [statuts, setStatuts] = useState<Set<string>>(() => new Set(['à acheter']));
+  const basculerStatut = (x: string) => { const n = new Set(statuts); if (n.has(x)) n.delete(x); else n.add(x); setStatuts(n); };
   const [fournisseur, setFournisseur] = useState('');
   const [selection, setSelection] = useState<Set<string>>(new Set());
   const [ouvert, setOuvert] = useState<string | 'nouveau' | null>(null);
@@ -45,7 +47,7 @@ function ListeCourses() {
   const setPar = (v: GroupementAchats) => { setParEtat(v); try { localStorage.setItem(CLE_GROUPEMENT, v); } catch { /* ignoré */ } };
   // Le filtre ne propose que les fournisseurs qui ont au moins une fourniture.
   const utilises = new Set(tous(d, 'Fournitures').map(f => f.fournisseur_id).filter(Boolean));
-  const groupes = regrouperAchats(d, { costumeId: costume || undefined, fournisseurId: fournisseur || undefined, statuts: statut ? [statut] : undefined }, par);
+  const groupes = regrouperAchats(d, { costumeId: costume || undefined, fournisseurId: fournisseur || undefined, statuts: statuts.size ? [...statuts] : undefined }, par);
   const nb = groupes.reduce((s, g) => s + g.lignes.length, 0);
   const choisirPlusieurs = (ids: string[], v: boolean) => { const s = new Set(selection); for (const id of ids) { if (v) s.add(id); else s.delete(id); } setSelection(s); };
   const selectionnables = (g: Ligne[]) => g.filter(f => !f.commande_id || !ligne(d, 'Commandes', f.commande_id));
@@ -67,7 +69,14 @@ function ListeCourses() {
         <Selection label="Tri" valeur={par} options={[['fournisseur', 'Tri par fournisseur'], ['costume', 'Tri par costume']]} onChange={v => setPar(v as GroupementAchats)} />
         <Selection label="Costume" valeur={costume} options={[['', 'Tous les costumes'], ...costumes(d).filter(c => c.statut !== 'archivé').map(c => [c.id, c.nom] as [string, string])]} onChange={setCostume} />
         <Selection label="Fournisseur" valeur={fournisseur} options={[['', 'Tous les fournisseurs'], ...tous(d, 'Fournisseurs').filter(f => utilises.has(f.id)).sort((a, b) => a.nom.localeCompare(b.nom)).map(f => [f.id, f.nom] as [string, string]), [SANS_FOURNISSEUR, 'Sans fournisseur']]} onChange={setFournisseur} />
-        <Selection label="Statut" valeur={statut} options={[['', 'Tous les statuts'], ...STATUTS_FOURNITURE.map(s => [s, s] as [string, string])]} onChange={setStatut} />
+        <div class="filtre-statuts" role="group" aria-label="Filtrer par statut">
+          {STATUTS_FOURNITURE.map(x => (
+            <label class={`puce-filtre${statuts.has(x) ? ' actif' : ''}`}>
+              <input type="checkbox" checked={statuts.has(x)} onChange={() => basculerStatut(x)} />
+              <span>{x}</span>
+            </label>
+          ))}
+        </div>
       </div>
       {selection.size > 0 && (
         <div class="barre-selection" role="region" aria-label="Sélection">
@@ -77,7 +86,7 @@ function ListeCourses() {
           <span class="petit-texte">Une commande par fournisseur ; elle peut mêler plusieurs costumes.</span>
         </div>
       )}
-      {!nb && <Vide icone="achats" titre={statut === 'à acheter' ? 'Rien à acheter' : 'Aucune fourniture'}><p>Ajoute des fournitures ici ou depuis l'onglet Fournitures d'un costume.</p></Vide>}
+      {!nb && <Vide icone="achats" titre={statuts.size === 1 && statuts.has('à acheter') ? 'Rien à acheter' : 'Aucune fourniture'}><p>Ajoute des fournitures ici ou depuis l'onglet Fournitures d'un costume.</p></Vide>}
       {groupes.map(g => {
         const libres = selectionnables(g.lignes);
         const tout = libres.length > 0 && libres.every(f => selection.has(f.id));
@@ -95,7 +104,7 @@ function ListeCourses() {
             </h2>
             <ul class="liste-fournitures">
               {regrouperParNom(g.lignes).map(gn => (
-                <GroupeFourniture key={gn.cle} g={gn} afficherCostume={!costume && par === 'fournisseur'} afficherFournisseur={par === 'costume'} selection={selection} onSelection={choisirPlusieurs} onOuvrir={setOuvert} />
+                <GroupeFourniture key={gn.cle} g={gn} sansStatut afficherCostume={!costume && par === 'fournisseur'} afficherFournisseur={par === 'costume'} selection={selection} onSelection={choisirPlusieurs} onOuvrir={setOuvert} />
               ))}
             </ul>
           </div>
