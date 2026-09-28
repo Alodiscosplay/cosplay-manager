@@ -476,6 +476,25 @@ dialog.feuille::backdrop { background: rgb(20 12 28 / 45%); }
 .agenda-nav { display: flex; align-items: center; gap: 8px; }
 .agenda-nav h2 { flex: 1; text-align: center; text-transform: capitalize; }
 .calendrier { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; }
+/* Agenda en semaines : les jours dessous, les pièces en barres par-dessus. */
+.calendrier-mois { display: flex; flex-direction: column; gap: 2px; --haut-num: 24px; --haut-barre: 10px; --haut-bas: 22px; }
+.calendrier-mois.grand { --haut-bas: 40px; }
+.cal-entetes { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; }
+.cal-semaine { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); column-gap: 2px; row-gap: 2px; }
+.cal-semaine .cal-jour { min-height: 0; }
+.cal-espace { display: block; flex: none; width: 100%; }
+.cal-barre { position: relative; z-index: 1; margin: 0 2px; display: flex; align-items: center; gap: 4px; min-width: 0; overflow: hidden;
+  border: 1px solid; border-left-width: 0; border-right-width: 0; text-decoration: none; font-size: .72rem; font-weight: 600; padding: 0 6px; }
+.cal-barre.ouvre { border-left-width: 3px; border-top-left-radius: 6px; border-bottom-left-radius: 6px; }
+.cal-barre.ferme { border-top-right-radius: 6px; border-bottom-right-radius: 6px; border-right-width: 1px; }
+.cal-barre.faite { opacity: .45; }
+.cal-barre-texte { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: none; }
+.cal-barre-fin { flex: none; display: none; }
+@media (min-width: 700px) {
+  .calendrier-mois { --haut-barre: 20px; --haut-bas: 44px; }
+  .calendrier-mois.grand { --haut-barre: 24px; --haut-bas: 64px; }
+  .cal-barre-texte, .cal-barre-fin { display: inline; }
+}
 .cal-entete { text-align: center; font-size: .75rem; color: var(--doux); padding: 4px 0; }
 .cal-jour {
   min-height: 56px; border: 1px solid var(--bord); background: var(--surface); border-radius: 8px; padding: 4px; cursor: pointer;

@@ -1,7 +1,8 @@
 import { useState } from 'preact/hooks';
 import { donnees, jour, faire } from '../store/store';
-import { agenda, type ElementAgenda, type TypeAgenda } from '../logique/planning';
+import { agenda, fenetresPieces, traveesSemaine, type ElementAgenda, type FenetrePiece, type TypeAgenda } from '../logique/planning';
 import { costumes, couleurCostume, teinteCouleur, TEINTES, GRIS, tous } from '../logique/acces';
+import { bool } from '../modele/schema';
 import { lundi, ajouterJours, versDate, MOIS, JOURS_COURTS, jourCourt, lireJour } from '../logique/dates';
 import { Feuille, Selection } from '../composants/base';
 import { Icone } from '../composants/Icone';
@@ -40,6 +41,11 @@ export function PageAgenda() {
       : { background: c };
   };
   const duJour = (x: string) => items.filter(i => i.jour === x);
+  // Les pièces s'étirent sur leur durée ; leurs deadlines ne sont donc plus des puces à part.
+  const fenetres = fenetresPieces(d, jours[0], jours[jours.length - 1], filtre || undefined);
+  const pucesDuJour = (x: string) => duJour(x).filter(i => i.ref.table !== 'Pieces');
+  const piecesDuJour = (x: string) => fenetres.filter(f => f.debut <= x && f.fin >= x);
+  const semainesGrille = Array.from({ length: nbJours / 7 }, (_, i) => jours[i * 7]);
 
   const naviguer = (sens: -1 | 1) => {
     if (vue === 'semaine') { setAncre(ajouterJours(ancre, 7 * sens)); return; }
@@ -74,26 +80,25 @@ export function PageAgenda() {
 
       {vue === 'mois' ? (
         <>
-          <div class="calendrier" role="grid" aria-label={titre}>
-            {JOURS_COURTS.map(x => <div class="cal-entete" role="columnheader">{x}</div>)}
-            {jours.map(x => {
-              const liste = duJour(x);
-              const horsMois = x.slice(0, 7) !== debutMois.slice(0, 7);
-              return (
-                <button role="gridcell" class={`cal-jour${horsMois ? ' hors-mois' : ''}${x === j ? ' aujourdhui' : ''}${x === choisi ? ' choisi' : ''}`}
-                  aria-label={`${jourCourt(x, j)}, ${liste.length} élément${liste.length > 1 ? 's' : ''}`} onClick={() => setChoisi(x)}>
-                  <span class="cal-num">{Number(x.slice(8))}</span>
-                  <span class="cal-points">{liste.slice(0, 4).map(i => <span class={`point ${i.type}${i.fait ? ' fait' : ''}`} style={style(i)} />)}</span>
-                  <span class="cal-textes">{liste.slice(0, 2).map(i => <span class={`cal-texte ${i.type}`} style={style(i, true)} title={`${i.titre} · ${i.detail}`}>{i.titre}</span>)}{liste.length > 2 && <span class="cal-plus">+{liste.length - 2}</span>}</span>
-                </button>
-              );
-            })}
+          <div class="calendrier-mois" aria-label={titre}>
+            <div class="cal-entetes">{JOURS_COURTS.map(x => <div class="cal-entete">{x}</div>)}</div>
+            {semainesGrille.map(l => (
+              <SemaineAgenda lundiS={l} jourJ={j} choisi={choisi} moisCourant={debutMois.slice(0, 7)} fenetres={fenetres}
+                puces={pucesDuJour} style={style} couleurs={couleurs} onChoisir={setChoisi} />
+            ))}
           </div>
-          <JourDetaille jourX={choisi} items={items.filter(i => i.jour === choisi)} ouvrirEvenement={setEvenement} couleur={i => style(i)} />
+          <JourDetaille jourX={choisi} items={pucesDuJour(choisi)} pieces={piecesDuJour(choisi)} couleurs={couleurs}
+            ouvrirEvenement={setEvenement} couleur={i => style(i)} />
         </>
       ) : (
         <div class="semaine">
-          {jours.map(x => <JourDetaille jourX={x} items={duJour(x)} ouvrirEvenement={setEvenement} compact couleur={i => style(i)} />)}
+          <div class="calendrier-mois grand">
+            <div class="cal-entetes">{JOURS_COURTS.map(x => <div class="cal-entete">{x}</div>)}</div>
+            <SemaineAgenda lundiS={jours[0]} jourJ={j} choisi={choisi} fenetres={fenetres}
+              puces={pucesDuJour} style={style} couleurs={couleurs} onChoisir={setChoisi} />
+          </div>
+          {jours.map(x => <JourDetaille jourX={x} items={pucesDuJour(x)} pieces={piecesDuJour(x)} couleurs={couleurs}
+            ouvrirEvenement={setEvenement} compact couleur={i => style(i)} />)}
         </div>
       )}
 
@@ -121,8 +126,9 @@ export function PageAgenda() {
   );
 }
 
-function JourDetaille({ jourX, items, ouvrirEvenement, compact, couleur }: {
-  jourX: string; items: ElementAgenda[]; ouvrirEvenement: (id: string) => void; compact?: boolean;
+function JourDetaille({ jourX, items, pieces = [], couleurs, ouvrirEvenement, compact, couleur }: {
+  jourX: string; items: ElementAgenda[]; pieces?: FenetrePiece[]; couleurs?: Map<string, string>;
+  ouvrirEvenement: (id: string) => void; compact?: boolean;
   couleur?: (i: ElementAgenda) => Record<string, string> | undefined;
 }) {
   const j = jour.value;
@@ -130,8 +136,15 @@ function JourDetaille({ jourX, items, ouvrirEvenement, compact, couleur }: {
   return (
     <section class={`jour-detaille${compact ? ' compact' : ''}${jourX === j ? ' aujourdhui' : ''}`}>
       <h3>{nomJour} {jourCourt(jourX, j)}</h3>
-      {!items.length ? <p class="petit-texte">{compact ? '—' : 'Rien ce jour-là.'}</p> : (
+      {!items.length && !pieces.length ? <p class="petit-texte">{compact ? '—' : 'Rien ce jour-là.'}</p> : (
         <ul>
+          {pieces.map(f => (
+            <li class={`item-agenda piece${f.faite ? ' fait' : ''}`}>
+              <span class="point" style={{ background: couleurs?.get(f.costume.id) }} />
+              <a href={lienCostume(f.costume.id, bool(f.costume.suivi_planning) ? 'planning' : 'pieces')}>{f.costume.nom} — {f.piece.nom}</a>
+              <span class="petit-texte"> · {f.fin === jourX ? 'deadline de la pièce' : `jusqu’au ${jourCourt(f.fin, j)}`}{f.faite ? ' · faite' : ''}</span>
+            </li>
+          ))}
           {items.map(i => (
             <li class={`item-agenda ${i.type}${i.fait ? ' fait' : ''}`}>
               <span class={`point ${i.type}`} style={couleur?.(i)} />
@@ -166,5 +179,51 @@ function ChoixCouleur({ id, rang, onFermer }: { id: string; rang: number; onFerm
       </div>
       <p class="petit-texte">Aperçu : <span class="cal-texte" style={{ background: `color-mix(in srgb, ${couleurCostume(c, rang)} 18%, var(--surface))`, color: `color-mix(in srgb, ${couleurCostume(c, rang)} 55%, var(--encre))` }}>{c.nom} — deadline</span></p>
     </Feuille>
+  );
+}
+
+/**
+ * Une semaine de l'agenda : sept jours cliquables, et par-dessus les pièces en cours, chacune en barre
+ * de son début à sa deadline, à la couleur de son projet.
+ */
+function SemaineAgenda({ lundiS, jourJ, choisi, moisCourant, fenetres, puces, style, couleurs, onChoisir }: {
+  lundiS: string; jourJ: string; choisi: string; moisCourant?: string; fenetres: FenetrePiece[];
+  puces: (x: string) => ElementAgenda[]; style: (i: ElementAgenda, fond?: boolean) => Record<string, string> | undefined;
+  couleurs: Map<string, string>; onChoisir: (x: string) => void;
+}) {
+  const jours = Array.from({ length: 7 }, (_, i) => ajouterJours(lundiS, i));
+  const travees = traveesSemaine(fenetres, lundiS);
+  const n = travees.reduce((m, t) => Math.max(m, t.ligne + 1), 0);
+  return (
+    <div class="cal-semaine" style={{ gridTemplateRows: `var(--haut-num) repeat(${n}, var(--haut-barre)) minmax(var(--haut-bas), auto)` }}>
+      {jours.map((x, i) => {
+        const liste = puces(x);
+        const horsMois = moisCourant ? x.slice(0, 7) !== moisCourant : false;
+        return (
+          <button class={`cal-jour${horsMois ? ' hors-mois' : ''}${x === jourJ ? ' aujourdhui' : ''}${x === choisi ? ' choisi' : ''}`}
+            style={{ gridColumn: `${i + 1}`, gridRow: '1 / -1' }}
+            aria-label={`${jourCourt(x, jourJ)}, ${liste.length} élément${liste.length > 1 ? 's' : ''}`} onClick={() => onChoisir(x)}>
+            <span class="cal-num">{Number(x.slice(8))}</span>
+            <span class="cal-espace" style={{ height: `calc(${n} * (var(--haut-barre) + 2px))` }} />
+            <span class="cal-points">{liste.slice(0, 4).map(it => <span class={`point ${it.type}${it.fait ? ' fait' : ''}`} style={style(it)} />)}</span>
+            <span class="cal-textes">{liste.slice(0, 2).map(it => <span class={`cal-texte ${it.type}`} style={style(it, true)} title={`${it.titre} · ${it.detail}`}>{it.titre}</span>)}{liste.length > 2 && <span class="cal-plus">+{liste.length - 2}</span>}</span>
+          </button>
+        );
+      })}
+      {travees.map(t => {
+        const c = couleurs.get(t.fenetre.costume.id) ?? 'var(--accent)';
+        const f = t.fenetre;
+        return (
+          <a class={`cal-barre${t.ouvre ? ' ouvre' : ''}${t.ferme ? ' ferme' : ''}${f.faite ? ' faite' : ''}`}
+            href={lienCostume(f.costume.id, bool(f.costume.suivi_planning) ? 'planning' : 'pieces')}
+            style={{ gridColumn: `${t.de + 1} / ${t.a + 2}`, gridRow: `${t.ligne + 2}`,
+              background: `color-mix(in srgb, ${c} 28%, var(--surface))`, color: `color-mix(in srgb, ${c} 60%, var(--encre))`, borderColor: c }}
+            title={`${f.costume.nom} — ${f.piece.nom} · du ${jourCourt(f.debut, jourJ)} au ${jourCourt(f.fin, jourJ)}`}>
+            <span class="cal-barre-texte">{f.costume.nom} — {f.piece.nom}</span>
+            {t.ferme && !f.faite && <span class="cal-barre-fin" aria-hidden="true">⚑</span>}
+          </a>
+        );
+      })}
+    </div>
   );
 }

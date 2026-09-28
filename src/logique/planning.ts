@@ -245,6 +245,54 @@ export function alertes(d: Donnees, jour: Jour, joursAvant = 14, joursRouge = 3)
   return res;
 }
 
+// ---------- Agenda : les pièces sur leur durée ----------
+
+/** Une pièce vue dans l'agenda : de son début à sa deadline, comme une barre du planning. */
+export interface FenetrePiece { piece: Ligne; costume: Ligne; debut: Jour; fin: Jour; faite: boolean }
+
+/**
+ * Les pièces dont la fenêtre croise [depuis, jusqua]. Sans début, la barre tient sur le jour de la
+ * deadline ; sans deadline propre, la dernière deadline de ses étapes en tient lieu.
+ */
+export function fenetresPieces(d: Donnees, depuis: Jour, jusqua: Jour, costumeFiltre?: string): FenetrePiece[] {
+  const res: FenetrePiece[] = [];
+  for (const c of costumes(d)) {
+    if (c.statut === 'archivé' || (costumeFiltre && c.id !== costumeFiltre)) continue;
+    for (const p of piecesDe(d, c.id)) {
+      const deadlines = pistesDe(d, p.id).map(x => lireJour(x.deadline)).filter(Boolean).sort();
+      const fin = lireJour(p.deadline) || deadlines[deadlines.length - 1] || '';
+      if (!fin) continue;
+      const debutPropre = lireJour(p.debut);
+      const debut = debutPropre && debutPropre <= fin ? debutPropre : fin;
+      if (fin < depuis || debut > jusqua) continue;
+      res.push({ piece: p, costume: c, debut, fin, faite: pieceTerminee(d, p.id) });
+    }
+  }
+  return res.sort((a, b) => a.debut.localeCompare(b.debut) || b.fin.localeCompare(a.fin));
+}
+
+/** Un morceau de barre sur une semaine, rangé dans la première ligne libre. */
+export interface Travee { fenetre: FenetrePiece; de: number; a: number; ligne: number; ouvre: boolean; ferme: boolean }
+
+/**
+ * Découpe les fenêtres sur la semaine qui commence le `lundi` (colonnes 0 à 6) et les range en lignes
+ * sans chevauchement : la première barre qui commence prend la première ligne libre.
+ */
+export function traveesSemaine(fenetres: FenetrePiece[], lundi: Jour): Travee[] {
+  const dimanche = ajouterJours(lundi, 6);
+  const lignes: number[] = []; // dernière colonne occupée par ligne
+  const res: Travee[] = [];
+  for (const f of fenetres) {
+    if (f.fin < lundi || f.debut > dimanche) continue;
+    const de = f.debut < lundi ? 0 : ecartJours(lundi, f.debut);
+    const a = f.fin > dimanche ? 6 : ecartJours(lundi, f.fin);
+    let ligne = lignes.findIndex(fin => fin < de);
+    if (ligne === -1) { ligne = lignes.length; lignes.push(a); } else lignes[ligne] = a;
+    res.push({ fenetre: f, de, a, ligne, ouvre: f.debut >= lundi, ferme: f.fin <= dimanche });
+  }
+  return res;
+}
+
 // ---------- Agenda ----------
 
 export type TypeAgenda = 'deadline' | 'evenement' | 'tache';

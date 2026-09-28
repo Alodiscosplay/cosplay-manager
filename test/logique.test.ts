@@ -4,7 +4,7 @@ import { lireJourSaisi, jourSaisi } from '../src/logique/dates';
 import { avancement, avancementPiece, formatPct } from '../src/logique/avancement';
 import { aFaire, etapeDisponible, creeraitBoucle, texteAttente, champsStatutPiece } from '../src/logique/disponibilite';
 import { activationsDuJour } from '../src/logique/activation';
-import { planifierCostume, debutEtape, retardPiece, finPlanifiable, alertes } from '../src/logique/planning';
+import { planifierCostume, debutEtape, retardPiece, finPlanifiable, alertes, fenetresPieces, traveesSemaine } from '../src/logique/planning';
 import { effacerPlanning } from '../src/store/operations';
 import { quantiteNombre, regrouperAchats, budgetCostume, totalCommande, regrouperParNom, texteQuantites } from '../src/logique/budget';
 import { analyserListe, versTexte, modeleVersTexte, texteVersModele } from '../src/logique/collerListe';
@@ -280,6 +280,25 @@ describe('Planifier', () => {
     d.Pistes[ids['Jupe/Coupe']].deadline = '2026-09-30';
     d.Pistes[ids['Jupe/Montage']].deadline = '2026-10-05';
     expect(retardPiece(d, ids.Jupe, '2026-10-01').enRetard.map(p => p.nom)).toEqual(['Coupe']);
+  });
+});
+
+describe('Agenda : les pièces sur leur durée', () => {
+  it('découpe les fenêtres par semaine et les range sans chevauchement', () => {
+    const { d, ids } = construire({ pieces: [
+      { nom: 'Corset', champs: { debut: '2026-09-28', deadline: '2026-10-07' }, pistes: [{ nom: '', etapes: ['a'] }] },
+      { nom: 'Jupe', champs: { debut: '2026-09-30', deadline: '2026-10-02' }, pistes: [{ nom: '', etapes: ['b'] }] },
+      { nom: 'Perruque', champs: { debut: '2026-10-03', deadline: '2026-10-04' }, pistes: [{ nom: '', etapes: ['c'] }] },
+      { nom: 'Chaussures', pistes: [{ nom: '', etapes: ['d'] }] },  // sans date : absente
+    ] });
+    const f = fenetresPieces(d, '2026-09-28', '2026-10-04');
+    expect(f.map(x => x.piece.nom)).toEqual(['Corset', 'Jupe', 'Perruque']);
+    const t = traveesSemaine(f, '2026-09-28');  // lundi 28 sept. → dimanche 4 oct.
+    const par = Object.fromEntries(t.map(x => [x.fenetre.piece.nom, x]));
+    expect([par.Corset.de, par.Corset.a, par.Corset.ferme]).toEqual([0, 6, false]); // continue la semaine suivante
+    expect([par.Jupe.de, par.Jupe.a, par.Jupe.ligne]).toEqual([2, 4, 1]);          // sous le corset
+    expect(par.Perruque.ligne).toBe(1);                                             // la jupe est finie, la ligne se libère
+    expect(ids.costume).toBeTruthy();
   });
 });
 
