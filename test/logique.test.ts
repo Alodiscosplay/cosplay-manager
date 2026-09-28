@@ -346,13 +346,15 @@ describe('achats et budget', () => {
     const f = (id: string, costume_id: string, prix_unitaire: string) => ({ id, maj: '', supprime: '', costume_id, libelle: id, quantite: '1', prix_unitaire, fournisseur_id: 'F', statut: 'à acheter' });
     d.Fournitures.a1 = f('a1', 'A', '10'); d.Fournitures.a2 = f('a2', 'A', '5'); d.Fournitures.a3 = f('a3', 'A', ''); d.Fournitures.b1 = f('b1', 'B', '20');
     d = appliquer(d, creerCommandes(d, ['a1', 'a2', 'a3', 'b1'], '2026-10-01', { F: '6' }));
-    // 6 € pour 4 fournitures : 1,50 € chacune, 3 pour Bridget et 1 pour Furina
-    expect(budgetCostume(d, 'A')).toMatchObject({ total: 19.5, prevu: 19.5, sansPrix: 1 });
+    // 6 € pour 4 fournitures : 1,50 € chacune, 3 pour Bridget et 1 pour Furina.
+    // Créer la commande, c'est la passer : tout est aussitôt « commandé », port compris.
+    expect(budgetCostume(d, 'A')).toMatchObject({ total: 19.5, prevu: 0, commande: 19.5, sansPrix: 1 });
     expect(budgetCostume(d, 'B')).toMatchObject({ total: 21.5 });
-    // commande passée : la part de port suit la fourniture dans « commandé »
+    expect(d.Commandes[d.Fournitures.a1.commande_id].statut).toBe('passée');
+    // à la réception, la part de port suit la fourniture dans « reçu »
     const cmd = d.Fournitures.a1.commande_id;
-    d = appliquer(d, changerStatutCommande(d, cmd, 'passée', '2026-10-02'));
-    expect(budgetCostume(d, 'A')).toMatchObject({ prevu: 0, commande: 19.5 });
+    d = appliquer(d, changerStatutCommande(d, cmd, 'reçue', '2026-10-05'));
+    expect(budgetCostume(d, 'A')).toMatchObject({ commande: 0, recu: 19.5 });
   });
 
   it('la liste de courses se groupe par fournisseur ou par costume (dans l’ordre des costumes, « sans » en dernier)', () => {

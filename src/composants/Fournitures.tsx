@@ -71,7 +71,7 @@ export function LigneFourniture({ f, afficherCostume, afficherFournisseur, selec
       {m !== null && <span class="montant">{euros(m)}</span>}
       {f.lien && <a class="bouton-icone petit" href={f.lien} target="_blank" rel="noopener noreferrer" aria-label={`Ouvrir le lien de ${f.libelle}`}><Icone nom="lien" taille={16} /></a>}
       {sansStatut
-        ? <span class="etat-fourniture">{statut}</span>
+        ? <span class={`etat-fourniture ${TON_STATUT[statut] ?? 'gris'}`}>{statut}</span>
         : <ChoixStatut valeur={statut} label={`Statut de ${f.libelle}${detail ? ` (${titre})` : ''}`} onChange={v => changerStatut([f.id], v)} />}
     </li>
   );
@@ -110,7 +110,7 @@ export function GroupeFourniture({ g, afficherCostume, afficherFournisseur, sele
         </div>
         {g.montant > 0 && <span class="montant">{euros(g.montant)}</span>}
         {sansStatut
-          ? <span class="etat-fourniture">{statuts.length === 1 ? statuts[0] : 'mixte'}</span>
+          ? <span class={`etat-fourniture ${statuts.length === 1 ? TON_STATUT[statuts[0]] ?? 'gris' : 'gris'}`}>{statuts.length === 1 ? statuts[0] : 'mixte'}</span>
           : <ChoixStatut valeur={statuts.length === 1 ? statuts[0] : 'mixte'} label={`Statut de tout « ${g.libelle} »`}
               onChange={v => changerStatut(g.lignes.map(f => f.id), v)} />}
       </div>

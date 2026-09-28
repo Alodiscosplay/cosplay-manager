@@ -219,9 +219,10 @@ export function creerCommandes(d: Donnees, fournitureIds: string[], jour: Jour, 
   }
   const ch: Changement[] = [];
   for (const [fournisseurId, ids] of parFournisseur) {
-    const cmd = creer('Commandes', { fournisseur_id: fournisseurId, statut: 'à passer', date: jour, frais_port: ports[fournisseurId] ?? '' });
+    // Créée = passée : ses fournitures sont aussitôt « commandé ».
+    const cmd = creer('Commandes', { fournisseur_id: fournisseurId, statut: 'passée', date: jour, frais_port: ports[fournisseurId] ?? '' });
     ch.push(cmd);
-    for (const id of ids) ch.push({ table: 'Fournitures', id, champs: { commande_id: cmd.id } });
+    for (const id of ids) ch.push({ table: 'Fournitures', id, champs: { commande_id: cmd.id, statut: 'commandé' } });
   }
   return ch;
 }

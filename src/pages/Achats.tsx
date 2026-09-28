@@ -56,7 +56,7 @@ function ListeCourses() {
   const commander = (ports: Record<string, string>) => {
     const ch = creerCommandes(d, [...selection], jour.value, ports);
     const n = ch.filter(c => c.table === 'Commandes').length;
-    faire(ch, `${n} commande${n > 1 ? 's' : ''} créée${n > 1 ? 's' : ''}`);
+    faire(ch, `${n} commande${n > 1 ? 's' : ''} passée${n > 1 ? 's' : ''}`);
     setSelection(new Set());
     setPreparer(false);
     location.hash = '#/achats/commandes';
@@ -170,7 +170,8 @@ function Commandes() {
           const lignes = lignesCommande(d, c.id);
           const t = totalCommande(d, c.id);
           const nomsCostumes = [...new Set(lignes.map(f => ligne(d, 'Costumes', f.costume_id)?.nom).filter(Boolean))];
-          const idx = STATUTS_COMMANDE.indexOf(c.statut as typeof STATUTS_COMMANDE[number]);
+          const recue = c.statut === 'reçue';
+          const idx = recue ? 1 : 0; // une ancienne commande « à passer » se lit comme passée
           return (
             <article class="carte-commande">
               <header>
@@ -195,9 +196,8 @@ function Commandes() {
                 <strong>{euros(t.total)}</strong>{t.sansPrix > 0 && <span class="petit-texte"> ({t.sansPrix} sans prix)</span>}
               </p>
               <div class="ligne-actions">
-                {c.statut === 'à passer' && <button class="bouton principal" onClick={() => faire(changerStatutCommande(d, c.id, 'passée', jour.value), 'Commande passée')}>Marquer passée</button>}
-                {c.statut === 'passée' && <button class="bouton principal" onClick={() => faire(changerStatutCommande(d, c.id, 'reçue', jour.value), 'Commande reçue')}>Marquer reçue</button>}
-                {c.statut === 'reçue' && <Puce ton="vert">reçue</Puce>}
+                {!recue && <button class="bouton principal" onClick={() => faire(changerStatutCommande(d, c.id, 'reçue', jour.value), 'Commande reçue')}>Confirmer la réception</button>}
+                {recue && <Puce ton="vert">reçue</Puce>}
               </div>
             </article>
           );
@@ -217,7 +217,7 @@ function EditeurCommande({ id, onFermer }: { id: string; onFermer: () => void })
       <Champ label="Fournisseur">
         <Selection label="Fournisseur" valeur={c.fournisseur_id ?? ''} options={[['', '—'], ...tous(d, 'Fournisseurs').map(f => [f.id, f.nom] as [string, string])]} onChange={v => m({ fournisseur_id: v })} />
       </Champ>
-      <Champ label="Statut"><Selection label="Statut" valeur={c.statut} options={STATUTS_COMMANDE} onChange={v => faire(changerStatutCommande(d, id, v, jour.value))} /></Champ>
+      <Champ label="Statut"><Selection label="Statut" valeur={c.statut === 'reçue' ? 'reçue' : 'passée'} options={STATUTS_COMMANDE} onChange={v => faire(changerStatutCommande(d, id, v, jour.value))} /></Champ>
       <Champ label="Frais de port (€)"><Texte type="number" valeur={c.frais_port ?? ''} onValider={v => m({ frais_port: v })} /></Champ>
       <Champ label="Notes"><Texte multiligne valeur={c.notes ?? ''} onValider={v => m({ notes: v })} /></Champ>
     </Feuille>

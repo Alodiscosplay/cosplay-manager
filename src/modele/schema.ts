@@ -57,7 +57,8 @@ export const STATUTS_COSTUME = ['projet', 'en attente', 'en cours', 'en pause', 
 // « à venir » n'existe plus (redondant avec « en pause ») ; une ancienne valeur « à venir » se lit « en pause ».
 export const STATUTS_PIECE = ['en cours', 'en pause', 'terminée'] as const;
 export const STATUTS_FOURNITURE = ['à acheter', 'commandé', 'reçu', 'déjà là'] as const;
-export const STATUTS_COMMANDE = ['à passer', 'passée', 'reçue'] as const;
+// Une commande se crée au moment où on la passe : plus d'état « à passer » (les anciennes sont lues comme passées).
+export const STATUTS_COMMANDE = ['passée', 'reçue'] as const;
 
 /** Durée → poids. Plus le poids est grand, plus l'étape compte dans le %. */
 export const DUREES = { 'rapide': 1, 'normal': 2, 'long': 4, 'très long': 8 } as const;
