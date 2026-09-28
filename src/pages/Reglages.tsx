@@ -1,11 +1,12 @@
 import { useState } from 'preact/hooks';
-import { donnees, mode, sync, synchroniser, faire, demarrer, quitter, reinitialiserDemo, emplacement } from '../store/store';
+import { donnees, mode, sync, synchroniser, faire, demarrer, quitter, reinitialiserDemo, emplacement, photosSurDrive, reglerPhotosDrive, dossierPhotos, reglerDossierPhotos } from '../store/store';
 import { tous, ordreSuivant, ligne } from '../logique/acces';
 import { analyserListe, compter, modeleVersTexte, texteVersModele, type PisteTexte } from '../logique/collerListe';
 import { NOMS_TABLES, DUREES, NOMS_DUREES, type NomTable, type Ligne, type Duree } from '../modele/schema';
 import { restaurer, nouvelId, supprimer, changementsImport } from '../store/operations';
 import { connecter, deconnecter, emailConnu, googleConfigure } from '../sync/google';
 import { placePhotos, urlClasseur } from '../sync/drive';
+import { choisirDossier, pickerConfigure } from '../sync/picker';
 import { Feuille, Champ, Confirmer, telechargerBlob } from '../composants/base';
 import { Icone } from '../composants/Icone';
 import { jourCourt } from '../logique/dates';
@@ -15,6 +16,7 @@ export function PageReglages() {
     <div class="page">
       <header class="page-tete"><h1>Réglages</h1></header>
       <Compte />
+      <Photos />
       <Modeles />
       <Corbeille />
       <Sauvegarde />
@@ -77,6 +79,57 @@ function Compte() {
       </div>
       <p class="petit-texte">Archiver un costume terminé libère la place de ses photos.</p>
       <button class="bouton" onClick={async () => { deconnecter(); await quitter(); }}>Se déconnecter</button>
+    </section>
+  );
+}
+
+/**
+ * Les photos vivent sur l'appareil ; on peut en envoyer une copie sur son Drive, dans le dossier de
+ * son choix (Drive plein, partage avec d'autres outils, ou simple préférence).
+ */
+function Photos() {
+  const d = donnees.value;
+  const actif = photosSurDrive.value;
+  const dossier = dossierPhotos.value;
+  const [erreur, setErreur] = useState('');
+  const locales = new Set<string>();
+  for (const p of Object.values(d.Photos)) if (p.supprime !== 'oui' && p.supprime !== 'purge' && p.drive_id?.startsWith('local:')) locales.add(p.drive_id);
+  for (const c of Object.values(d.Costumes)) if (c.image_ref?.startsWith('local:')) locales.add(c.image_ref);
+  const choisir = async () => {
+    setErreur('');
+    try {
+      const jeton = await connecter(true);
+      const choix = await choisirDossier(jeton);
+      if (choix) await reglerDossierPhotos(choix);
+    } catch (e) { setErreur((e as Error).message); }
+  };
+  return (
+    <section class="carte-reglage">
+      <h2>Photos</h2>
+      <p class="petit-texte">Tes photos sont réduites puis gardées <strong>sur cet appareil</strong>. Elles n’occupent pas de place sur ton Drive.</p>
+      <label class="interrupteur">
+        <input type="checkbox" checked={actif} onChange={e => void reglerPhotosDrive((e.target as HTMLInputElement).checked)} />
+        <span>Envoyer aussi une copie sur mon Google Drive</span>
+      </label>
+      {actif && (
+        <>
+          <p class="petit-texte">Dossier : <strong>{dossier ? dossier.nom : 'Photos (dossier de l’appli)'}</strong></p>
+          <div class="ligne-actions">
+            <button class="bouton" disabled={mode.value !== 'google' || !pickerConfigure()} onClick={() => void choisir()}>
+              <Icone nom="nuage" />Choisir un dossier…
+            </button>
+            {dossier && <button class="bouton" onClick={() => void reglerDossierPhotos(null)}>Revenir au dossier de l’appli</button>}
+          </div>
+          {mode.value === 'google' && !pickerConfigure() && <p class="petit-texte">Le choix du dossier sera disponible une fois l’appli entièrement configurée auprès de Google.</p>}
+          <p class="petit-texte">Tes autres appareils retrouvent alors les photos. Les photos déjà envoyées restent sur le Drive si tu décoches.</p>
+        </>
+      )}
+      {!actif && <p class="petit-texte">Sans copie, tes autres appareils ne verront pas les photos, et elles disparaîtraient si tu effaçais les données du navigateur. Archive tes costumes terminés pour les garder sur ton ordinateur.</p>}
+      {locales.size > 0 && actif && (
+        <p class="petit-texte">{locales.size} photo{locales.size > 1 ? 's partiront' : ' partira'} sur le Drive à la prochaine synchro{mode.value !== 'google' ? ' (une fois connecté à Google)' : ''}.</p>
+      )}
+      {mode.value !== 'google' && <p class="petit-texte">En mode démo, rien n’est envoyé : le réglage prendra effet une fois connecté à Google.</p>}
+      {erreur && <p class="erreur">{erreur}</p>}
     </section>
   );
 }

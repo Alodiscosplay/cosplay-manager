@@ -9,18 +9,25 @@ import { MODELES_PAR_DEFAUT } from '../modele/modelesParDefaut';
 import { type Pendants, clePendant, lireDistant, fusionner, ecrituresAFaire } from '../sync/fusion';
 import { lireClasseur, ecrireLignes } from '../sync/sheets';
 import { trouverOuCreer, envoyerPhoto, type Emplacement } from '../sync/drive';
+import { type DossierDrive } from '../sync/picker';
 import { ErreurConnexion, ErreurReseau, jetonValide, emailConnu } from '../sync/google';
 import { donneesDemo } from '../demo/donneesDemo';
 
 export type Mode = 'demo' | 'google';
 const CLE_MODE = 'cosplay-planner.mode';
 
-interface Meta { pendants: Pendants; emplacement?: Emplacement; derniere?: string }
+// Les photos vivent sur l'appareil ; `photosDrive` (coché par l'utilisatrice) en envoie une copie sur le
+// Drive, dans `dossierPhotos` s'il est choisi, sinon dans le dossier Photos de l'appli.
+interface Meta { pendants: Pendants; emplacement?: Emplacement; derniere?: string; photosDrive?: boolean; dossierPhotos?: DossierDrive }
 
 export const mode = signal<Mode | null>(lireMode());
 export const donnees = signal<Donnees>(donneesVides());
 export const pret = signal(false);
 export const jour = signal(aujourdhui());
+/** Une copie des photos part-elle sur le Drive ? Non par défaut. Réglage propre à cet appareil. */
+export const photosSurDrive = signal(false);
+/** Dossier du Drive choisi pour les photos (sinon le dossier Photos de l'appli). */
+export const dossierPhotos = signal<DossierDrive | null>(null);
 
 export type EtatSync = 'local' | 'ok' | 'envoi' | 'hors-ligne' | 'reconnexion' | 'erreur';
 export const sync = signal<{ etat: EtatSync; message?: string; derniere?: string; attente: number }>({ etat: 'local', attente: 0 });
@@ -46,6 +53,8 @@ export async function demarrer(m: Mode): Promise<void> {
   base = await ouvrirBase(nomBase);
   const d = await lireKv<Donnees>(base, 'donnees');
   meta = (await lireKv<Meta>(base, 'meta')) ?? { pendants: {} };
+  photosSurDrive.value = meta.photosDrive === true;
+  dossierPhotos.value = meta.dossierPhotos ?? null;
   const complet = donneesVides();
   if (d) for (const t of NOMS_TABLES) complet[t] = d[t] ?? {};
   donnees.value = complet;
@@ -57,6 +66,7 @@ export async function demarrer(m: Mode): Promise<void> {
   appliquerActivations();
   majEtatSync();
   pret.value = true;
+  if (!photosSurDrive.value) protegerPhotosLocales();
   if (m === 'google') void synchroniser();
   else await enregistrer();
 }
@@ -199,9 +209,33 @@ function semerModeles(): void {
     champs: { nom: m.nom, contenu: m.contenu, ordre: String(i + 1) } })));
 }
 
+/**
+ * Envoyer ou non une copie des photos sur le Drive. Coupé, rien ne part (ce qui est déjà envoyé y
+ * reste) ; allumé, les photos gardées sur l'appareil partent à la synchro suivante.
+ */
+export async function reglerPhotosDrive(v: boolean): Promise<void> {
+  meta.photosDrive = v;
+  photosSurDrive.value = v;
+  await enregistrer();
+  if (v) planifierSync(200);
+}
+
+/** Le dossier du Drive où partent les photos ; null = le dossier Photos de l'appli. */
+export async function reglerDossierPhotos(d: DossierDrive | null): Promise<void> {
+  meta.dossierPhotos = d ?? undefined;
+  dossierPhotos.value = d;
+  await enregistrer();
+}
+
+/** Des photos qui ne vivent que sur l'appareil : on demande au navigateur de ne pas les effacer. */
+export function protegerPhotosLocales(): void {
+  void navigator.storage?.persist?.().catch(() => false);
+}
+
 /** Les photos prises hors-ligne (id « local:… ») partent vers le Drive avant les lignes. */
 async function envoyerPhotosEnAttente(): Promise<void> {
-  if (!base || !meta.emplacement) return;
+  if (!base || !meta.emplacement || meta.photosDrive !== true) return;
+  const dossier = meta.dossierPhotos?.id ?? meta.emplacement.photosId;
   const d = donnees.value;
   const locales = new Set<string>();
   for (const p of Object.values(d.Photos)) if (p.drive_id?.startsWith('local:') && vivant(p)) locales.add(p.drive_id);
@@ -209,7 +243,7 @@ async function envoyerPhotosEnAttente(): Promise<void> {
   for (const idLocal of locales) {
     const blob = await lirePhoto(base, idLocal);
     if (!blob) continue;
-    const idDrive = await envoyerPhoto(blob, `${idLocal.slice(6)}.jpg`, meta.emplacement.photosId);
+    const idDrive = await envoyerPhoto(blob, `${idLocal.slice(6)}.jpg`, dossier);
     await ecrirePhoto(base, idDrive, blob);
     const ch: Changement[] = [];
     for (const p of Object.values(donnees.value.Photos)) if (p.drive_id === idLocal) ch.push({ table: 'Photos', id: p.id, champs: { drive_id: idDrive } });

@@ -520,6 +520,8 @@ dialog.feuille::backdrop { background: rgb(20 12 28 / 45%); }
 .point.evenement { background: var(--accent); }
 .point.tache { background: var(--orange); }
 .point.fait { opacity: .35; }
+.bandeau-info { display: flex; align-items: center; gap: 8px; margin: 0; padding: 8px 12px; border-radius: 10px; background: var(--accent-fond); color: var(--encre); font-size: .88rem; }
+.bandeau-info .icone { color: var(--accent); flex: none; }
 .filtre-statuts { display: flex; flex-wrap: wrap; gap: 6px; }
 .puce-filtre { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border: 1px solid var(--bord); border-radius: 99px; font-size: .85rem; color: var(--doux); cursor: pointer; background: var(--surface); }
 .puce-filtre input { position: absolute; opacity: 0; width: 0; height: 0; }

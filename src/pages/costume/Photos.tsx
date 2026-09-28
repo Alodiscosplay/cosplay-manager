@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'preact/hooks';
-import { donnees, faire, jour } from '../../store/store';
+import { donnees, faire, jour, photosSurDrive } from '../../store/store';
 import { photosDe, piecesDe, pistesDe, etapesDePiste, ligne } from '../../logique/acces';
 import { jourCourt } from '../../logique/dates';
 import { bool, txtBool, OUI, type Ligne } from '../../modele/schema';
@@ -60,6 +60,9 @@ export function OngletPhotos({ costume }: { costume: Ligne }) {
 
   return (
     <section class="onglet-photos">
+      {!photosSurDrive.value && (
+        <p class="bandeau-info"><Icone nom="info" taille={16} /><span>Tes photos sont stockées sur cet appareil. Pour en envoyer une copie sur ton Drive : <a href="#/reglages">Réglages › Photos</a>.</span></p>
+      )}
       <h3 class="titre-section">Photos de référence</h3>
       <p class="petit-texte">Le personnage, les détails du costume d'origine, les croquis : ce qui sert de modèle. Elles ne vont pas dans le dossier WIP.</p>
       <div class="barre-outils">
