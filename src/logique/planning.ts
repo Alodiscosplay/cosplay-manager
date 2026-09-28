@@ -225,8 +225,9 @@ export function alertes(d: Donnees, jour: Jour, joursAvant = 14, joursRouge = 3)
       const dp = lireJour(p.deadline);
       if (dp && proche(dp)) res.push({ niveau: niveau(dp), costumeId: c.id,
         texte: dp < jour ? `${c.nom} › ${p.nom} : deadline dépassée (${jourCourt(dp, jour)})` : `${c.nom} › ${p.nom} : à finir pour le ${jourCourt(dp, jour)}` });
+      // Une pièce déjà hors délai a son alerte rouge : ses étapes en retard n'en rajoutent pas une.
       const r = retardPiece(d, p.id, jour);
-      if (r.enRetard.length) res.push({ niveau: 'orange', costumeId: c.id,
+      if (r.enRetard.length && !(dp && dp < jour)) res.push({ niveau: 'orange', costumeId: c.id,
         texte: `${c.nom} › ${p.nom} : ${r.enRetard.length} étape${r.enRetard.length > 1 ? 's' : ''} en retard sur le planning` });
       for (const pi of pistesDe(d, p.id)) {
         if (etapesDePiste(d, pi.id).every(e => bool(e.fait))) continue;

@@ -3,7 +3,7 @@ import { donnees, jour, faire } from '../store/store';
 import { costumes, piecesDe, ligne } from '../logique/acces';
 import { avancementCostume } from '../logique/avancement';
 import { statutCostume, pieceTerminee } from '../logique/disponibilite';
-import { deadlineCostume, alertes } from '../logique/planning';
+import { deadlineCostume } from '../logique/planning';
 import { relatif, jourCourt } from '../logique/dates';
 import { creerCostume } from '../store/operations';
 import { lienCostume } from '../routeur';
@@ -24,7 +24,6 @@ export function Accueil() {
   const [creation, setCreation] = useState(false);
   const liste = costumes(d).filter(c => c.statut !== 'archivé');
   const nbArchives = costumes(d).length - liste.length;
-  const al = alertes(d, j);
 
   return (
     <div class="page">
@@ -33,15 +32,6 @@ export function Accueil() {
         <IndicateurSync />
         <button class="bouton principal" onClick={() => setCreation(true)}><Icone nom="plus" />Nouveau costume</button>
       </header>
-
-      {al.length > 0 && (
-        <section class="alertes" aria-label="Alertes">
-          {al.slice(0, 5).map(a => (
-            <a class={`alerte ${a.niveau}`} href={lienCostume(a.costumeId)}><Icone nom="alerte" taille={16} />{a.texte}</a>
-          ))}
-          {al.length > 5 && <p class="petit-texte">… et {al.length - 5} autre{al.length > 6 ? 's' : ''}</p>}
-        </section>
-      )}
 
       {liste.length === 0 && (
         <Vide icone="boite" titre="Aucun costume pour l'instant">

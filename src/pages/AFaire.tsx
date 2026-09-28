@@ -1,6 +1,7 @@
 import { useState } from 'preact/hooks';
 import { donnees, jour, faire } from '../store/store';
 import { aFaire, tailleRepli, texteAttente, type ElementAFaire } from '../logique/disponibilite';
+import { alertes } from '../logique/planning';
 import { costumes, ligne, tous, ordreSuivant } from '../logique/acces';
 import { jourCourt, lireJour, relatif } from '../logique/dates';
 import { bool, txtBool, type Ligne } from '../modele/schema';
@@ -14,6 +15,7 @@ export function PageAFaire() {
   const d = donnees.value;
   const j = jour.value;
   const r = aFaire(d, j);
+  const al = alertes(d, j);
   const [tache, setTache] = useState<string | null>(null);
   const [nouvelle, setNouvelle] = useState('');
 
@@ -51,6 +53,15 @@ export function PageAFaire() {
         <Vide icone="afaire" titre="Rien à faire pour l'instant">
           <p>Mets un costume « en cours », puis une de ses pièces « en cours » : sa prochaine sous-étape apparaîtra ici.</p>
         </Vide>
+      )}
+
+      {/* Les rappels d'échéances : ce qui approche ou a dépassé sa deadline. */}
+      {al.length > 0 && (
+        <section class="alertes" aria-label="Rappels">
+          {al.map(x => (
+            <a class={`alerte ${x.niveau}`} href={lienCostume(x.costumeId)}><Icone nom="alerte" taille={16} />{x.texte}</a>
+          ))}
+        </section>
       )}
 
       {r.repli.costumesSansPieceEnCours.map(c => (
