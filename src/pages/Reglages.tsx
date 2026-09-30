@@ -1,9 +1,9 @@
 import { useState } from 'preact/hooks';
 import { donnees, mode, sync, synchroniser, faire, demarrer, quitter, reinitialiserDemo, emplacement, photosSurDrive, reglerPhotosDrive, dossierPhotos, reglerDossierPhotos } from '../store/store';
-import { tous, ordreSuivant, ligne } from '../logique/acces';
+import { tous, ordreSuivant } from '../logique/acces';
 import { analyserListe, compter, modeleVersTexte, texteVersModele, type PisteTexte } from '../logique/collerListe';
-import { NOMS_TABLES, DUREES, NOMS_DUREES, type NomTable, type Ligne, type Duree } from '../modele/schema';
-import { restaurer, nouvelId, supprimer, changementsImport } from '../store/operations';
+import { DUREES, NOMS_DUREES, type Duree } from '../modele/schema';
+import { nouvelId, supprimer, changementsImport } from '../store/operations';
 import { connecter, deconnecter, emailConnu, googleConfigure } from '../sync/google';
 import { placePhotos, urlClasseur } from '../sync/drive';
 import { choisirDossier, pickerConfigure } from '../sync/picker';
@@ -18,7 +18,6 @@ export function PageReglages() {
       <Compte />
       <Photos />
       <Modeles />
-      <Corbeille />
       <Sauvegarde />
       <section class="carte-reglage">
         <h2>À propos</h2>
@@ -179,7 +178,7 @@ function EditeurModele({ id, onFermer }: { id: string; onFermer: () => void }) {
 
   return (
     <Feuille titre="Modèle" large onFermer={enregistrer} pied={<>
-      <button class="bouton danger" onClick={() => { faire(supprimer('Modeles', id), `Modèle « ${m.nom} » supprimé`); onFermer(); }}>Supprimer</button>
+      <button class="bouton danger" onClick={() => { faire(supprimer(donnees.value, 'Modeles', id), `Modèle « ${m.nom} » supprimé`); onFermer(); }}>Supprimer</button>
       <button class="bouton principal" onClick={enregistrer}>Terminé</button>
     </>}>
       <Champ label="Nom du modèle"><input value={nom} onInput={e => setNom((e.target as HTMLInputElement).value)} /></Champ>
@@ -232,41 +231,6 @@ function EditeurModele({ id, onFermer }: { id: string; onFermer: () => void }) {
           onChange={e => { const lues = texteVersModele((e.target as HTMLTextAreaElement).value); if (lues.length) setEtapes(lues); }} />
       </details>
     </Feuille>
-  );
-}
-
-const TITRES: Partial<Record<NomTable, string>> = {
-  Costumes: 'Costume', Pieces: 'Pièce', Pistes: 'Étape', Etapes: 'Sous-étape', Fournitures: 'Fourniture', Fournisseurs: 'Fournisseur',
-  Commandes: 'Commande', Taches: 'Tâche', Photos: 'Photo', Evenements: 'Événement', Modeles: 'Modèle',
-};
-
-function Corbeille() {
-  const d = donnees.value;
-  const [ouverte, setOuverte] = useState(false);
-  const elements: { table: NomTable; l: Ligne }[] = [];
-  for (const t of NOMS_TABLES) for (const l of Object.values(d[t])) if (l.supprime === 'oui') elements.push({ table: t, l });
-  elements.sort((a, b) => (b.l.maj || '').localeCompare(a.l.maj || ''));
-  const nom = (t: NomTable, l: Ligne) => l.nom || l.titre || l.libelle || l.legende || (t === 'Commandes' ? ligne(d, 'Fournisseurs', l.fournisseur_id)?.nom ?? 'commande' : '(sans nom)');
-  return (
-    <section class="carte-reglage">
-      <h2>Corbeille</h2>
-      <p class="petit-texte">Ce qui a été supprimé reste restaurable. Restaurer un costume ramène aussi ses pièces, étapes et sous-étapes.</p>
-      {!elements.length ? <p class="petit-texte">Vide.</p> : (
-        <>
-          <button class="bouton" onClick={() => setOuverte(!ouverte)}>{ouverte ? 'Masquer' : `Voir (${elements.length})`}</button>
-          {ouverte && (
-            <ul class="liste-simple">
-              {elements.slice(0, 100).map(({ table, l }) => (
-                <li>
-                  <span class="petit-texte">{TITRES[table]}</span> {nom(table, l)}
-                  <button class="bouton petit" onClick={() => faire(restaurer(table, l.id), 'Restauré')}>Restaurer</button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </>
-      )}
-    </section>
   );
 }
 

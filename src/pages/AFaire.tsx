@@ -183,7 +183,7 @@ function EditeurTache({ id, onFermer }: { id: string; onFermer: () => void }) {
   const m = (champs: Record<string, string>) => faire([{ table: 'Taches', id, champs }]);
   return (
     <Feuille titre="Tâche" onFermer={onFermer} pied={<>
-      <button class="bouton danger" onClick={() => { faire(supprimer('Taches', id), 'Tâche supprimée'); onFermer(); }}>Supprimer</button>
+      <button class="bouton danger" onClick={() => { faire(supprimer(donnees.value, 'Taches', id), 'Tâche supprimée'); onFermer(); }}>Supprimer</button>
       <button class="bouton principal" onClick={onFermer}>Terminé</button>
     </>}>
       <Champ label="Titre"><Texte valeur={t.titre} onValider={v => v && m({ titre: v })} /></Champ>

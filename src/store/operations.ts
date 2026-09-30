@@ -188,13 +188,75 @@ export function effacerPlanning(d: Donnees, pieceIds: string[]): Changement[] {
   return ch;
 }
 
-// ---------- Suppression douce, restauration, purge ----------
+// ---------- Suppression (définitive, pas de corbeille) ----------
 
-export function supprimer(table: NomTable, id: string): Changement[] {
-  return [{ table, id, champs: { supprime: OUI } }];
+/**
+ * Supprime une ligne pour de bon : elle est vidée (le Sheet garde une ligne marquée « purge » pour ne pas
+ * décaler les numéros), avec ce qui n'a pas de sens sans elle. Un costume emporte ses pièces, étapes,
+ * sous-étapes, fournitures et photos ; une pièce emporte ses étapes, mais ses fournitures et ses photos
+ * restent au costume (« hors pièce », « à trier »). Le bandeau « Annuler » rattrape une erreur de clic.
+ */
+export function supprimer(d: Donnees, table: NomTable, id: string): Changement[] {
+  const racine = d[table]?.[id];
+  if (!racine) return [];
+  const ch: Changement[] = [];
+  const vus = new Set<string>();
+  const vider = (t: NomTable, l: Ligne) => {
+    const k = `${t}/${l.id}`;
+    if (vus.has(k) || l.supprime === 'purge') return;
+    vus.add(k);
+    ch.push(purger(t, l));
+  };
+  const retoucher = (t: NomTable, l: Ligne, champs: Record<string, string>) => {
+    if (!vus.has(`${t}/${l.id}`)) ch.push({ table: t, id: l.id, champs });
+  };
+  const viderPiste = (p: Ligne) => {
+    vider('Pistes', p);
+    for (const e of Object.values(d.Etapes)) if (e.piste_id === p.id) vider('Etapes', e);
+  };
+  const viderPiece = (p: Ligne) => {
+    vider('Pieces', p);
+    for (const pi of Object.values(d.Pistes)) if (pi.piece_id === p.id) viderPiste(pi);
+    for (const e of Object.values(d.Etapes)) if (e.piece_id === p.id) vider('Etapes', e);
+  };
+  switch (table) {
+    case 'Costumes':
+      vider('Costumes', racine);
+      for (const p of Object.values(d.Pieces)) if (p.costume_id === id) viderPiece(p);
+      for (const f of Object.values(d.Fournitures)) if (f.costume_id === id) vider('Fournitures', f);
+      for (const ph of Object.values(d.Photos)) if (ph.costume_id === id) vider('Photos', ph);
+      for (const t of Object.values(d.Taches)) if (t.costume_id === id) retoucher('Taches', t, { costume_id: '' });
+      break;
+    case 'Pieces':
+      viderPiece(racine);
+      for (const f of Object.values(d.Fournitures)) {
+        const ps = liste(f.piece_id);
+        if (ps.includes(id)) retoucher('Fournitures', f, { piece_id: txtListe(ps.filter(x => x !== id)) });
+      }
+      for (const ph of Object.values(d.Photos)) if (ph.piece_id === id) retoucher('Photos', ph, { piece_id: '', piste_id: '', etape_id: '' });
+      break;
+    case 'Pistes':
+      viderPiste(racine);
+      for (const ph of Object.values(d.Photos)) if (ph.piste_id === id) retoucher('Photos', ph, { piste_id: '', etape_id: '' });
+      break;
+    case 'Etapes':
+      vider('Etapes', racine);
+      for (const ph of Object.values(d.Photos)) if (ph.etape_id === id) retoucher('Photos', ph, { etape_id: '' });
+      break;
+    default:
+      vider(table, racine);
+  }
+  return ch;
 }
-export function restaurer(table: NomTable, id: string): Changement[] {
-  return [{ table, id, champs: { supprime: '' } }];
+
+/**
+ * Ce qu'avait laissé l'ancienne corbeille (lignes marquées « oui ») : supprimé pour de bon, avec
+ * la même cascade. Joué au démarrage et après chaque synchro.
+ */
+export function viderAnciensSupprimes(d: Donnees): Changement[] {
+  const ch: Changement[] = [];
+  for (const t of NOMS_TABLES) for (const l of Object.values(d[t])) if (l.supprime === OUI) ch.push(...supprimer(d, t, l.id));
+  return ch;
 }
 /** Purge : on vide la ligne (le Sheet garde une ligne marquée « purge » pour ne pas décaler les numéros). */
 export function purger(table: NomTable, ligneActuelle: Ligne): Changement {

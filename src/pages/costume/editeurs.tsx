@@ -28,7 +28,7 @@ export function EditeurEtape({ id, onFermer }: { id: string; onFermer: () => voi
 
   return (
     <Feuille titre="Sous-étape" onFermer={onFermer} pied={<>
-      <button class="bouton danger" onClick={() => { faire(supprimer('Etapes', id), `Étape « ${e.titre} » supprimée`); onFermer(); }}>Supprimer</button>
+      <button class="bouton danger" onClick={() => { faire(supprimer(donnees.value, 'Etapes', id), `Étape « ${e.titre} » supprimée`); onFermer(); }}>Supprimer</button>
       <button class="bouton principal" onClick={onFermer}>Terminé</button>
     </>}>
       <Champ label="Titre"><Texte valeur={e.titre} onValider={v => v && m({ titre: v })} /></Champ>
@@ -72,7 +72,7 @@ export function EditeurPiece({ id, onFermer }: { id: string; onFermer: () => voi
   const dl = deadlinePiece(d, p);
   return (
     <Feuille titre="Pièce" onFermer={onFermer} pied={<>
-      <button class="bouton danger" onClick={() => { faire(supprimer('Pieces', id), `Pièce « ${p.nom} » supprimée`); onFermer(); }}>Supprimer</button>
+      <button class="bouton danger" onClick={() => { faire(supprimer(donnees.value, 'Pieces', id), `Pièce « ${p.nom} » supprimée`); onFermer(); }}>Supprimer</button>
       <button class="bouton principal" onClick={onFermer}>Terminé</button>
     </>}>
       <Champ label="Nom"><Texte valeur={p.nom} onValider={v => v && m({ nom: v })} /></Champ>
@@ -107,7 +107,7 @@ export function EditeurPiste({ id, onFermer }: { id: string; onFermer: () => voi
   const m = (champs: Record<string, string>) => maj('Pistes', id, champs);
   return (
     <Feuille titre="Étape" onFermer={onFermer} pied={<>
-      <button class="bouton danger" onClick={() => { faire(supprimer('Pistes', id), 'Piste supprimée'); onFermer(); }}>Supprimer</button>
+      <button class="bouton danger" onClick={() => { faire(supprimer(donnees.value, 'Pistes', id), 'Piste supprimée'); onFermer(); }}>Supprimer</button>
       <button class="bouton principal" onClick={onFermer}>Terminé</button>
     </>}>
       <p class="petit-texte">Les étapes d'une même pièce avancent en parallèle.</p>

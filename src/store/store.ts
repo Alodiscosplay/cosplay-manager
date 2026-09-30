@@ -1,7 +1,7 @@
 // État de l'appli : données réactives, enregistrement local, synchro avec le Sheet, annulation.
 import { signal } from '@preact/signals';
 import { type Donnees, type NomTable, donneesVides, NOMS_TABLES, vivant } from '../modele/schema';
-import { appliquerChangements, type Changement } from './operations';
+import { appliquerChangements, viderAnciensSupprimes, type Changement } from './operations';
 import { ouvrirBase, lireKv, ecrireKv, type Base, lirePhoto, ecrirePhoto } from './idb';
 import { activationsDuJour } from '../logique/activation';
 import { aujourdhui } from '../logique/dates';
@@ -64,6 +64,7 @@ export async function demarrer(m: Mode): Promise<void> {
   if (m === 'demo' && !d) donnees.value = donneesDemo(aujourdhui());
   jour.value = aujourdhui();
   appliquerActivations();
+  { const vieux = viderAnciensSupprimes(donnees.value); if (vieux.length) faire(vieux); }
   majEtatSync();
   pret.value = true;
   if (!photosSurDrive.value) protegerPhotosLocales();
@@ -110,7 +111,7 @@ export function faire(changements: Changement[], annulable?: string): void {
       if (vus.has(k)) continue;
       vus.add(k);
       const l = avant[c.table][c.id];
-      retour.push(l ? { table: c.table, id: c.id, champs: { ...l } } : { table: c.table, id: c.id, champs: { supprime: 'oui' } });
+      retour.push(l ? { table: c.table, id: c.id, champs: { ...l } } : { table: c.table, id: c.id, champs: { supprime: 'purge' } });
     }
     montrerToast(annulable, () => faire(retour));
   }
@@ -194,6 +195,7 @@ export async function synchroniser(): Promise<void> {
     await enregistrer();
     majEtatSync({ etat: 'ok' });
     appliquerActivations();
+    { const vieux = viderAnciensSupprimes(donnees.value); if (vieux.length) faire(vieux); }
   } catch (e) {
     if (e instanceof ErreurConnexion) majEtatSync({ etat: 'reconnexion', message: e.message });
     else if (e instanceof ErreurReseau) majEtatSync({ etat: 'hors-ligne' });
@@ -261,6 +263,7 @@ export function brancherEvenements(): void {
     const j = aujourdhui();
     if (j !== jour.value) jour.value = j;
     appliquerActivations();
+    { const vieux = viderAnciensSupprimes(donnees.value); if (vieux.length) faire(vieux); }
     planifierSync(200);
   });
   setInterval(() => { if (document.visibilityState === 'visible') planifierSync(0); }, 3 * 60_000);

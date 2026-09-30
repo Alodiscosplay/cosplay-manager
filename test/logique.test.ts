@@ -8,7 +8,7 @@ import { planifierCostume, debutEtape, retardPiece, finPlanifiable, alertes, fen
 import { effacerPlanning } from '../src/store/operations';
 import { quantiteNombre, regrouperAchats, budgetCostume, totalCommande, regrouperParNom, texteQuantites } from '../src/logique/budget';
 import { analyserListe, versTexte, modeleVersTexte, texteVersModele } from '../src/logique/collerListe';
-import { changementsImport, enchainerPistes, cocherEtape, creerCommandes, changerStatutCommande, appliquerListe, insererModele, deplacerEtape, creerCostume } from '../src/store/operations';
+import { changementsImport, enchainerPistes, supprimer, viderAnciensSupprimes, cocherEtape, creerCommandes, changerStatutCommande, appliquerListe, insererModele, deplacerEtape, creerCostume } from '../src/store/operations';
 import { etapesDePiste, pistesDe, piecesDe, etapesDePiece, piecesDeFourniture } from '../src/logique/acces';
 
 const titres = (r: ReturnType<typeof aFaire>) => r.elements.map(e => e.etape.titre);
@@ -389,6 +389,41 @@ describe('achats et budget', () => {
       .toEqual([['Furina', 'y'], ['Bridget', 'wx'], ['—', 'z']]);
     expect(regrouperAchats(d, { fournisseurId: 'F' }, 'costume').flatMap(g => g.lignes.map(l => l.id)).sort()).toEqual(['x', 'z']);
     expect(regrouperAchats(d, { fournisseurId: '__aucun', costumeId: 'A' }).flatMap(g => g.lignes.map(l => l.id))).toEqual(['w']);
+  });
+});
+
+describe('Suppression définitive', () => {
+  it('un costume emporte ses pièces, étapes, sous-étapes, fournitures et photos ; ses tâches sont détachées', () => {
+    let { d, ids } = construire({ pieces: [{ nom: 'Jupe', pistes: [{ nom: 'Coupe', etapes: ['couper'] }] }] });
+    d.Fournitures.f = { id: 'f', maj: '', supprime: '', costume_id: ids.costume, piece_id: ids.Jupe, libelle: 'Satin' };
+    d.Photos.p = { id: 'p', maj: '', supprime: '', costume_id: ids.costume, piece_id: ids.Jupe, drive_id: 'x' };
+    d.Taches.t = { id: 't', maj: '', supprime: '', costume_id: ids.costume, titre: 'Acheter du fil' };
+    d = appliquer(d, supprimer(d, 'Costumes', ids.costume));
+    for (const [t, id] of [['Costumes', ids.costume], ['Pieces', ids.Jupe], ['Pistes', ids['Jupe/Coupe']], ['Etapes', ids['Jupe/Coupe/couper']], ['Fournitures', 'f'], ['Photos', 'p']] as const) {
+      expect(d[t][id].supprime).toBe('purge');
+    }
+    expect(d.Pieces[ids.Jupe].nom).toBe('');          // la ligne est vidée, pas seulement marquée
+    expect(d.Taches.t.supprime).toBe('');              // la tâche reste, sans costume
+    expect(d.Taches.t.costume_id).toBe('');
+  });
+
+  it('une pièce emporte ses étapes, mais ses fournitures et photos restent au costume', () => {
+    let { d, ids } = construire({ pieces: [{ nom: 'Jupe', pistes: [{ nom: 'Coupe', etapes: ['couper'] }] }] });
+    d.Fournitures.f = { id: 'f', maj: '', supprime: '', costume_id: ids.costume, piece_id: ids.Jupe, libelle: 'Satin' };
+    d.Photos.p = { id: 'p', maj: '', supprime: '', costume_id: ids.costume, piece_id: ids.Jupe, drive_id: 'x' };
+    d = appliquer(d, supprimer(d, 'Pieces', ids.Jupe));
+    expect(d.Etapes[ids['Jupe/Coupe/couper']].supprime).toBe('purge');
+    expect([d.Fournitures.f.supprime, d.Fournitures.f.piece_id]).toEqual(['', '']);
+    expect([d.Photos.p.supprime, d.Photos.p.piece_id]).toEqual(['', '']);
+  });
+
+  it('ce que l’ancienne corbeille gardait est vidé pour de bon', () => {
+    let { d, ids } = construire({ pieces: [{ nom: 'Jupe', pistes: [{ nom: 'Coupe', etapes: ['couper'] }] }] });
+    d.Pieces[ids.Jupe].supprime = 'oui';
+    d = appliquer(d, viderAnciensSupprimes(d));
+    expect(d.Pieces[ids.Jupe].supprime).toBe('purge');
+    expect(d.Etapes[ids['Jupe/Coupe/couper']].supprime).toBe('purge');
+    expect(viderAnciensSupprimes(d)).toEqual([]);
   });
 });
 

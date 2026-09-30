@@ -63,7 +63,7 @@ export function PageArchives() {
                 <div class="titre-ligne">
                   <h3>{c.nom}</h3>
                   <Menu label={`Actions pour ${c.nom}`} actions={[
-                    { texte: 'Retirer des archives', icone: 'poubelle', danger: true, faire: () => faire(supprimer('Costumes', c.id), `« ${c.nom} » retiré`) },
+                    { texte: 'Retirer des archives', icone: 'poubelle', danger: true, faire: () => faire(supprimer(donnees.value, 'Costumes', c.id), `« ${c.nom} » retiré`) },
                   ]} />
                 </div>
                 {(c.personnage || c.oeuvre) && <p class="sous-titre">{[c.personnage, c.oeuvre].filter(Boolean).join(' · ')}</p>}

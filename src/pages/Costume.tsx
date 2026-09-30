@@ -82,7 +82,7 @@ export function PageCostume({ id, onglet = 'pieces' }: { id: string; onglet?: st
             <Menu actions={[
               { texte: 'Modifier la fiche', icone: 'crayon', faire: () => setFiche(true) },
               sc !== 'terminé' && { texte: 'Marquer terminé', icone: 'afaire', faire: () => maj('Costumes', id, { statut: 'terminé' }) },
-              { texte: 'Supprimer le costume', icone: 'poubelle', danger: true, faire: () => { faire(supprimer('Costumes', id), `« ${c.nom} » supprimé`); aller('/'); } },
+              { texte: 'Supprimer le costume', icone: 'poubelle', danger: true, faire: () => { faire(supprimer(donnees.value, 'Costumes', id), `« ${c.nom} » supprimé`); aller('/'); } },
             ]} />
           </div>
           {(c.personnage || c.oeuvre) && <p class="sous-titre">{[c.personnage, c.oeuvre].filter(Boolean).join(' · ')}</p>}
@@ -206,7 +206,7 @@ export function EditeurEvenement({ id, onFermer }: { id?: string; onFermer: (id?
   };
   return (
     <Feuille titre={id ? "Modifier l'événement" : 'Nouvel événement'} onFermer={() => onFermer()} pied={<>
-      {id && <button class="bouton danger" onClick={() => { faire(supprimer('Evenements', id), 'Événement supprimé'); onFermer(); }}>Supprimer</button>}
+      {id && <button class="bouton danger" onClick={() => { faire(supprimer(donnees.value, 'Evenements', id), 'Événement supprimé'); onFermer(); }}>Supprimer</button>}
       <button class="bouton principal" disabled={!v.nom.trim()} onClick={valider}>Enregistrer</button>
     </>}>
       <Champ label="Nom"><input value={v.nom} autoFocus onInput={e => setV({ ...v, nom: (e.target as HTMLInputElement).value })} /></Champ>

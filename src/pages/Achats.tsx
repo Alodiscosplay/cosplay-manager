@@ -178,7 +178,7 @@ function Commandes() {
                 <h3>{four?.nom ?? 'Sans fournisseur'}</h3>
                 <Menu label="Actions de la commande" actions={[
                   { texte: 'Modifier', icone: 'crayon', faire: () => setOuverte(c.id) },
-                  { texte: 'Supprimer la commande', icone: 'poubelle', danger: true, faire: () => faire([...supprimer('Commandes', c.id), ...lignes.flatMap(f => retirerDeCommande(f.id))], 'Commande supprimée') },
+                  { texte: 'Supprimer la commande', icone: 'poubelle', danger: true, faire: () => faire([...supprimer(donnees.value, 'Commandes', c.id), ...lignes.flatMap(f => retirerDeCommande(f.id))], 'Commande supprimée') },
                 ]} />
               </header>
               <ol class="etapes-statut" aria-label="Statut">
@@ -262,7 +262,7 @@ function EditeurFournisseur({ id, onFermer }: { id: string; onFermer: () => void
   const m = (champs: Record<string, string>) => faire([{ table: 'Fournisseurs', id, champs }]);
   return (
     <Feuille titre="Fournisseur" onFermer={onFermer} pied={<>
-      <button class="bouton danger" onClick={() => { faire(supprimer('Fournisseurs', id), `« ${f.nom} » supprimé`); onFermer(); }}>Supprimer</button>
+      <button class="bouton danger" onClick={() => { faire(supprimer(donnees.value, 'Fournisseurs', id), `« ${f.nom} » supprimé`); onFermer(); }}>Supprimer</button>
       <button class="bouton principal" onClick={onFermer}>Terminé</button>
     </>}>
       <Champ label="Nom"><Texte valeur={f.nom} autoFocus={f.nom === NOM_PROVISOIRE} onValider={v => v && m({ nom: v })} /></Champ>

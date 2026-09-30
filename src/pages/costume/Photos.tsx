@@ -2,7 +2,7 @@ import { useEffect, useState } from 'preact/hooks';
 import { donnees, faire, jour, photosSurDrive } from '../../store/store';
 import { photosDe, piecesDe, pistesDe, etapesDePiste, ligne } from '../../logique/acces';
 import { jourCourt } from '../../logique/dates';
-import { bool, txtBool, OUI, type Ligne } from '../../modele/schema';
+import { bool, txtBool, OUI, vivant, type Ligne } from '../../modele/schema';
 import { nouvelId, supprimer } from '../../store/operations';
 import { ajouterImage } from '../../store/photos';
 import { PhotoImg, Feuille, Champ, Texte, ChoixDate, Selection, Vide, Puce } from '../../composants/base';
@@ -100,7 +100,7 @@ function EditeurPhoto({ id, costume, parcours, onAller, onFermer }: {
   id: string; costume: Ligne; parcours: string[]; onAller: (id: string) => void; onFermer: () => void;
 }) {
   const d = donnees.value;
-  const ids = parcours.filter(x => d.Photos[x] && d.Photos[x].supprime !== 'oui');
+  const ids = parcours.filter(x => vivant(d.Photos[x]));
   const rang = ids.indexOf(id);
   const precedente = rang > 0 ? ids[rang - 1] : undefined;
   const suivante = rang >= 0 && rang < ids.length - 1 ? ids[rang + 1] : undefined;
@@ -128,7 +128,7 @@ function EditeurPhoto({ id, costume, parcours, onAller, onFermer }: {
   const sousEtapes = pisteId ? etapesDePiste(d, pisteId) : [];
   return (
     <Feuille titre="Photo" large onFermer={onFermer} pied={<>
-      <button class="bouton danger" onClick={() => { faire(supprimer('Photos', id), 'Photo supprimée'); onFermer(); }}>Supprimer</button>
+      <button class="bouton danger" onClick={() => { faire(supprimer(donnees.value, 'Photos', id), 'Photo supprimée'); onFermer(); }}>Supprimer</button>
       <button class="bouton principal" onClick={onFermer}>Terminé</button>
     </>}>
       <div class="photo-grande">

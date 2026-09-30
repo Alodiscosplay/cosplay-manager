@@ -170,7 +170,7 @@ export function EditeurFourniture({ id, costumeId, pieceId, onFermer }: { id?: s
 
   return (
     <Feuille titre={id ? 'Fourniture' : 'Nouvelle fourniture'} onFermer={onFermer} pied={<>
-      {id && <button class="bouton danger" onClick={() => { faire(supprimer('Fournitures', id), `« ${v.libelle} » supprimé`); onFermer(); }}>Supprimer</button>}
+      {id && <button class="bouton danger" onClick={() => { faire(supprimer(donnees.value, 'Fournitures', id), `« ${v.libelle} » supprimé`); onFermer(); }}>Supprimer</button>}
       <button class="bouton principal" disabled={!v.libelle.trim()} onClick={valider}>Enregistrer</button>
     </>}>
       <form onSubmit={e => { e.preventDefault(); valider(); }}>
