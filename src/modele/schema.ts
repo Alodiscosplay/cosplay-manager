@@ -1,6 +1,6 @@
-// Schéma des données : un onglet du Google Sheet par table, une colonne par champ.
-// Les colonnes sont lues par NOM d'en-tête, jamais par position : on peut
-// réordonner ou ajouter des colonnes à la main dans le Sheet sans rien casser.
+// Schéma des données : une table par type de ligne, un champ texte par colonne. Les données vivent sur
+// l'appareil et dans un fichier JSON caché du Drive.
+// Dans l'appli, une « piste » (code) s'appelle une « étape » et une « étape » (code) une « sous-étape ».
 
 export const VERSION_SCHEMA = 1;
 
@@ -23,14 +23,6 @@ export const TABLES = {
 
 export type NomTable = keyof typeof TABLES;
 
-/**
- * Titre de l'onglet dans le Sheet. Dans l'appli, une « piste » (code) s'appelle une « étape » et une
- * « étape » (code) une « sous-étape » : les onglets suivent le vocabulaire affiché.
- */
-export const ONGLET: Record<NomTable, string> = {
-  Costumes: 'Costumes', Evenements: 'Evenements', Pieces: 'Pieces', Pistes: 'Etapes', Etapes: 'Sous-etapes',
-  Taches: 'Taches', Fournisseurs: 'Fournisseurs', Fournitures: 'Fournitures', Commandes: 'Commandes', Photos: 'Photos', Modeles: 'Modeles',
-};
 export const NOMS_TABLES = Object.keys(TABLES) as NomTable[];
 
 /** Colonnes communes à toutes les tables. */
@@ -40,7 +32,7 @@ export function entetes(table: NomTable): string[] {
   return [...COLONNES_COMMUNES.debut, ...TABLES[table], ...COLONNES_COMMUNES.fin];
 }
 
-/** Une ligne telle qu'elle vit dans le Sheet : que du texte. */
+/** Une ligne de données : que du texte. */
 export type Ligne = { id: string; maj: string; supprime: string; [champ: string]: string };
 
 export type Donnees = Record<NomTable, Record<string, Ligne>>;

@@ -1,13 +1,17 @@
 // Connexion Google (Google Identity Services, modèle « jeton »).
-// Portée unique `drive.file` : l'appli ne voit QUE les fichiers qu'elle a créés elle-même
-// (son Sheet, ses photos). Pas d'accès au reste du Drive de l'utilisateur.
+// Deux portées, toutes deux « non sensibles » pour Google :
+//  - `drive.appdata` : l'espace caché réservé à l'appli, où vivent ses données ;
+//  - `drive.file` : les seuls fichiers que l'appli a créés (copies de photos, exports) ou que l'utilisatrice
+//    lui a montrés (le dossier choisi pour les photos). Pas d'accès au reste du Drive.
 
 export const CLIENT_ID: string = import.meta.env.VITE_GOOGLE_CLIENT_ID ?? '';
-const PORTEES = 'https://www.googleapis.com/auth/drive.file openid email profile';
+const PORTEES = 'https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/drive.file openid email profile';
 const CLE_JETON = 'cosplay-planner.jeton';
 
 export class ErreurConnexion extends Error { constructor(m = 'Connexion Google à renouveler') { super(m); } }
 export class ErreurReseau extends Error { constructor(m = 'Pas de réseau') { super(m); } }
+/** Le fichier demandé n'existe pas (ou plus). */
+export class ErreurIntrouvable extends Error { constructor(m = 'Fichier introuvable') { super(m); } }
 
 interface Jeton { access_token: string; expire: number; email?: string }
 
@@ -100,6 +104,7 @@ export async function gfetch(url: string, init: RequestInit = {}): Promise<Respo
     throw new ErreurReseau();
   }
   if (r.status === 401) { localStorage.removeItem(CLE_JETON); throw new ErreurConnexion(); }
+  if (r.status === 404) throw new ErreurIntrouvable();
   if (!r.ok) {
     let msg = `${r.status}`;
     try { msg = (await r.json()).error?.message ?? msg; } catch { /* corps non JSON */ }

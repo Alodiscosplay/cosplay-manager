@@ -3,7 +3,7 @@ import { donnees, mode, emplacement } from '../../store/store';
 import { piecesDe, photosDe } from '../../logique/acces';
 import { bool, type Ligne } from '../../modele/schema';
 import { genererWip, type OptionsWip } from '../../export/dossierWip';
-import { versGoogleSlides } from '../../sync/drive';
+import { versGoogleSlides, dossierVisible } from '../../sync/drive';
 import { telechargerBlob, nomFichier, Vide } from '../../composants/base';
 import { Icone } from '../../composants/Icone';
 import { lienCostume } from '../../routeur';
@@ -39,9 +39,10 @@ export function OngletWip({ costume }: { costume: Ligne }) {
     setErreur('');
     try {
       const blob = await genererWip(d, costume.id, options(), setEtat);
-      if (versSlides && emplacement()) {
+      const e = emplacement();
+      if (versSlides && e) {
         setEtat('Envoi vers Google Slides');
-        window.open(await versGoogleSlides(blob, nomPptx.replace('.pptx', ''), emplacement()!.dossierId), '_blank', 'noopener');
+        window.open(await versGoogleSlides(blob, nomPptx.replace('.pptx', ''), await dossierVisible(e)), '_blank', 'noopener');
       } else telechargerBlob(blob, nomPptx);
     } catch (e) {
       setErreur((e as Error).message);

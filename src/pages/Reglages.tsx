@@ -5,7 +5,7 @@ import { analyserListe, compter, modeleVersTexte, texteVersModele, type PisteTex
 import { DUREES, NOMS_DUREES, type Duree } from '../modele/schema';
 import { nouvelId, supprimer, changementsImport } from '../store/operations';
 import { connecter, deconnecter, emailConnu, googleConfigure } from '../sync/google';
-import { placePhotos, urlClasseur } from '../sync/drive';
+import { placePhotos, tailleDonnees } from '../sync/drive';
 import { choisirDossier, pickerConfigure } from '../sync/picker';
 import { Feuille, Champ, Confirmer, telechargerBlob } from '../composants/base';
 import { Icone } from '../composants/Icone';
@@ -21,7 +21,7 @@ export function PageReglages() {
       <Sauvegarde />
       <section class="carte-reglage">
         <h2>À propos</h2>
-        <p class="petit-texte">Cosplay Planner — tes données restent dans ton propre Google Drive (un Sheet et un dossier de photos créés par l'appli), ou sur cet appareil en mode démo. L'appli n'a accès à aucun autre fichier.</p>
+        <p class="petit-texte">Cosplay Planner — tes données restent dans ton propre Google Drive, dans un espace caché réservé à l'appli, ou sur cet appareil en mode démo. Tes photos restent sur l'appareil, avec une copie sur ton Drive si tu le choisis. L'appli n'a accès à aucun autre fichier.</p>
       </section>
     </div>
   );
@@ -68,11 +68,18 @@ function Compte() {
       <div class="ligne-actions">
         <button class="bouton" onClick={() => synchroniser()}><Icone nom="sync" />Synchroniser</button>
         {s.etat === 'reconnexion' && <button class="bouton principal" onClick={async () => { await connecter(true); await synchroniser(); }}>Se reconnecter</button>}
-        {e && <a class="bouton" href={urlClasseur(e.classeurId)} target="_blank" rel="noopener noreferrer"><Icone nom="tableau" />Ouvrir mon Sheet</a>}
       </div>
+      <p class="petit-texte">Tes données sont rangées dans un espace caché de ton Google Drive, réservé à l'appli : tu ne les vois pas dans ton Drive, et aucune autre appli n'y a accès. Chaque appareil en garde aussi une copie complète.</p>
       <div class="ligne-actions">
-        <button class="bouton" onClick={async () => { setPlace('calcul…'); try { const p = await placePhotos(); setPlace(`${p.nb} photo${p.nb > 1 ? 's' : ''} · ${(p.octets / 1024 / 1024).toFixed(1)} Mo`); } catch (x) { setPlace((x as Error).message); } }}>
-          Place occupée par les photos
+        <button class="bouton" onClick={async () => {
+          setPlace('calcul…');
+          try {
+            const donneesKo = e?.donneesId ? (await tailleDonnees(e.donneesId)) / 1024 : 0;
+            const p = await placePhotos();
+            setPlace(`données ${donneesKo < 1024 ? `${donneesKo.toFixed(0)} Ko` : `${(donneesKo / 1024).toFixed(1)} Mo`} · ${p.nb} photo${p.nb > 1 ? 's' : ''} copiée${p.nb > 1 ? 's' : ''} · ${(p.octets / 1024 / 1024).toFixed(1)} Mo`);
+          } catch (x) { setPlace((x as Error).message); }
+        }}>
+          Place occupée sur le Drive
         </button>
         {place && <span class="petit-texte">{place}</span>}
       </div>
@@ -238,7 +245,7 @@ function Sauvegarde() {
   return (
     <section class="carte-reglage">
       <h2>Sauvegarde</h2>
-      <p class="petit-texte">Un fichier JSON avec toutes tes données (sans les photos). En mode Google, le Sheet est déjà une sauvegarde.</p>
+      <p class="petit-texte">Un fichier JSON avec toutes tes données (sans les photos), à garder où tu veux : c'est ta sauvegarde personnelle.</p>
       <button class="bouton" onClick={() => {
         const blob = new Blob([JSON.stringify({ format: 'cosplay-planner-sauvegarde', exporte_le: new Date().toISOString(), donnees: donnees.value }, null, 1)], { type: 'application/json' });
         telechargerBlob(blob, `cosplay-planner-sauvegarde-${new Date().toISOString().slice(0, 10)}.json`);

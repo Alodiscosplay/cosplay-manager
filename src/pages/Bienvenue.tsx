@@ -31,7 +31,7 @@ export function Bienvenue() {
               {attente ? 'Connexion…' : 'Se connecter avec Google'}
             </button>
             <p class="petit-texte">
-              Tes données vont dans <strong>ton</strong> Google Drive, dans un Sheet créé pour l'appli.
+              Tes données vont dans <strong>ton</strong> Google Drive, dans un espace caché réservé à l'appli.
               L'appli ne voit que les fichiers qu'elle a créés elle-même.
             </p>
           </>

@@ -191,8 +191,8 @@ export function effacerPlanning(d: Donnees, pieceIds: string[]): Changement[] {
 // ---------- Suppression (définitive, pas de corbeille) ----------
 
 /**
- * Supprime une ligne pour de bon : elle est vidée (le Sheet garde une ligne marquée « purge » pour ne pas
- * décaler les numéros), avec ce qui n'a pas de sens sans elle. Un costume emporte ses pièces, étapes,
+ * Supprime une ligne pour de bon : elle est vidée et marquée « purge » (cette trace minuscule fait passer
+ * la suppression aux autres appareils), avec ce qui n'a pas de sens sans elle. Un costume emporte ses pièces, étapes,
  * sous-étapes, fournitures et photos ; une pièce emporte ses étapes, mais ses fournitures et ses photos
  * restent au costume (« hors pièce », « à trier »). Le bandeau « Annuler » rattrape une erreur de clic.
  */
@@ -258,7 +258,7 @@ export function viderAnciensSupprimes(d: Donnees): Changement[] {
   for (const t of NOMS_TABLES) for (const l of Object.values(d[t])) if (l.supprime === OUI) ch.push(...supprimer(d, t, l.id));
   return ch;
 }
-/** Purge : on vide la ligne (le Sheet garde une ligne marquée « purge » pour ne pas décaler les numéros). */
+/** Purge : on vide la ligne et on la marque « purge », pour que la suppression atteigne les autres appareils. */
 export function purger(table: NomTable, ligneActuelle: Ligne): Changement {
   const champs: Record<string, string> = {};
   for (const c of entetes(table)) if (c !== 'id') champs[c] = '';

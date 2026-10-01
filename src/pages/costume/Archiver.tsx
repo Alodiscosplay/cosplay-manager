@@ -52,7 +52,7 @@ export function OngletArchiver({ costume }: { costume: Ligne }) {
       if (mode.value === 'google') await synchroniser();
       aller('/archives');
     } catch (e) {
-      setErreur(`Archivage interrompu : ${(e as Error).message}. Rien n'a été retiré du Sheet ; tu peux réessayer.`);
+      setErreur(`Archivage interrompu : ${(e as Error).message}. Rien n'a été retiré ; tu peux réessayer.`);
     } finally { setEtat(''); }
   };
 
@@ -65,7 +65,7 @@ export function OngletArchiver({ costume }: { costume: Ligne }) {
       <ol>
         <li>Un fichier <strong>ZIP</strong> est téléchargé : les données du costume (réimportables), une <strong>fiche lisible</strong> hors appli, et toutes les <strong>photos</strong> ({photos.length}) en pleine taille{avecWip ? ', plus le dossier WIP' : ''}.</li>
         <li>Tu confirmes que le fichier est bien enregistré.</li>
-        <li>Seulement alors, les photos sont supprimées {mode.value === 'google' ? 'du Drive' : 'de l’appareil'} et le détail du costume est retiré {mode.value === 'google' ? 'du Sheet' : 'de l’appli'}. Le costume reste visible dans les Archives, avec un résumé.</li>
+        <li>Seulement alors, les photos sont supprimées {mode.value === 'google' ? 'du Drive' : 'de l’appareil'} et le détail du costume est retiré de l’appli. Le costume reste visible dans les Archives, avec un résumé.</li>
       </ol>
       <label class="interrupteur"><input type="checkbox" checked={avecWip} onChange={e => setAvecWip((e.target as HTMLInputElement).checked)} /><span>Inclure le dossier WIP (PowerPoint)</span></label>
       <button class="bouton principal" disabled={!!etat} onClick={telecharger}><Icone nom="telecharger" />Télécharger l'archive</button>
@@ -77,7 +77,7 @@ export function OngletArchiver({ costume }: { costume: Ligne }) {
             <p>Vérifie dans ton dossier de téléchargements :</p>
             <p><strong>{fichier.nom}</strong> · {mo(fichier.taille)}</p>
             {fichier.manquantes > 0 && <p class="erreur">{fichier.manquantes} photo{fichier.manquantes > 1 ? 's n’ont' : ' n’a'} pas pu être récupérée{fichier.manquantes > 1 ? 's' : ''} (hors ligne ?). Elle{fichier.manquantes > 1 ? 's' : ''} manquera{fichier.manquantes > 1 ? 'ont' : ''} dans l'archive : mieux vaut annuler et réessayer connecté.</p>}
-            <p>En confirmant, les photos de ce costume sont <strong>supprimées {ou}</strong> et son détail retiré {mode.value === 'google' ? 'du Sheet' : 'de l’appli'}. L'archive ZIP permettra de le réimporter.</p>
+            <p>En confirmant, les photos de ce costume sont <strong>supprimées {ou}</strong> et son détail retiré de l’appli. L'archive ZIP permettra de le réimporter.</p>
           </>} />
       )}
     </section>

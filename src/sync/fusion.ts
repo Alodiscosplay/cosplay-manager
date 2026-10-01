@@ -1,73 +1,64 @@
-// Fusion copie locale ↔ Sheet. Logique PURE, testée.
+// Fusion copie locale ↔ fichier de données du Drive. Logique PURE, testée.
 //
+// Les données vivent dans un seul fichier JSON, caché dans l'espace réservé à l'appli sur le Drive.
 // Règles :
-//  - le Sheet fait foi, SAUF pour une ligne modifiée localement et pas encore envoyée (« en attente ») :
-//    dans ce cas, la version la plus récente (colonne `maj`) gagne ;
-//  - une ligne locale absente du Sheet est gardée seulement si elle est en attente (créée hors-ligne) ;
-//  - on n'efface jamais de ligne dans le Sheet (suppression = marqueur), donc les numéros de ligne sont stables.
-import { type Donnees, type Ligne, type NomTable, NOMS_TABLES, entetes, donneesVides } from '../modele/schema';
-import { type Classeur, type Ecriture } from './sheets';
+//  - une ligne présente des deux côtés : la version la plus récente (colonne `maj`) gagne ; à égalité,
+//    le fichier, sauf si la ligne locale attend d'être envoyée ;
+//  - une ligne présente d'un seul côté est GARDÉE. Rien ne disparaît par la synchro : une suppression est
+//    une ligne vidée et marquée « purge », qui se propage comme une modification. Une ligne qui n'existe
+//    que sur l'appareil repart donc vers le fichier — c'est ce qui protège d'un fichier perdu ou écrasé.
+import { type Donnees, type Ligne, type NomTable, NOMS_TABLES, donneesVides } from '../modele/schema';
 
 /** Lignes en attente d'envoi : clé `Table/id` → `maj` au moment de la modification. */
 export type Pendants = Record<string, string>;
 export const clePendant = (t: NomTable, id: string) => `${t}/${id}`;
 
-export interface Distant { lignes: Partial<Record<NomTable, Map<string, { ligne: Ligne; numero: number }>>>; prochaine: Partial<Record<NomTable, number>> }
-
-export function lireDistant(c: Classeur): Distant {
-  const res: Distant = { lignes: {}, prochaine: {} };
-  for (const t of NOMS_TABLES) {
-    const o = c[t];
-    const m = new Map<string, { ligne: Ligne; numero: number }>();
-    res.lignes[t] = m;
-    if (!o) { res.prochaine[t] = 2; continue; }
-    o.valeurs.slice(1).forEach((vals, i) => {
-      const l = {} as Ligne;
-      for (const h of entetes(t)) l[h] = '';
-      o.entetes.forEach((h, j) => { if (h) l[h] = (vals[j] ?? '').trim(); });
-      if (l.id && !m.has(l.id)) m.set(l.id, { ligne: l, numero: i + 2 });
-    });
-    res.prochaine[t] = Math.max(2, o.valeurs.length + 1);
-  }
-  return res;
+/** Le contenu du fichier de données. */
+export interface Fichier {
+  format: 'cosplay-planner-donnees';
+  schema: number;
+  maj: string;
+  donnees: Partial<Record<NomTable, Record<string, Ligne>>>;
 }
 
-export function fusionner(local: Donnees, distant: Distant, pendants: Pendants): { donnees: Donnees; pendants: Pendants } {
+export interface Fusion {
+  donnees: Donnees;
+  /** Lignes à (r)envoyer : celles où la version locale gagne, ou qui manquent au fichier. */
+  pendants: Pendants;
+  /** Faut-il réécrire le fichier ? */
+  aEnvoyer: boolean;
+}
+
+export function fusionner(local: Donnees, distant: Fichier['donnees'], pendants: Pendants): Fusion {
   const res = donneesVides();
-  const restants: Pendants = { ...pendants };
+  const restants: Pendants = {};
   for (const t of NOMS_TABLES) {
-    const dist = distant.lignes[t] ?? new Map();
-    for (const [id, { ligne }] of dist) {
+    const dist = distant[t] ?? {};
+    const loc = local[t] ?? {};
+    for (const id of new Set([...Object.keys(dist), ...Object.keys(loc)])) {
+      const d = dist[id];
+      const l = loc[id];
       const cle = clePendant(t, id);
-      const loc = local[t][id];
-      if (cle in restants && loc && (loc.maj || '') >= (ligne.maj || '')) res[t][id] = loc;
-      else { res[t][id] = ligne; delete restants[cle]; }
-    }
-    for (const [id, loc] of Object.entries(local[t])) {
-      if (!dist.has(id) && clePendant(t, id) in restants) res[t][id] = loc;
+      if (d && !l) { res[t][id] = d; continue; }
+      if (l && !d) { res[t][id] = l; restants[cle] = l.maj || ''; continue; } // absente du fichier : on la renvoie
+      const majL = l!.maj || '';
+      const majD = d!.maj || '';
+      const localGagne = majL > majD || (majL === majD && cle in pendants);
+      res[t][id] = localGagne ? l! : d!;
+      if (localGagne && majL !== majD) restants[cle] = majL;
     }
   }
-  // Un pendant dont la ligne n'existe plus nulle part n'a plus lieu d'être.
-  for (const cle of Object.keys(restants)) {
-    const [t, id] = cle.split('/') as [NomTable, string];
-    if (!res[t]?.[id]) delete restants[cle];
-  }
-  return { donnees: res, pendants: restants };
+  return { donnees: res, pendants: restants, aEnvoyer: Object.keys(restants).length > 0 };
 }
 
-/** Écritures à faire pour les lignes en attente : mise à jour à leur numéro, ou nouvelle ligne à la fin. */
-export function ecrituresAFaire(d: Donnees, distant: Distant, c: Classeur, pendants: Pendants): Ecriture[] {
-  const res: Ecriture[] = [];
-  const prochaine = { ...distant.prochaine };
-  for (const cle of Object.keys(pendants).sort()) {
-    const [t, id] = cle.split('/') as [NomTable, string];
-    const l = d[t]?.[id];
-    if (!l) continue;
-    const tete = c[t]?.entetes ?? entetes(t);
-    const valeurs = tete.map(h => (h ? l[h] ?? '' : ''));
-    const existant = distant.lignes[t]?.get(id);
-    const numero = existant?.numero ?? (prochaine[t] = (prochaine[t] ?? 2) + 1) - 1;
-    res.push({ table: t, numero, valeurs });
-  }
-  return res;
+/** Le fichier à écrire pour des données. */
+export function versFichier(d: Donnees, schema: number, maj: string): Fichier {
+  return { format: 'cosplay-planner-donnees', schema, maj, donnees: d };
+}
+
+/** Lit un fichier téléchargé ; un contenu illisible ou d'un autre format compte comme vide. */
+export function lireFichier(brut: unknown): Fichier['donnees'] {
+  const f = brut as Partial<Fichier> | null;
+  if (!f || f.format !== 'cosplay-planner-donnees' || typeof f.donnees !== 'object' || !f.donnees) return {};
+  return f.donnees;
 }

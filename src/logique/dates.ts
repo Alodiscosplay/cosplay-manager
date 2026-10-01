@@ -1,5 +1,5 @@
 // Dates « jour » sans heure, stockées en ISO (2026-11-03).
-// On accepte aussi le format français (03/11/2026) : quelqu'un peut taper une date à la main dans le Sheet.
+// On accepte aussi le format français (03/11/2026), tel qu'on le tape au clavier.
 
 export type Jour = string; // 'YYYY-MM-DD'
 

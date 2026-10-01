@@ -16,9 +16,11 @@ Planifier et suivre la création de ses cosplays, pièce par pièce, étape par 
 
 ## Où sont les données
 
-Chaque utilisateur a ses données **dans son propre Google Drive** : un dossier « Cosplay Planner » avec un Sheet (un onglet par table, lisible et modifiable à la main ; l'onglet `Etapes` contient les étapes, `Sous-etapes` ce qu'on coche) et un sous-dossier Photos. L'appli demande seulement la portée `drive.file` : elle ne voit que les fichiers qu'elle a créés. Une copie de travail reste sur l'appareil (IndexedDB), donc l'appli marche hors ligne et envoie les modifications au retour du réseau.
+Chaque utilisatrice a ses données **dans son propre Google Drive**, dans un fichier `donnees.json` rangé dans l'**espace caché réservé à l'appli** (portée `drive.appdata`) : invisible dans le Drive, inaccessible aux autres applis. Une copie complète reste sur chaque appareil (IndexedDB) : l'appli marche hors ligne et envoie les modifications au retour du réseau.
 
-Règles de synchro : le Sheet fait foi ; une modification locale pas encore envoyée gagne si elle est plus récente (colonne `maj`). On ne supprime jamais de ligne dans le Sheet (colonne `supprime`), pour que les numéros de ligne restent stables. **Ne pas renommer les en-têtes ni la colonne `id`.**
+Les **photos** restent sur l'appareil. Une copie peut partir sur le Drive (Réglages › Photos), dans un dossier « Cosplay Planner / Photos » créé pour l'occasion ou dans un dossier choisi avec le Google Picker (portée `drive.file` : l'appli ne voit que les fichiers qu'elle a créés et le dossier qu'on lui a montré).
+
+Règles de synchro (`src/sync/fusion.ts`) : ligne par ligne, la version la plus récente (champ `maj`) gagne. **Rien ne disparaît par la synchro** : une suppression vide la ligne et la marque `purge`, et se propage comme une modification ; une ligne qui n'existe que sur un appareil repart vers le fichier. Si le fichier est perdu, il se reconstruit depuis n'importe quel appareil. Avant d'écrire, l'appli vérifie que personne n'a écrit entre-temps, sinon elle refusionne.
 
 ## Développer
 
@@ -31,20 +33,21 @@ npm run build      # vérifie les types puis construit dist/
 
 Dans le code, une étape s'appelle encore « piste » (`Pistes`) et une sous-étape « étape » (`Etapes`).
 
-Code : `src/logique/` (règles métier pures, testées), `src/store/` (état, opérations, photos), `src/sync/` (Google : connexion, Drive, Sheets, fusion), `src/pages/`, `src/export/` (dossier WIP, archive).
+Code : `src/logique/` (règles métier pures, testées), `src/store/` (état, opérations, photos), `src/sync/` (Google : connexion, Drive, Picker, fusion), `src/pages/`, `src/export/` (dossier WIP, archive).
 
 ## Mise en ligne (une fois)
 
 1. **Google Cloud Console**, avec le compte Google qui « possède » l'appli :
-   - créer un projet ; activer **Google Drive API** et **Google Sheets API** ;
-   - écran de consentement OAuth : type *Externe*, portée `.../auth/drive.file` (+ `openid`, `email`, `profile`), puis **Publier l'application** (en mode test, 100 utilisateurs max et reconnexion tous les 7 jours) ;
-   - Identifiants → *ID client OAuth* → type *Application Web*, **origine JavaScript autorisée** : `https://<compte>.github.io` (et `http://localhost:5173` pour le dev).
+   - créer un projet ; activer **Google Drive API** et **Google Picker API** ;
+   - écran de consentement OAuth : type *Externe*, portées `.../auth/drive.appdata` et `.../auth/drive.file` (+ `openid`, `email`, `profile`), toutes non sensibles, puis **Publier l'application** (en mode test, 100 utilisateurs max) ;
+   - Identifiants → *ID client OAuth* → type *Application Web*, **origine JavaScript autorisée** : `https://<compte>.github.io` (et `http://localhost:5173` pour le dev) ;
+   - Identifiants → *Clé API*, restreinte à l'API Picker et au site ; noter aussi le **numéro du projet** (page d'accueil du projet).
 2. **GitHub** : pousser ce dépôt (public pour Pages gratuit), puis
    - Settings → Pages → Source : *GitHub Actions* ;
-   - Settings → Secrets and variables → Actions → *Variables* : `VITE_GOOGLE_CLIENT_ID` = l'ID client (ce n'est pas un secret).
+   - Settings → Secrets and variables → Actions → *Variables* : `VITE_GOOGLE_CLIENT_ID` (l'ID client), `VITE_GOOGLE_API_KEY` (la clé API) et `VITE_GOOGLE_APP_ID` (le numéro du projet). Aucun n'est un secret.
 3. Chaque push sur `main` construit et publie le site (`.github/workflows/deploiement.yml`).
 
-En local, copier `.env.example` en `.env.local` et y mettre l'ID client pour tester la connexion Google.
+En local, copier `.env.example` en `.env.local` et y mettre les mêmes valeurs pour tester la connexion Google.
 
 ## Installer sur le téléphone
 

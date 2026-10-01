@@ -1,67 +1,72 @@
 import { describe, it, expect } from 'vitest';
-import { lireDistant, fusionner, ecrituresAFaire, clePendant } from '../src/sync/fusion';
-import { entetes, donneesVides } from '../src/modele/schema';
-import { type Classeur } from '../src/sync/sheets';
-import { colonne } from '../src/sync/sheets';
+import { fusionner, lireFichier, versFichier, clePendant } from '../src/sync/fusion';
+import { donneesVides, type Ligne } from '../src/modele/schema';
 
-function classeur(taches: string[][]): Classeur {
-  const c: Classeur = {};
-  c.Taches = { sheetId: 1, nbLignesGrille: 1000, nbColonnesGrille: 26, entetes: entetes('Taches'), valeurs: [entetes('Taches'), ...taches] };
-  return c;
-}
-// Une ligne de l'onglet Taches, rangée d'après ses en-têtes (robuste à l'ajout d'une colonne).
-const tache = (id: string, titre: string, maj: string) => {
-  const v: Record<string, string> = { id, titre, ordre: '1', maj };
-  return entetes('Taches').map(h => v[h] ?? '');
-};
+const tache = (id: string, titre: string, maj: string, supprime = ''): Ligne => ({ id, maj, supprime, titre });
 
-describe('fusion local ↔ Sheet', () => {
-  it('le Sheet fait foi pour une ligne sans modification locale', () => {
+describe('fusion appareil ↔ fichier de données', () => {
+  it('le fichier fait foi pour une ligne plus récente ailleurs', () => {
     const local = donneesVides();
-    local.Taches.a = { id: 'a', maj: '1', supprime: '', titre: 'ancien' };
-    const { donnees } = fusionner(local, lireDistant(classeur([tache('a', 'nouveau', '2')])), {});
-    expect(donnees.Taches.a.titre).toBe('nouveau');
+    local.Taches.a = tache('a', 'ancien', '1');
+    const r = fusionner(local, { Taches: { a: tache('a', 'nouveau', '2') } }, {});
+    expect(r.donnees.Taches.a.titre).toBe('nouveau');
+    expect(r.aEnvoyer).toBe(false);
   });
 
-  it('une modification locale en attente et plus récente gagne', () => {
+  it('une modification locale plus récente gagne et part au fichier', () => {
     const local = donneesVides();
-    local.Taches.a = { id: 'a', maj: '3', supprime: '', titre: 'local' };
-    const r = fusionner(local, lireDistant(classeur([tache('a', 'distant', '2')])), { [clePendant('Taches', 'a')]: '3' });
+    local.Taches.a = tache('a', 'local', '3');
+    const r = fusionner(local, { Taches: { a: tache('a', 'distant', '2') } }, { [clePendant('Taches', 'a')]: '3' });
     expect(r.donnees.Taches.a.titre).toBe('local');
     expect(Object.keys(r.pendants)).toEqual(['Taches/a']);
+    expect(r.aEnvoyer).toBe(true);
   });
 
-  it('une modification distante plus récente gagne, et annule l’attente', () => {
+  it('une modification venue d’un autre appareil, plus récente, gagne et annule l’attente', () => {
     const local = donneesVides();
-    local.Taches.a = { id: 'a', maj: '1', supprime: '', titre: 'local' };
-    const r = fusionner(local, lireDistant(classeur([tache('a', 'distant', '2')])), { 'Taches/a': '1' });
+    local.Taches.a = tache('a', 'local', '1');
+    const r = fusionner(local, { Taches: { a: tache('a', 'distant', '2') } }, { 'Taches/a': '1' });
     expect(r.donnees.Taches.a.titre).toBe('distant');
     expect(r.pendants).toEqual({});
   });
 
-  it('garde une ligne créée hors-ligne ; oublie une ligne ni en attente ni dans le Sheet', () => {
+  it('rien ne disparaît : une ligne absente du fichier est gardée et renvoyée', () => {
     const local = donneesVides();
-    local.Taches.neuf = { id: 'neuf', maj: '5', supprime: '', titre: 'hors-ligne' };
-    local.Taches.vieux = { id: 'vieux', maj: '1', supprime: '', titre: 'effacé à la main' };
-    const r = fusionner(local, lireDistant(classeur([])), { 'Taches/neuf': '5' });
-    expect(Object.keys(r.donnees.Taches)).toEqual(['neuf']);
+    local.Taches.neuf = tache('neuf', 'créée hors-ligne', '5');
+    local.Taches.ancienne = tache('ancienne', 'absente du fichier', '1');
+    const r = fusionner(local, {}, { 'Taches/neuf': '5' });
+    expect(Object.keys(r.donnees.Taches).sort()).toEqual(['ancienne', 'neuf']);
+    expect(Object.keys(r.pendants).sort()).toEqual(['Taches/ancienne', 'Taches/neuf']);
   });
 
-  it('écrit une ligne existante à son numéro, une nouvelle à la fin, dans l’ordre des en-têtes du Sheet', () => {
-    const c = classeur([tache('a', 'A', '1'), [], tache('b', 'B', '1')]);
-    c.Taches!.entetes = ['titre', 'id', ...entetes('Taches').slice(2), 'colonne perso'];
+  it('un fichier perdu se reconstruit entièrement depuis l’appareil', () => {
+    const local = donneesVides();
+    local.Costumes.c = { id: 'c', maj: '1', supprime: '', nom: 'Ariel' };
+    local.Pieces.p = { id: 'p', maj: '1', supprime: '', costume_id: 'c', nom: 'Corset' };
+    const r = fusionner(local, lireFichier(null), {});
+    expect(r.donnees.Costumes.c.nom).toBe('Ariel');
+    expect(r.donnees.Pieces.p.nom).toBe('Corset');
+    expect(r.aEnvoyer).toBe(true);
+  });
+
+  it('une ligne arrivée d’un autre appareil s’ajoute', () => {
+    const r = fusionner(donneesVides(), { Taches: { b: tache('b', 'du téléphone', '4') } }, {});
+    expect(r.donnees.Taches.b.titre).toBe('du téléphone');
+    expect(r.aEnvoyer).toBe(false);
+  });
+
+  it('une suppression se propage comme une modification', () => {
+    const local = donneesVides();
+    local.Taches.a = tache('a', 'à supprimer', '1');
+    const r = fusionner(local, { Taches: { a: tache('a', '', '2', 'purge') } }, {});
+    expect(r.donnees.Taches.a.supprime).toBe('purge');
+  });
+
+  it('lit son propre format, et ignore le reste', () => {
     const d = donneesVides();
-    d.Taches.b = { id: 'b', maj: '2', supprime: '', titre: 'B2' };
-    d.Taches.z = { id: 'z', maj: '2', supprime: '', titre: 'Z' };
-    // avec les en-têtes réordonnés, l'id est en 2e colonne : on relit
-    c.Taches!.valeurs = [c.Taches!.entetes, ['A', 'a'], [], ['B', 'b']];
-    const dist = lireDistant(c);
-    const e = ecrituresAFaire(d, dist, c, { 'Taches/b': '2', 'Taches/z': '2' });
-    expect(e.map(x => [x.numero, x.valeurs[0], x.valeurs[1]])).toEqual([[4, 'B2', 'b'], [5, 'Z', 'z']]);
-    expect(e[0].valeurs).toHaveLength(c.Taches!.entetes.length);
-  });
-
-  it('noms de colonnes A1', () => {
-    expect([colonne(0), colonne(25), colonne(26), colonne(27)]).toEqual(['A', 'Z', 'AA', 'AB']);
+    d.Taches.a = tache('a', 'x', '1');
+    expect(lireFichier(JSON.parse(JSON.stringify(versFichier(d, 1, '2026-10-01')))).Taches?.a.titre).toBe('x');
+    expect(lireFichier({ format: 'autre chose', donnees: { Taches: {} } })).toEqual({});
+    expect(lireFichier('pas du JSON')).toEqual({});
   });
 });

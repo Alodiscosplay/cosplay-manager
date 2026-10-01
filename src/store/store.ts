@@ -1,14 +1,13 @@
-// État de l'appli : données réactives, enregistrement local, synchro avec le Sheet, annulation.
+// État de l'appli : données réactives, enregistrement local, synchro avec le fichier caché du Drive, annulation.
 import { signal } from '@preact/signals';
-import { type Donnees, type NomTable, donneesVides, NOMS_TABLES, vivant } from '../modele/schema';
+import { type Donnees, type NomTable, donneesVides, NOMS_TABLES, VERSION_SCHEMA, vivant } from '../modele/schema';
 import { appliquerChangements, viderAnciensSupprimes, type Changement } from './operations';
 import { ouvrirBase, lireKv, ecrireKv, type Base, lirePhoto, ecrirePhoto } from './idb';
 import { activationsDuJour } from '../logique/activation';
 import { aujourdhui } from '../logique/dates';
 import { MODELES_PAR_DEFAUT } from '../modele/modelesParDefaut';
-import { type Pendants, clePendant, lireDistant, fusionner, ecrituresAFaire } from '../sync/fusion';
-import { lireClasseur, ecrireLignes } from '../sync/sheets';
-import { trouverOuCreer, envoyerPhoto, type Emplacement } from '../sync/drive';
+import { type Pendants, clePendant, fusionner, lireFichier, versFichier } from '../sync/fusion';
+import { trouverDonnees, lireDonnees, versionDonnees, ecrireDonnees, envoyerPhoto, dossierPhotosParDefaut, type Emplacement } from '../sync/drive';
 import { type DossierDrive } from '../sync/picker';
 import { ErreurConnexion, ErreurReseau, jetonValide, emailConnu } from '../sync/google';
 import { donneesDemo } from '../demo/donneesDemo';
@@ -92,7 +91,7 @@ let dernierToast = 0;
 
 /**
  * Applique des changements : mise à jour immédiate de l'écran, enregistrement local,
- * puis envoi vers le Sheet un peu plus tard. `annulable` affiche un bandeau « Annuler ».
+ * puis envoi vers le Drive un peu plus tard. `annulable` affiche un bandeau « Annuler ».
  */
 export function faire(changements: Changement[], annulable?: string): void {
   if (!changements.length) return;
@@ -164,20 +163,29 @@ export async function synchroniser(): Promise<void> {
   majEtatSync({ etat: 'envoi', message: undefined });
   try {
     if (!jetonValide()) throw new ErreurConnexion();
-    if (!meta.emplacement) {
-      const e = await trouverOuCreer();
-      meta.emplacement = { classeurId: e.classeurId, dossierId: e.dossierId, photosId: e.photosId };
-      if (e.cree) semerModeles();
-    }
+    meta.emplacement ??= {};
+    const e = meta.emplacement;
+    if (!e.donneesId) e.donneesId = await trouverDonnees();
     await envoyerPhotosEnAttente();
 
-    const p0 = { ...meta.pendants };
-    const classeur = await lireClasseur(meta.emplacement.classeurId);
-    const distant = lireDistant(classeur);
-    const f = fusionner(donnees.value, distant, p0);
-    // Sheet vide + rien en local : premier appareil d'un nouvel utilisateur → modèles par défaut
+    // Lire, fusionner, écrire. Si un autre appareil a écrit entre la lecture et l'écriture, on recommence
+    // avec sa version : aucune modification ne se perd, la plus récente gagne ligne par ligne.
+    let p0: Pendants = {};
+    let f: ReturnType<typeof fusionner> | null = null;
+    for (let essai = 0; essai < 3 && !f; essai++) {
+      p0 = { ...meta.pendants };
+      const lu = e.donneesId ? await lireDonnees(e.donneesId) : null;
+      if (!lu) e.donneesId = undefined; // pas encore créé, ou supprimé : il sera recréé depuis l'appareil
+      const fusion = fusionner(donnees.value, lireFichier(lu?.contenu), p0);
+      if (fusion.aEnvoyer || !e.donneesId) {
+        if (e.donneesId && lu && (await versionDonnees(e.donneesId)) !== lu.version) continue;
+        e.donneesId = await ecrireDonnees(e.donneesId, versFichier(fusion.donnees, VERSION_SCHEMA, new Date().toISOString()));
+      }
+      f = fusion;
+    }
+    if (!f) throw new Error('Le fichier de données change trop vite : nouvel essai bientôt');
+    // Rien nulle part : premier appareil d'une nouvelle utilisatrice → modèles par défaut.
     if (!Object.keys(f.donnees.Modeles).length && !Object.keys(donnees.value.Modeles).length) semerModeles();
-    await ecrireLignes(meta.emplacement.classeurId, classeur, ecrituresAFaire(f.donnees, distant, classeur, f.pendants));
 
     // Ce qui a été modifié PENDANT la synchro reste en attente et garde sa version locale.
     const actuels = meta.pendants;
@@ -237,7 +245,7 @@ export function protegerPhotosLocales(): void {
 /** Les photos prises hors-ligne (id « local:… ») partent vers le Drive avant les lignes. */
 async function envoyerPhotosEnAttente(): Promise<void> {
   if (!base || !meta.emplacement || meta.photosDrive !== true) return;
-  const dossier = meta.dossierPhotos?.id ?? meta.emplacement.photosId;
+  let dossier: string | undefined = meta.dossierPhotos?.id;
   const d = donnees.value;
   const locales = new Set<string>();
   for (const p of Object.values(d.Photos)) if (p.drive_id?.startsWith('local:') && vivant(p)) locales.add(p.drive_id);
@@ -245,6 +253,7 @@ async function envoyerPhotosEnAttente(): Promise<void> {
   for (const idLocal of locales) {
     const blob = await lirePhoto(base, idLocal);
     if (!blob) continue;
+    dossier ??= await dossierPhotosParDefaut(meta.emplacement);
     const idDrive = await envoyerPhoto(blob, `${idLocal.slice(6)}.jpg`, dossier);
     await ecrirePhoto(base, idDrive, blob);
     const ch: Changement[] = [];

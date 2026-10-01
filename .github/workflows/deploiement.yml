@@ -1,6 +1,6 @@
 # Construit le site et le publie sur GitHub Pages à chaque push sur main.
 # Réglages du dépôt : Settings → Pages → Source = « GitHub Actions »,
-# et Settings → Secrets and variables → Actions → Variables : VITE_GOOGLE_CLIENT_ID.
+# et Settings → Secrets and variables → Actions → Variables : VITE_GOOGLE_CLIENT_ID, VITE_GOOGLE_API_KEY, VITE_GOOGLE_APP_ID.
 name: Déploiement
 on:
   push:
@@ -28,6 +28,8 @@ jobs:
         env:
           BASE: /${{ github.event.repository.name }}/
           VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID }}
+          VITE_GOOGLE_API_KEY: ${{ vars.VITE_GOOGLE_API_KEY }}
+          VITE_GOOGLE_APP_ID: ${{ vars.VITE_GOOGLE_APP_ID }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

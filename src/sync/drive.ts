@@ -1,14 +1,67 @@
-// Fichiers de l'appli dans le Drive de l'utilisateur : un dossier « Cosplay Planner »,
-// le Sheet de données dedans, et un sous-dossier « Photos ». Retrouvés par leurs appProperties.
-import { gjson, gfetch } from './google';
-import { NOMS_TABLES, ONGLET, entetes, VERSION_SCHEMA } from '../modele/schema';
+// Fichiers de l'appli dans le Drive de l'utilisatrice.
+//  - Les DONNÉES : un seul fichier JSON dans l'espace caché réservé à l'appli (`appDataFolder`, portée
+//    `drive.appdata`). Invisible dans le Drive, inaccessible aux autres applis, et sans corbeille.
+//  - Ce qu'elle doit voir : un dossier « Cosplay Planner » (portée `drive.file`), créé seulement s'il sert
+//    — copie des photos, export vers Google Slides — avec un sous-dossier « Photos ».
+import { gjson, gfetch, ErreurIntrouvable } from './google';
 
 const DRIVE = 'https://www.googleapis.com/drive/v3/files';
 const UPLOAD = 'https://www.googleapis.com/upload/drive/v3/files';
 const DOSSIER = 'application/vnd.google-apps.folder';
 const CLE = 'cosplayPlanner';
+const NOM_DONNEES = 'donnees.json';
 
-export interface Emplacement { classeurId: string; dossierId: string; photosId: string }
+/** Où vivent les fichiers de l'appli. Le dossier visible et ses Photos n'existent que s'ils ont servi. */
+export interface Emplacement { donneesId?: string; dossierId?: string; photosId?: string }
+
+// ---------- Données (espace caché) ----------
+
+/** Le fichier de données, s'il existe déjà (un autre appareil a pu le créer). */
+export async function trouverDonnees(): Promise<string | undefined> {
+  const q = encodeURIComponent(`name='${NOM_DONNEES}' and trashed=false`);
+  const r = await gjson<{ files: { id: string }[] }>(`${DRIVE}?spaces=appDataFolder&q=${q}&fields=files(id)&orderBy=createdTime`);
+  return r.files[0]?.id;
+}
+
+/** Numéro de version du fichier : il augmente à chaque écriture, d'où qu'elle vienne. */
+export async function versionDonnees(id: string): Promise<string> {
+  return (await gjson<{ version: string }>(`${DRIVE}/${id}?fields=version`)).version;
+}
+
+/** Le contenu et sa version ; null si le fichier n'existe plus. */
+export async function lireDonnees(id: string): Promise<{ contenu: unknown; version: string } | null> {
+  try {
+    const version = await versionDonnees(id);
+    const texte = await (await gfetch(`${DRIVE}/${id}?alt=media`)).text();
+    let contenu: unknown = null;
+    try { contenu = JSON.parse(texte); } catch { /* fichier abîmé : lu comme vide, il sera réécrit */ }
+    return { contenu, version };
+  } catch (e) {
+    if (e instanceof ErreurIntrouvable) return null;
+    throw e;
+  }
+}
+
+/** Écrit le fichier de données (le crée dans l'espace caché s'il n'existe pas) ; renvoie son id. */
+export async function ecrireDonnees(id: string | undefined, contenu: unknown): Promise<string> {
+  const corps = new Blob([JSON.stringify(contenu)], { type: 'application/json' });
+  if (id) {
+    try {
+      await gjson(`${UPLOAD}/${id}?uploadType=media&fields=id`, { method: 'PATCH', body: corps });
+      return id;
+    } catch (e) {
+      if (!(e instanceof ErreurIntrouvable)) throw e; // disparu entre-temps : on le recrée
+    }
+  }
+  return envoyerMultipart({ name: NOM_DONNEES, parents: ['appDataFolder'], mimeType: 'application/json' }, corps);
+}
+
+/** Poids du fichier de données, en octets. */
+export async function tailleDonnees(id: string): Promise<number> {
+  return Number((await gjson<{ size?: string }>(`${DRIVE}/${id}?fields=size`)).size ?? 0);
+}
+
+// ---------- Dossier visible (créé à la demande) ----------
 
 async function chercher(role: string): Promise<string | undefined> {
   const q = encodeURIComponent(`appProperties has { key='${CLE}' and value='${role}' } and trashed=false`);
@@ -16,53 +69,27 @@ async function chercher(role: string): Promise<string | undefined> {
   return r.files[0]?.id;
 }
 
-async function creerFichier(meta: Record<string, unknown>): Promise<string> {
+async function creerDossier(nom: string, role: string, parent?: string): Promise<string> {
   const r = await gjson<{ id: string }>(`${DRIVE}?fields=id`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(meta),
+    method: 'POST',
+    body: JSON.stringify({ name: nom, mimeType: DOSSIER, appProperties: { [CLE]: role }, ...(parent ? { parents: [parent] } : {}) }),
   });
   return r.id;
 }
 
-/** Retrouve le Sheet de l'utilisateur, ou le crée (première connexion). `cree` = il vient d'être créé. */
-export async function trouverOuCreer(): Promise<Emplacement & { cree: boolean }> {
-  let dossierId = await chercher('dossier');
-  if (!dossierId) dossierId = await creerFichier({ name: 'Cosplay Planner', mimeType: DOSSIER, appProperties: { [CLE]: 'dossier' } });
-  let photosId = await chercher('photos');
-  if (!photosId) photosId = await creerFichier({ name: 'Photos', mimeType: DOSSIER, parents: [dossierId], appProperties: { [CLE]: 'photos' } });
-  let classeurId = await chercher('classeur');
-  let cree = false;
-  if (!classeurId) {
-    classeurId = await creerFichier({
-      name: 'Cosplay Planner — données', mimeType: 'application/vnd.google-apps.spreadsheet',
-      parents: [dossierId], appProperties: { [CLE]: 'classeur' },
-    });
-    await initialiserClasseur(classeurId);
-    cree = true;
-  }
-  return { classeurId, dossierId, photosId, cree };
+/** Le dossier « Cosplay Planner » visible dans le Drive ; créé la première fois qu'il sert. */
+export async function dossierVisible(e: Emplacement): Promise<string> {
+  e.dossierId ??= (await chercher('dossier')) ?? (await creerDossier('Cosplay Planner', 'dossier'));
+  return e.dossierId;
 }
 
-/** Crée un onglet par table avec sa ligne d'en-têtes, plus `_meta`, et retire la feuille par défaut. */
-async function initialiserClasseur(id: string): Promise<void> {
-  const SHEETS = `https://sheets.googleapis.com/v4/spreadsheets/${id}`;
-  const info = await gjson<{ sheets: { properties: { sheetId: number } }[] }>(`${SHEETS}?fields=sheets.properties.sheetId`);
-  const requests: unknown[] = [...NOMS_TABLES.map(t => ONGLET[t]), '_meta'].map(t => ({
-    addSheet: { properties: { title: t, gridProperties: { frozenRowCount: 1 } } },
-  }));
-  requests.push(...info.sheets.map(s => ({ deleteSheet: { sheetId: s.properties.sheetId } })));
-  await gjson(`${SHEETS}:batchUpdate`, { method: 'POST', body: JSON.stringify({ requests }) });
-  await gjson(`${SHEETS}/values:batchUpdate`, {
-    method: 'POST',
-    body: JSON.stringify({
-      valueInputOption: 'RAW',
-      data: [
-        ...NOMS_TABLES.map(t => ({ range: `'${ONGLET[t]}'!A1`, values: [entetes(t)] })),
-        { range: `'_meta'!A1`, values: [['cle', 'valeur'], ['version_schema', String(VERSION_SCHEMA)],
-          ['note', "Données de l'appli Cosplay Planner. Modifiable à la main : ne pas renommer les onglets, les en-têtes ni la colonne id. Onglet Etapes = étapes d'une pièce (Doublure, Broderie…), onglet Sous-etapes = ce qu'on coche ; piste_id y désigne l'étape parente."]] },
-      ],
-    }),
-  });
+/** Son sous-dossier « Photos », destination par défaut des copies de photos. */
+export async function dossierPhotosParDefaut(e: Emplacement): Promise<string> {
+  e.photosId ??= (await chercher('photos')) ?? (await creerDossier('Photos', 'photos', await dossierVisible(e)));
+  return e.photosId;
 }
+
+// ---------- Photos et exports ----------
 
 export async function envoyerPhoto(blob: Blob, nom: string, parent: string): Promise<string> {
   return envoyerMultipart({ name: nom, parents: [parent], appProperties: { [CLE]: 'photo' } }, blob);
@@ -84,11 +111,11 @@ export async function supprimerFichier(id: string): Promise<void> {
   try {
     await gfetch(`${DRIVE}/${id}`, { method: 'DELETE' });
   } catch (e) {
-    if (!String(e).includes('404')) throw e; // déjà supprimé : rien à faire
+    if (!(e instanceof ErreurIntrouvable)) throw e; // déjà supprimé : rien à faire
   }
 }
 
-/** Place occupée par les photos de l'appli, en octets. */
+/** Place occupée par les copies de photos de l'appli, en octets. */
 export async function placePhotos(): Promise<{ octets: number; nb: number }> {
   let octets = 0, nb = 0, page = '';
   const q = encodeURIComponent(`appProperties has { key='${CLE}' and value='photo' } and trashed=false`);
@@ -107,5 +134,3 @@ export async function versGoogleSlides(pptx: Blob, nom: string, parent: string):
     new Blob([pptx], { type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' }));
   return `https://docs.google.com/presentation/d/${id}/edit`;
 }
-
-export const urlClasseur = (id: string) => `https://docs.google.com/spreadsheets/d/${id}/edit`;

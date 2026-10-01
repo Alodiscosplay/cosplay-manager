@@ -65,7 +65,7 @@ export function blobVersDataUrl(b: Blob): Promise<string> {
   return new Promise((ok, ko) => { const r = new FileReader(); r.onload = () => ok(String(r.result)); r.onerror = ko; r.readAsDataURL(b); });
 }
 
-/** Vignette légère (pour garder une trace d'un costume archivé dans le Sheet : < 50 000 caractères). */
+/** Vignette légère (pour garder une trace d'un costume archivé dans les données : < 50 000 caractères). */
 export async function vignette(id: string): Promise<string> {
   const b = await blobPhoto(id);
   if (!b) return '';
