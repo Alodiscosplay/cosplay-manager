@@ -242,6 +242,32 @@ export function protegerPhotosLocales(): void {
   void navigator.storage?.persist?.().catch(() => false);
 }
 
+/**
+ * Après l'import, dans un compte, d'une sauvegarde faite en démo : les photos ne voyagent pas dans le
+ * fichier, mais elles sont encore dans la base démo de cet appareil. On y recopie celles qui manquent ;
+ * la base démo est seulement lue. Renvoie le nombre de photos récupérées.
+ */
+export async function recupererPhotosDemo(): Promise<number> {
+  if (!base || mode.value !== 'google') return 0;
+  const bases = await indexedDB.databases?.().catch(() => []) ?? [];
+  if (!bases.some(b => b.name === 'cosplay-planner-demo')) return 0;
+  const d = donnees.value;
+  const voulues = new Set<string>();
+  for (const p of Object.values(d.Photos)) if (p.drive_id?.startsWith('local:') && vivant(p)) voulues.add(p.drive_id);
+  for (const c of Object.values(d.Costumes)) if (c.image_ref?.startsWith('local:') && vivant(c)) voulues.add(c.image_ref);
+  const demo = await ouvrirBase('demo');
+  let n = 0;
+  try {
+    for (const id of voulues) {
+      if (await lirePhoto(base, id)) continue;
+      const blob = await lirePhoto(demo, id);
+      if (blob) { await ecrirePhoto(base, id, blob); n++; }
+    }
+  } finally { demo.close(); }
+  if (n) protegerPhotosLocales();
+  return n;
+}
+
 /** Les photos prises hors-ligne (id « local:… ») partent vers le Drive avant les lignes. */
 async function envoyerPhotosEnAttente(): Promise<void> {
   if (!base || !meta.emplacement || meta.photosDrive !== true) return;

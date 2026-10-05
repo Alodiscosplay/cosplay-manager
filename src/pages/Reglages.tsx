@@ -1,5 +1,6 @@
 import { useState } from 'preact/hooks';
-import { donnees, mode, sync, synchroniser, faire, demarrer, quitter, reinitialiserDemo, emplacement, photosSurDrive, reglerPhotosDrive, dossierPhotos, reglerDossierPhotos } from '../store/store';
+import { donnees, mode, sync, synchroniser, faire, demarrer, quitter, reinitialiserDemo, emplacement, photosSurDrive, reglerPhotosDrive, dossierPhotos, reglerDossierPhotos, recupererPhotosDemo } from '../store/store';
+import { photosChargees } from '../store/photos';
 import { tous, ordreSuivant } from '../logique/acces';
 import { analyserListe, compter, modeleVersTexte, texteVersModele, type PisteTexte } from '../logique/collerListe';
 import { DUREES, NOMS_DUREES, type Duree } from '../modele/schema';
@@ -261,17 +262,22 @@ function Sauvegarde() {
  */
 function ImportSauvegarde() {
   const [bilan, setBilan] = useState<{ ajouts: number; majs: number; ignorees: number; changements: number } | null>(null);
+  const [photos, setPhotos] = useState(0);
   const [erreur, setErreur] = useState('');
   const lire = async (f: File | undefined) => {
-    setErreur(''); setBilan(null);
+    setErreur(''); setBilan(null); setPhotos(0);
     if (!f) return;
     try {
       const lu = JSON.parse(await f.text());
       if (lu?.format !== 'cosplay-planner-sauvegarde' || !lu.donnees) throw new Error('Ce fichier n’est pas une sauvegarde Cosplay Manager.');
       const { changements, bilan: b } = changementsImport(donnees.value, lu.donnees);
-      if (!changements.length) { setErreur('Rien à importer : tes données sont déjà à jour.'); return; }
-      faire(changements, `${changements.length} ligne${changements.length > 1 ? 's' : ''} importée${changements.length > 1 ? 's' : ''}`);
-      setBilan({ ...b, changements: changements.length });
+      if (changements.length) {
+        faire(changements, `${changements.length} ligne${changements.length > 1 ? 's' : ''} importée${changements.length > 1 ? 's' : ''}`);
+        setBilan({ ...b, changements: changements.length });
+      }
+      const n = await recupererPhotosDemo();
+      if (n) { setPhotos(n); photosChargees.value++; }
+      if (!changements.length && !n) setErreur('Rien à importer : tes données sont déjà à jour.');
     } catch (e) {
       setErreur(e instanceof Error ? e.message : 'Fichier illisible.');
     }
@@ -284,6 +290,7 @@ function ImportSauvegarde() {
       </label>
       <p class="petit-texte">La fusion se fait ligne par ligne : la version la plus récente gagne, et rien n’est supprimé.</p>
       {bilan && <p class="petit-texte">{bilan.ajouts} ajoutée{bilan.ajouts > 1 ? 's' : ''} · {bilan.majs} mise{bilan.majs > 1 ? 's' : ''} à jour · {bilan.ignorees} déjà à jour.</p>}
+      {photos > 0 && <p class="petit-texte">{photos} photo{photos > 1 ? 's' : ''} de la démo récupérée{photos > 1 ? 's' : ''} sur cet appareil.</p>}
       {erreur && <p class="erreur">{erreur}</p>}
     </>
   );
