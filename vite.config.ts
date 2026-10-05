@@ -2,7 +2,7 @@ import { defineConfig } from 'vite';
 import preact from '@preact/preset-vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
-// BASE = sous-chemin GitHub Pages, ex. /cosplay-planner/ (défini par le workflow de déploiement)
+// BASE = sous-chemin GitHub Pages, ex. /cosplay-manager/ (défini par le workflow de déploiement)
 const base = process.env.BASE ?? '/';
 
 export default defineConfig({
@@ -13,7 +13,7 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['icone.svg'],
       manifest: {
-        name: 'Cosplay Planner',
+        name: 'Cosplay Manager',
         short_name: 'Cosplay',
         description: 'Planifier et suivre la création de ses cosplays, pièce par pièce.',
         lang: 'fr',

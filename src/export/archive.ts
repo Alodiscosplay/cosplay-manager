@@ -95,9 +95,9 @@ export async function lireArchive(fichier: Blob, d: Donnees): Promise<{ changeme
   const { default: Zip } = await import('jszip');
   const zip = await Zip.loadAsync(fichier);
   const brut = await zip.file('costume.json')?.async('string');
-  if (!brut) throw new Error("Ce fichier n'est pas une archive Cosplay Planner (costume.json absent).");
+  if (!brut) throw new Error("Ce fichier n'est pas une archive Cosplay Manager (costume.json absent).");
   const contenu = JSON.parse(brut) as ContenuArchive;
-  if (contenu.format !== FORMAT) throw new Error("Ce fichier n'est pas une archive Cosplay Planner.");
+  if (contenu.format !== FORMAT) throw new Error("Ce fichier n'est pas une archive Cosplay Manager.");
 
   const nouveaux = new Map<string, string>();
   const nid = (ancien: string) => { if (!ancien) return ''; if (!nouveaux.has(ancien)) nouveaux.set(ancien, nouvelId()); return nouveaux.get(ancien)!; };
@@ -179,7 +179,7 @@ table{border-collapse:collapse;width:100%}td,th{border-bottom:1px solid #e3dcea;
 <h1>${echap(c.nom)}</h1><p>${echap([c.personnage, c.oeuvre].filter(Boolean).join(' — '))}</p>
 <p><strong>${formatPct(a)}</strong> · ${a.nbFait} sous-étapes faites sur ${a.nb} · ${pieces.length} pièces</p>
 ${c.deadline ? `<p>Deadline : ${jourCourt(c.deadline, '')}</p>` : ''}${c.notes ? `<p class="notes">${echap(c.notes)}</p>` : ''}
-<p><small>Archivé le ${jourCourt(new Date().toISOString().slice(0, 10), '')} avec Cosplay Planner.</small></p></div></div>
+<p><small>Archivé le ${jourCourt(new Date().toISOString().slice(0, 10), '')} avec Cosplay Manager.</small></p></div></div>
 <h2>Pièces, étapes et sous-étapes</h2>${pieces.map(blocPiece).join('')}
 ${photos.some(p => !p.piece_id) ? `<h2>Photos générales</h2><div class="photos">${photos.filter(p => !p.piece_id).map(ph => `<figure><img src="${fichiers[ph.drive_id]}" alt=""><figcaption>${jourCourt(ph.date, '')} ${echap(ph.legende ?? '')}</figcaption></figure>`).join('')}</div>` : ''}
 <h2>Fournitures</h2>${fournitures.length ? `<table><tr><th>Quoi</th><th>Quantité</th><th>Fournisseur</th><th>Prix</th><th>Statut</th></tr>${fournitures.map(f => {

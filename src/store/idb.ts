@@ -1,5 +1,7 @@
 // Copie de travail locale (IndexedDB) : l'appli démarre sans réseau et ne perd rien hors-ligne.
 // Une base par compte (ou « demo »), pour que deux comptes sur le même appareil ne se mélangent jamais.
+// Les noms internes (bases, clés, formats de fichier) gardent « cosplay-planner », l'ancien nom de l'appli :
+// les changer ferait perdre les données déjà enregistrées et refuser les anciennes sauvegardes.
 import { openDB, type IDBPDatabase } from 'idb';
 
 export type Base = IDBPDatabase;

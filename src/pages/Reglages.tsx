@@ -21,7 +21,7 @@ export function PageReglages() {
       <Sauvegarde />
       <section class="carte-reglage">
         <h2>À propos</h2>
-        <p class="petit-texte">Cosplay Planner — tes données restent dans ton propre Google Drive, dans un espace caché réservé à l'appli, ou sur cet appareil en mode démo. Tes photos restent sur l'appareil, avec une copie sur ton Drive si tu le choisis. L'appli n'a accès à aucun autre fichier.</p>
+        <p class="petit-texte">Cosplay Manager — tes données restent dans ton propre Google Drive, dans un espace caché réservé à l'appli, ou sur cet appareil en mode démo. Tes photos restent sur l'appareil, avec une copie sur ton Drive si tu le choisis. L'appli n'a accès à aucun autre fichier.</p>
       </section>
     </div>
   );
@@ -248,7 +248,7 @@ function Sauvegarde() {
       <p class="petit-texte">Un fichier JSON avec toutes tes données (sans les photos), à garder où tu veux : c'est ta sauvegarde personnelle.</p>
       <button class="bouton" onClick={() => {
         const blob = new Blob([JSON.stringify({ format: 'cosplay-planner-sauvegarde', exporte_le: new Date().toISOString(), donnees: donnees.value }, null, 1)], { type: 'application/json' });
-        telechargerBlob(blob, `cosplay-planner-sauvegarde-${new Date().toISOString().slice(0, 10)}.json`);
+        telechargerBlob(blob, `cosplay-manager-sauvegarde-${new Date().toISOString().slice(0, 10)}.json`);
       }}><Icone nom="telecharger" />Exporter mes données</button>
       <ImportSauvegarde />
     </section>
@@ -267,7 +267,7 @@ function ImportSauvegarde() {
     if (!f) return;
     try {
       const lu = JSON.parse(await f.text());
-      if (lu?.format !== 'cosplay-planner-sauvegarde' || !lu.donnees) throw new Error('Ce fichier n’est pas une sauvegarde Cosplay Planner.');
+      if (lu?.format !== 'cosplay-planner-sauvegarde' || !lu.donnees) throw new Error('Ce fichier n’est pas une sauvegarde Cosplay Manager.');
       const { changements, bilan: b } = changementsImport(donnees.value, lu.donnees);
       if (!changements.length) { setErreur('Rien à importer : tes données sont déjà à jour.'); return; }
       faire(changements, `${changements.length} ligne${changements.length > 1 ? 's' : ''} importée${changements.length > 1 ? 's' : ''}`);

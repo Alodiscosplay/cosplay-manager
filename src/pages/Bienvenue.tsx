@@ -17,7 +17,7 @@ export function Bienvenue() {
     <div class="bienvenue">
       <div class="bienvenue-carte">
         <div class="bienvenue-logo" aria-hidden="true">✂</div>
-        <h1>Cosplay Planner</h1>
+        <h1>Cosplay Manager</h1>
         <p class="bienvenue-accroche">Planifier et suivre ses cosplays, pièce par pièce, étape par étape.</p>
         <ul class="bienvenue-points">
           <li>Chaque costume détaillé en pièces, chaque pièce en étapes et sous-étapes à cocher, avec le % d'avancement.</li>

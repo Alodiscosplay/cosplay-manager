@@ -1,7 +1,7 @@
 // Fichiers de l'appli dans le Drive de l'utilisatrice.
 //  - Les DONNÉES : un seul fichier JSON dans l'espace caché réservé à l'appli (`appDataFolder`, portée
 //    `drive.appdata`). Invisible dans le Drive, inaccessible aux autres applis, et sans corbeille.
-//  - Ce qu'elle doit voir : un dossier « Cosplay Planner » (portée `drive.file`), créé seulement s'il sert
+//  - Ce qu'elle doit voir : un dossier « Cosplay Manager » (portée `drive.file`), créé seulement s'il sert
 //    — copie des photos, export vers Google Slides — avec un sous-dossier « Photos ».
 import { gjson, gfetch, ErreurIntrouvable } from './google';
 
@@ -77,9 +77,9 @@ async function creerDossier(nom: string, role: string, parent?: string): Promise
   return r.id;
 }
 
-/** Le dossier « Cosplay Planner » visible dans le Drive ; créé la première fois qu'il sert. */
+/** Le dossier « Cosplay Manager » visible dans le Drive ; créé la première fois qu'il sert. */
 export async function dossierVisible(e: Emplacement): Promise<string> {
-  e.dossierId ??= (await chercher('dossier')) ?? (await creerDossier('Cosplay Planner', 'dossier'));
+  e.dossierId ??= (await chercher('dossier')) ?? (await creerDossier('Cosplay Manager', 'dossier'));
   return e.dossierId;
 }
 

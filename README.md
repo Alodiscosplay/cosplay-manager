@@ -1,4 +1,4 @@
-# Cosplay Planner
+# Cosplay Manager
 
 Planifier et suivre la création de ses cosplays, pièce par pièce, étape par étape. Sur ordinateur et téléphone, synchronisé par le compte Google de chacun.
 
@@ -18,7 +18,7 @@ Planifier et suivre la création de ses cosplays, pièce par pièce, étape par 
 
 Chaque utilisatrice a ses données **dans son propre Google Drive**, dans un fichier `donnees.json` rangé dans l'**espace caché réservé à l'appli** (portée `drive.appdata`) : invisible dans le Drive, inaccessible aux autres applis. Une copie complète reste sur chaque appareil (IndexedDB) : l'appli marche hors ligne et envoie les modifications au retour du réseau.
 
-Les **photos** restent sur l'appareil. Une copie peut partir sur le Drive (Réglages › Photos), dans un dossier « Cosplay Planner / Photos » créé pour l'occasion ou dans un dossier choisi avec le Google Picker (portée `drive.file` : l'appli ne voit que les fichiers qu'elle a créés et le dossier qu'on lui a montré).
+Les **photos** restent sur l'appareil. Une copie peut partir sur le Drive (Réglages › Photos), dans un dossier « Cosplay Manager / Photos » créé pour l'occasion ou dans un dossier choisi avec le Google Picker (portée `drive.file` : l'appli ne voit que les fichiers qu'elle a créés et le dossier qu'on lui a montré).
 
 Règles de synchro (`src/sync/fusion.ts`) : ligne par ligne, la version la plus récente (champ `maj`) gagne. **Rien ne disparaît par la synchro** : une suppression vide la ligne et la marque `purge`, et se propage comme une modification ; une ligne qui n'existe que sur un appareil repart vers le fichier. Si le fichier est perdu, il se reconstruit depuis n'importe quel appareil. Avant d'écrire, l'appli vérifie que personne n'a écrit entre-temps, sinon elle refusionne.
 

@@ -39,7 +39,7 @@ export function App() {
   return (
     <div class="coquille">
       <nav class="navigation" aria-label="Navigation principale">
-        <div class="marque"><span class="marque-logo" aria-hidden="true">✂</span><span>Cosplay Planner</span></div>
+        <div class="marque"><span class="marque-logo" aria-hidden="true">✂</span><span>Cosplay Manager</span></div>
         {NAV.map(n => (
           <a href={`#/${n.chemin}`} class={`nav-lien${actif === n.chemin ? ' actif' : ''}`} aria-current={actif === n.chemin ? 'page' : undefined}>
             <Icone nom={n.nom} /><span>{n.texte}</span>
