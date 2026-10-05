@@ -10,12 +10,13 @@ import { placePhotos, tailleDonnees } from '../sync/drive';
 import { choisirDossier, pickerConfigure } from '../sync/picker';
 import { Feuille, Champ, Confirmer, telechargerBlob } from '../composants/base';
 import { Icone } from '../composants/Icone';
+import { IndicateurSync } from '../app';
 import { jourCourt } from '../logique/dates';
 
 export function PageReglages() {
   return (
     <div class="page">
-      <header class="page-tete"><h1>Réglages</h1></header>
+      <header class="page-tete"><h1>Réglages</h1><IndicateurSync /></header>
       <Compte />
       <Photos />
       <Modeles />

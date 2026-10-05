@@ -179,6 +179,12 @@ code { background: var(--surface-2); padding: 1px 5px; border-radius: 5px; font-
 .toast .bouton { background: transparent; color: var(--fond); border-color: color-mix(in srgb, var(--fond) 40%, transparent); }
 @media (min-width: 900px) { .toast { bottom: 24px; left: calc(50% + 110px); } }
 .indicateur-sync { display: inline-flex; align-items: center; gap: 6px; border: 0; background: var(--surface-2); color: var(--doux); padding: 4px 10px; border-radius: 99px; font-size: .8rem; cursor: pointer; }
+.nav-sync { display: none; }
+@media (min-width: 900px) {
+  .nav-sync { display: block; padding: 0 10px 12px; }
+  .nav-sync:empty { display: none; }
+  .page-tete .indicateur-sync { display: none; }
+}
 .indicateur-sync.envoi .icone { animation: tourne 1s linear infinite; }
 .indicateur-sync.reconnexion, .indicateur-sync.erreur { background: var(--orange-fond); color: var(--orange); }
 @keyframes tourne { to { transform: rotate(360deg); } }

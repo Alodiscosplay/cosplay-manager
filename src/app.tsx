@@ -40,6 +40,7 @@ export function App() {
     <div class="coquille">
       <nav class="navigation" aria-label="Navigation principale">
         <div class="marque"><span class="marque-logo" aria-hidden="true">✂</span><span>Cosplay Manager</span></div>
+        <div class="nav-sync"><IndicateurSync /></div>
         {NAV.map(n => (
           <a href={`#/${n.chemin}`} class={`nav-lien${actif === n.chemin ? ' actif' : ''}`} aria-current={actif === n.chemin ? 'page' : undefined}>
             <Icone nom={n.nom} /><span>{n.texte}</span>
