@@ -1,5 +1,5 @@
-import { useState } from 'preact/hooks';
-import { donnees, mode, sync, synchroniser, faire, demarrer, quitter, reinitialiserDemo, emplacement, photosSurDrive, reglerPhotosDrive, dossierPhotos, reglerDossierPhotos, recupererPhotosDemo } from '../store/store';
+import { useEffect, useState } from 'preact/hooks';
+import { donnees, mode, sync, synchroniser, faire, demarrer, quitter, reinitialiserDemo, emplacement, photosSurDrive, reglerPhotosDrive, dossierPhotos, lireNomDossierPhotos, renommerDossierPhotos, recupererPhotosDemo } from '../store/store';
 import { photosChargees } from '../store/photos';
 import { tous, ordreSuivant } from '../logique/acces';
 import { analyserListe, compter, modeleVersTexte, texteVersModele, type PisteTexte } from '../logique/collerListe';
@@ -7,7 +7,6 @@ import { DUREES, NOMS_DUREES, type Duree } from '../modele/schema';
 import { nouvelId, supprimer, changementsImport } from '../store/operations';
 import { connecter, deconnecter, emailConnu, googleConfigure } from '../sync/google';
 import { placePhotos, tailleDonnees } from '../sync/drive';
-import { choisirDossier, pickerConfigure } from '../sync/picker';
 import { Feuille, Champ, Confirmer, telechargerBlob } from '../composants/base';
 import { Icone } from '../composants/Icone';
 import { IndicateurSync } from '../app';
@@ -100,17 +99,11 @@ function Photos() {
   const actif = photosSurDrive.value;
   const dossier = dossierPhotos.value;
   const [erreur, setErreur] = useState('');
+  const [renommer, setRenommer] = useState(false);
+  useEffect(() => { if (actif) lireNomDossierPhotos().catch(() => { /* hors ligne : on garde le nom connu */ }); }, [actif]);
   const locales = new Set<string>();
   for (const p of Object.values(d.Photos)) if (p.supprime !== 'oui' && p.supprime !== 'purge' && p.drive_id?.startsWith('local:')) locales.add(p.drive_id);
   for (const c of Object.values(d.Costumes)) if (c.image_ref?.startsWith('local:')) locales.add(c.image_ref);
-  const choisir = async () => {
-    setErreur('');
-    try {
-      const jeton = await connecter(true);
-      const choix = await choisirDossier(jeton);
-      if (choix) await reglerDossierPhotos(choix);
-    } catch (e) { setErreur((e as Error).message); }
-  };
   return (
     <section class="carte-reglage">
       <h2>Photos</h2>
@@ -121,14 +114,13 @@ function Photos() {
       </label>
       {actif && (
         <>
-          <p class="petit-texte">Dossier : <strong>{dossier ? dossier.nom : 'Photos (dossier de l’appli)'}</strong></p>
+          <p class="petit-texte">Dossier : <strong>{dossier ?? 'Cosplay Manager › Photos'}</strong>{!dossier && ' (créé au premier envoi)'}</p>
           <div class="ligne-actions">
-            <button class="bouton" disabled={mode.value !== 'google' || !pickerConfigure()} onClick={() => void choisir()}>
-              <Icone nom="nuage" />Choisir un dossier…
+            <button class="bouton" disabled={mode.value !== 'google'} onClick={() => { setErreur(''); setRenommer(true); }}>
+              <Icone nom="nuage" />Nommer le dossier…
             </button>
-            {dossier && <button class="bouton" onClick={() => void reglerDossierPhotos(null)}>Revenir au dossier de l’appli</button>}
           </div>
-          {mode.value === 'google' && !pickerConfigure() && <p class="petit-texte">Le choix du dossier sera disponible une fois l’appli entièrement configurée auprès de Google.</p>}
+          <p class="petit-texte">Tu peux ensuite déplacer ce dossier où tu veux dans ton Drive : l’appli le retrouve.</p>
           <p class="petit-texte">Tes autres appareils retrouvent alors les photos. Les photos déjà envoyées restent sur le Drive si tu décoches.</p>
         </>
       )}
@@ -138,7 +130,29 @@ function Photos() {
       )}
       {mode.value !== 'google' && <p class="petit-texte">En mode démo, rien n’est envoyé : le réglage prendra effet une fois connecté à Google.</p>}
       {erreur && <p class="erreur">{erreur}</p>}
+      {renommer && <NommerDossier nom={dossier ?? ''} onFermer={() => setRenommer(false)} onErreur={setErreur} />}
     </section>
+  );
+}
+
+function NommerDossier({ nom, onFermer, onErreur }: { nom: string; onFermer: () => void; onErreur: (m: string) => void }) {
+  const [v, setV] = useState(nom);
+  const [attente, setAttente] = useState(false);
+  const valider = async () => {
+    const n = v.trim();
+    if (!n || n === nom) { onFermer(); return; }
+    setAttente(true);
+    try { await renommerDossierPhotos(n); } catch (e) { onErreur((e as Error).message); }
+    onFermer();
+  };
+  return (
+    <Feuille titre="Dossier des photos" onFermer={onFermer} pied={
+      <button class="bouton principal" disabled={attente} onClick={() => void valider()}>{attente ? 'Un instant…' : 'Valider'}</button>
+    }>
+      <Champ label="Nom du dossier sur ton Drive" aide={nom ? 'Le dossier est renommé, ses photos restent dedans.' : 'Le dossier est créé à la racine de ton Drive.'}>
+        <input value={v} autoFocus onInput={e => setV((e.target as HTMLInputElement).value)} />
+      </Champ>
+    </Feuille>
   );
 }
 

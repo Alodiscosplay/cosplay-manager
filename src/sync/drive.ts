@@ -83,10 +83,41 @@ export async function dossierVisible(e: Emplacement): Promise<string> {
   return e.dossierId;
 }
 
-/** Son sous-dossier « Photos », destination par défaut des copies de photos. */
+/**
+ * Le dossier des copies de photos : un seul par compte, retrouvé par son marqueur et non par son nom ou
+ * sa place. On peut donc le renommer depuis l'appli et le déplacer dans le Drive. Créé au premier envoi,
+ * en sous-dossier « Photos » du dossier de l'appli.
+ */
 export async function dossierPhotosParDefaut(e: Emplacement): Promise<string> {
   e.photosId ??= (await chercher('photos')) ?? (await creerDossier('Photos', 'photos', await dossierVisible(e)));
   return e.photosId;
+}
+
+/** Nom actuel du dossier des photos ; null s'il n'existe pas encore. */
+export async function nomDossierPhotos(e: Emplacement): Promise<string | null> {
+  e.photosId ??= await chercher('photos');
+  if (!e.photosId) return null;
+  try {
+    return (await gjson<{ name: string }>(`${DRIVE}/${e.photosId}?fields=name`)).name;
+  } catch (x) {
+    if (!(x instanceof ErreurIntrouvable)) throw x;
+    e.photosId = undefined; // supprimé pour de bon : il sera recréé au prochain envoi
+    return null;
+  }
+}
+
+/** Renomme le dossier des photos ; s'il n'existe pas encore, le crée à la racine du Drive sous ce nom. */
+export async function nommerDossierPhotos(e: Emplacement, nom: string): Promise<void> {
+  e.photosId ??= await chercher('photos');
+  if (e.photosId) {
+    try {
+      await gjson(`${DRIVE}/${e.photosId}?fields=id`, { method: 'PATCH', body: JSON.stringify({ name: nom }) });
+      return;
+    } catch (x) {
+      if (!(x instanceof ErreurIntrouvable)) throw x;
+    }
+  }
+  e.photosId = await creerDossier(nom, 'photos');
 }
 
 // ---------- Photos et exports ----------

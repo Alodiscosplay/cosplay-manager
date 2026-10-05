@@ -7,17 +7,16 @@ import { activationsDuJour } from '../logique/activation';
 import { aujourdhui } from '../logique/dates';
 import { MODELES_PAR_DEFAUT } from '../modele/modelesParDefaut';
 import { type Pendants, clePendant, fusionner, lireFichier, versFichier } from '../sync/fusion';
-import { trouverDonnees, lireDonnees, versionDonnees, ecrireDonnees, envoyerPhoto, dossierPhotosParDefaut, type Emplacement } from '../sync/drive';
-import { type DossierDrive } from '../sync/picker';
+import { trouverDonnees, lireDonnees, versionDonnees, ecrireDonnees, envoyerPhoto, dossierPhotosParDefaut, nomDossierPhotos, nommerDossierPhotos, type Emplacement } from '../sync/drive';
 import { ErreurConnexion, ErreurReseau, jetonValide, emailConnu } from '../sync/google';
 import { donneesDemo } from '../demo/donneesDemo';
 
 export type Mode = 'demo' | 'google';
 const CLE_MODE = 'cosplay-planner.mode';
 
-// Les photos vivent sur l'appareil ; `photosDrive` (coché par l'utilisatrice) en envoie une copie sur le
-// Drive, dans `dossierPhotos` s'il est choisi, sinon dans le dossier Photos de l'appli.
-interface Meta { pendants: Pendants; emplacement?: Emplacement; derniere?: string; photosDrive?: boolean; dossierPhotos?: DossierDrive }
+// Les photos vivent sur l'appareil ; `photosDrive` (coché par l'utilisatrice) en envoie une copie dans
+// le dossier des photos du Drive, dont `nomDossierPhotos` garde le dernier nom connu, pour l'affichage.
+interface Meta { pendants: Pendants; emplacement?: Emplacement; derniere?: string; photosDrive?: boolean; nomDossierPhotos?: string }
 
 export const mode = signal<Mode | null>(lireMode());
 export const donnees = signal<Donnees>(donneesVides());
@@ -25,8 +24,8 @@ export const pret = signal(false);
 export const jour = signal(aujourdhui());
 /** Une copie des photos part-elle sur le Drive ? Non par défaut. Réglage propre à cet appareil. */
 export const photosSurDrive = signal(false);
-/** Dossier du Drive choisi pour les photos (sinon le dossier Photos de l'appli). */
-export const dossierPhotos = signal<DossierDrive | null>(null);
+/** Nom du dossier des photos sur le Drive ; null tant qu'il n'existe pas. */
+export const dossierPhotos = signal<string | null>(null);
 
 export type EtatSync = 'local' | 'ok' | 'envoi' | 'hors-ligne' | 'reconnexion' | 'erreur';
 export const sync = signal<{ etat: EtatSync; message?: string; derniere?: string; attente: number }>({ etat: 'local', attente: 0 });
@@ -53,7 +52,7 @@ export async function demarrer(m: Mode): Promise<void> {
   const d = await lireKv<Donnees>(base, 'donnees');
   meta = (await lireKv<Meta>(base, 'meta')) ?? { pendants: {} };
   photosSurDrive.value = meta.photosDrive === true;
-  dossierPhotos.value = meta.dossierPhotos ?? null;
+  dossierPhotos.value = meta.nomDossierPhotos ?? null;
   const complet = donneesVides();
   if (d) for (const t of NOMS_TABLES) complet[t] = d[t] ?? {};
   donnees.value = complet;
@@ -230,10 +229,24 @@ export async function reglerPhotosDrive(v: boolean): Promise<void> {
   if (v) planifierSync(200);
 }
 
-/** Le dossier du Drive où partent les photos ; null = le dossier Photos de l'appli. */
-export async function reglerDossierPhotos(d: DossierDrive | null): Promise<void> {
-  meta.dossierPhotos = d ?? undefined;
-  dossierPhotos.value = d;
+/** Relit le nom du dossier des photos (il a pu être renommé depuis le Drive ou un autre appareil). */
+export async function lireNomDossierPhotos(): Promise<void> {
+  if (mode.value !== 'google' || !base) return;
+  meta.emplacement ??= {};
+  const nom = await nomDossierPhotos(meta.emplacement);
+  if (nom === (meta.nomDossierPhotos ?? null)) return;
+  meta.nomDossierPhotos = nom ?? undefined;
+  dossierPhotos.value = nom;
+  await enregistrer();
+}
+
+/** Renomme le dossier des photos sur le Drive (ou le crée sous ce nom). */
+export async function renommerDossierPhotos(nom: string): Promise<void> {
+  if (mode.value !== 'google' || !base) return;
+  meta.emplacement ??= {};
+  await nommerDossierPhotos(meta.emplacement, nom);
+  meta.nomDossierPhotos = nom;
+  dossierPhotos.value = nom;
   await enregistrer();
 }
 
@@ -271,7 +284,7 @@ export async function recupererPhotosDemo(): Promise<number> {
 /** Les photos prises hors-ligne (id « local:… ») partent vers le Drive avant les lignes. */
 async function envoyerPhotosEnAttente(): Promise<void> {
   if (!base || !meta.emplacement || meta.photosDrive !== true) return;
-  let dossier: string | undefined = meta.dossierPhotos?.id;
+  let dossier: string | undefined;
   const d = donnees.value;
   const locales = new Set<string>();
   for (const p of Object.values(d.Photos)) if (p.drive_id?.startsWith('local:') && vivant(p)) locales.add(p.drive_id);
