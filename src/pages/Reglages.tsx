@@ -120,7 +120,7 @@ function Photos() {
               <Icone nom="nuage" />Nommer le dossier…
             </button>
           </div>
-          <p class="petit-texte">Tu peux ensuite déplacer ce dossier où tu veux dans ton Drive : l’appli le retrouve.</p>
+          <p class="petit-texte">Les photos y sont rangées par costume, puis en Références et WIP, puis par pièce. Tu peux déplacer ce dossier où tu veux dans ton Drive : l’appli le retrouve.</p>
           <p class="petit-texte">Tes autres appareils retrouvent alors les photos. Les photos déjà envoyées restent sur le Drive si tu décoches.</p>
         </>
       )}

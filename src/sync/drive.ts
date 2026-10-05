@@ -2,7 +2,8 @@
 //  - Les DONNÉES : un seul fichier JSON dans l'espace caché réservé à l'appli (`appDataFolder`, portée
 //    `drive.appdata`). Invisible dans le Drive, inaccessible aux autres applis, et sans corbeille.
 //  - Ce qu'elle doit voir : un dossier « Cosplay Manager » (portée `drive.file`), créé seulement s'il sert
-//    — copie des photos, export vers Google Slides — avec un sous-dossier « Photos ».
+//    — copie des photos, export vers Google Slides — avec un sous-dossier « Photos », rangé par costume :
+//    Photos / <costume> / Références | WIP / <pièce>.
 import { gjson, gfetch, ErreurIntrouvable } from './google';
 
 const DRIVE = 'https://www.googleapis.com/drive/v3/files';
@@ -11,8 +12,19 @@ const DOSSIER = 'application/vnd.google-apps.folder';
 const CLE = 'cosplayPlanner';
 const NOM_DONNEES = 'donnees.json';
 
-/** Où vivent les fichiers de l'appli. Le dossier visible et ses Photos n'existent que s'ils ont servi. */
-export interface Emplacement { donneesId?: string; dossierId?: string; photosId?: string }
+/**
+ * Où vivent les fichiers de l'appli. Le dossier visible et ses Photos n'existent que s'ils ont servi.
+ * `dossiers` et `places` sont des mémos propres à l'appareil (dossiers rangés déjà trouvés, dossier
+ * où se trouve chaque photo) : ils évitent de redemander au Drive ce qu'on sait déjà.
+ */
+export interface Emplacement {
+  donneesId?: string; dossierId?: string; photosId?: string;
+  dossiers?: Record<string, { id: string; nom: string }>;
+  places?: Record<string, string>;
+}
+
+/** Un dossier du rangement des photos : son rôle, l'id de ce qu'il représente, et son nom. */
+export interface PlaceDossier { role: string; ref: string; nom: string }
 
 // ---------- Données (espace caché) ----------
 
@@ -69,10 +81,10 @@ async function chercher(role: string): Promise<string | undefined> {
   return r.files[0]?.id;
 }
 
-async function creerDossier(nom: string, role: string, parent?: string): Promise<string> {
+async function creerDossier(nom: string, role: string, parent?: string, plus: Record<string, string> = {}): Promise<string> {
   const r = await gjson<{ id: string }>(`${DRIVE}?fields=id`, {
     method: 'POST',
-    body: JSON.stringify({ name: nom, mimeType: DOSSIER, appProperties: { [CLE]: role }, ...(parent ? { parents: [parent] } : {}) }),
+    body: JSON.stringify({ name: nom, mimeType: DOSSIER, appProperties: { [CLE]: role, ...plus }, ...(parent ? { parents: [parent] } : {}) }),
   });
   return r.id;
 }
@@ -118,6 +130,42 @@ export async function nommerDossierPhotos(e: Emplacement, nom: string): Promise<
     }
   }
   e.photosId = await creerDossier(nom, 'photos');
+}
+
+/**
+ * La chaîne de dossiers sous le dossier des photos (du plus haut au plus bas) ; renvoie l'id du dernier.
+ * Chaque dossier est retrouvé par son rôle et l'id du costume ou de la pièce, jamais par son nom : un
+ * costume renommé renomme son dossier, et on peut déplacer les dossiers dans le Drive.
+ */
+export async function dossierRange(e: Emplacement, chemin: PlaceDossier[]): Promise<string> {
+  let parent = await dossierPhotosParDefaut(e);
+  e.dossiers ??= {};
+  for (const p of chemin) {
+    const cle = `${p.role}:${p.ref}`;
+    let connu = e.dossiers[cle];
+    if (!connu) {
+      const q = encodeURIComponent(`appProperties has { key='${CLE}' and value='${p.role}' } and appProperties has { key='ref' and value='${p.ref}' } and trashed=false`);
+      const id = (await gjson<{ files: { id: string }[] }>(`${DRIVE}?q=${q}&fields=files(id,name)&spaces=drive`)).files[0]?.id;
+      connu = id ? { id, nom: '' } : { id: await creerDossier(p.nom, p.role, parent, { ref: p.ref }), nom: p.nom };
+      e.dossiers[cle] = connu;
+    }
+    if (connu.nom !== p.nom) {
+      await gjson(`${DRIVE}/${connu.id}?fields=id`, { method: 'PATCH', body: JSON.stringify({ name: p.nom }) });
+      connu.nom = p.nom;
+    }
+    parent = connu.id;
+  }
+  return parent;
+}
+
+/** Le dossier où se trouve un fichier. */
+export async function dossierDe(id: string): Promise<string | undefined> {
+  return (await gjson<{ parents?: string[] }>(`${DRIVE}/${id}?fields=parents`)).parents?.[0];
+}
+
+/** Déplace un fichier d'un dossier à un autre. */
+export async function deplacer(id: string, vers: string, depuis: string | undefined): Promise<void> {
+  await gjson(`${DRIVE}/${id}?addParents=${vers}${depuis ? `&removeParents=${depuis}` : ''}&fields=id`, { method: 'PATCH', body: '{}' });
 }
 
 // ---------- Photos et exports ----------

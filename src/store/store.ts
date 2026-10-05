@@ -7,8 +7,8 @@ import { activationsDuJour } from '../logique/activation';
 import { aujourdhui } from '../logique/dates';
 import { MODELES_PAR_DEFAUT } from '../modele/modelesParDefaut';
 import { type Pendants, clePendant, fusionner, lireFichier, versFichier } from '../sync/fusion';
-import { trouverDonnees, lireDonnees, versionDonnees, ecrireDonnees, envoyerPhoto, dossierPhotosParDefaut, nomDossierPhotos, nommerDossierPhotos, type Emplacement } from '../sync/drive';
-import { ErreurConnexion, ErreurReseau, jetonValide, emailConnu } from '../sync/google';
+import { trouverDonnees, lireDonnees, versionDonnees, ecrireDonnees, envoyerPhoto, nomDossierPhotos, nommerDossierPhotos, dossierRange, dossierDe, deplacer, type Emplacement, type PlaceDossier } from '../sync/drive';
+import { ErreurConnexion, ErreurReseau, ErreurIntrouvable, jetonValide, emailConnu } from '../sync/google';
 import { donneesDemo } from '../demo/donneesDemo';
 
 export type Mode = 'demo' | 'google';
@@ -281,24 +281,63 @@ export async function recupererPhotosDemo(): Promise<number> {
   return n;
 }
 
-/** Les photos prises hors-ligne (id « local:… ») partent vers le Drive avant les lignes. */
+/** Où ranger une photo : Photos / costume / Références ou WIP / pièce (sans pièce : à la racine de Références ou WIP). */
+function cheminPhoto(d: Donnees, costumeId: string, pieceId: string, reference: boolean): PlaceDossier[] {
+  const c = d.Costumes[costumeId];
+  const chemin: PlaceDossier[] = [
+    { role: 'costume', ref: costumeId, nom: c?.nom || 'Sans nom' },
+    reference ? { role: 'references', ref: costumeId, nom: 'Références' } : { role: 'wip', ref: costumeId, nom: 'WIP' },
+  ];
+  const p = pieceId ? d.Pieces[pieceId] : undefined;
+  if (p && vivant(p) && p.costume_id === costumeId) chemin.push({ role: reference ? 'piece-ref' : 'piece-wip', ref: pieceId, nom: p.nom || 'Sans nom' });
+  return chemin;
+}
+
+/**
+ * Copie des photos sur le Drive : celles qui ne sont que sur l'appareil (id « local:… ») partent, et
+ * toutes sont rangées par costume puis Références / WIP puis pièce. Une photo changée de pièce ou de
+ * type, un costume ou une pièce renommés : le Drive suit. Un échec de rangement n'empêche pas la synchro.
+ */
 async function envoyerPhotosEnAttente(): Promise<void> {
   if (!base || !meta.emplacement || meta.photosDrive !== true) return;
-  let dossier: string | undefined;
+  const e = meta.emplacement;
+  e.places ??= {};
   const d = donnees.value;
-  const locales = new Set<string>();
-  for (const p of Object.values(d.Photos)) if (p.drive_id?.startsWith('local:') && vivant(p)) locales.add(p.drive_id);
-  for (const c of Object.values(d.Costumes)) if (c.image_ref?.startsWith('local:') && vivant(c)) locales.add(c.image_ref);
-  for (const idLocal of locales) {
-    const blob = await lirePhoto(base, idLocal);
-    if (!blob) continue;
-    dossier ??= await dossierPhotosParDefaut(meta.emplacement);
-    const idDrive = await envoyerPhoto(blob, `${idLocal.slice(6)}.jpg`, dossier);
-    await ecrirePhoto(base, idDrive, blob);
-    const ch: Changement[] = [];
-    for (const p of Object.values(donnees.value.Photos)) if (p.drive_id === idLocal) ch.push({ table: 'Photos', id: p.id, champs: { drive_id: idDrive } });
-    for (const c of Object.values(donnees.value.Costumes)) if (c.image_ref === idLocal) ch.push({ table: 'Costumes', id: c.id, champs: { image_ref: idDrive } });
-    faire(ch);
+  const voulues = new Map<string, PlaceDossier[]>();
+  for (const p of Object.values(d.Photos)) if (p.drive_id && p.costume_id && vivant(p)) voulues.set(p.drive_id, cheminPhoto(d, p.costume_id, p.piece_id, p.type === 'reference'));
+  for (const c of Object.values(d.Costumes)) if (c.image_ref && vivant(c) && !voulues.has(c.image_ref)) voulues.set(c.image_ref, cheminPhoto(d, c.id, '', true));
+  for (const [id, chemin] of voulues) {
+    try {
+      const dossier = await dossierRange(e, chemin);
+      if (id.startsWith('local:')) {
+        const blob = await lirePhoto(base, id);
+        if (!blob) continue;
+        const idDrive = await envoyerPhoto(blob, `${id.slice(6)}.jpg`, dossier);
+        await ecrirePhoto(base, idDrive, blob);
+        e.places[idDrive] = dossier;
+        const ch: Changement[] = [];
+        for (const p of Object.values(donnees.value.Photos)) if (p.drive_id === id) ch.push({ table: 'Photos', id: p.id, champs: { drive_id: idDrive } });
+        for (const c of Object.values(donnees.value.Costumes)) if (c.image_ref === id) ch.push({ table: 'Costumes', id: c.id, champs: { image_ref: idDrive } });
+        faire(ch);
+      } else if (e.places[id] !== dossier) {
+        let actuel: string | undefined;
+        try {
+          actuel = e.places[id] ?? (await dossierDe(id));
+        } catch (x) {
+          // La copie a été supprimée à la main dans le Drive : on ne la cherche plus.
+          if (x instanceof ErreurIntrouvable) { e.places[id] = dossier; continue; }
+          throw x;
+        }
+        if (actuel !== dossier) await deplacer(id, dossier, actuel);
+        e.places[id] = dossier;
+      }
+    } catch (x) {
+      if (x instanceof ErreurConnexion || x instanceof ErreurReseau) throw x;
+      // Un dossier supprimé à la main dans le Drive : on oublie les mémos, les dossiers seront
+      // retrouvés ou recréés à la prochaine synchro.
+      if (x instanceof ErreurIntrouvable) { e.dossiers = {}; e.photosId = undefined; delete e.places[id]; }
+      console.warn('Rangement des photos :', x);
+    }
   }
 }
 
