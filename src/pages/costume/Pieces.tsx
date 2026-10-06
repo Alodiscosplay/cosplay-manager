@@ -1,6 +1,7 @@
 // Onglet « Pièces » : pièces → pistes → étapes à cocher, réordonnables par glisser.
 import { useEffect, useRef, useState } from 'preact/hooks';
 import Sortable from 'sortablejs';
+import { annulerDeplacementDom } from '../../composants/glisser';
 import { donnees, jour, faire } from '../../store/store';
 import { piecesDe, pistesDe, etapesDePiste, idsAttendus } from '../../logique/acces';
 import { avancementPiece, avancementPiste, poids } from '../../logique/avancement';
@@ -75,14 +76,6 @@ export function OngletPieces({ costume }: { costume: Ligne }) {
       )}
     </section>
   );
-}
-
-/** Sortable déplace le DOM lui-même ; on le remet en place et on laisse Preact redessiner depuis les données. */
-function annulerDeplacementDom(evt: Sortable.SortableEvent): void {
-  const { item, from, oldIndex } = evt;
-  // Les frères de l'élément, sans lui, sont dans l'ordre d'origine : on le remet à son ancien rang.
-  const reste = [...from.children].filter(c => c !== item);
-  from.insertBefore(item, reste[oldIndex!] ?? null);
 }
 
 const CLE_REPLI = 'cosplay-planner.pieces-repliees';

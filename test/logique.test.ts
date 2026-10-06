@@ -9,7 +9,7 @@ import { effacerPlanning } from '../src/store/operations';
 import { quantiteNombre, regrouperAchats, budgetCostume, totalCommande, regrouperParNom, texteQuantites } from '../src/logique/budget';
 import { analyserListe, versTexte, modeleVersTexte, texteVersModele } from '../src/logique/collerListe';
 import { changementsImport, enchainerPistes, supprimer, viderAnciensSupprimes, cocherEtape, creerCommandes, changerStatutCommande, appliquerListe, insererModele, deplacerEtape, creerCostume } from '../src/store/operations';
-import { etapesDePiste, pistesDe, piecesDe, etapesDePiece, piecesDeFourniture } from '../src/logique/acces';
+import { etapesDePiste, pistesDe, piecesDe, etapesDePiece, piecesDeFourniture, reordonnerParmi } from '../src/logique/acces';
 
 const titres = (r: ReturnType<typeof aFaire>) => r.elements.map(e => e.etape.titre);
 
@@ -517,5 +517,15 @@ describe('déplacer une étape', () => {
     const d2 = appliquer(d, deplacerEtape(d, ids['P/A/a2'], ids['P/B'], 0));
     expect(etapesDePiste(d2, ids['P/B']).map(e => e.titre)).toEqual(['a2', 'b1']);
     expect(etapesDePiste(d2, ids['P/A']).map(e => e.titre)).toEqual(['a1']);
+  });
+});
+
+describe('priorité des costumes dans À faire', () => {
+  it('ne réordonne que les costumes affichés, les autres gardent leur place', () => {
+    const l = (id: string) => ({ id }) as never;
+    const tous = ['ariel-projet', 'mary', 'chapeau-projet', 'ariel'].map(l);
+    // Affichés : mary puis ariel ; on remonte ariel avant mary.
+    const r = reordonnerParmi(tous, [l('ariel'), l('mary')]);
+    expect(r.map((x: { id: string }) => x.id)).toEqual(['ariel-projet', 'ariel', 'chapeau-projet', 'mary']);
   });
 });

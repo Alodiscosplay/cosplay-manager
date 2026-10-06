@@ -28,6 +28,17 @@ export function teinteCouleur(t: string | number): string {
   return t === GRIS ? 'hsl(230 8% 52%)' : `hsl(${t} 62% 48%)`;
 }
 
+/**
+ * Applique un nouvel ordre à une partie seulement d'une liste ordonnée : les éléments de `partie`
+ * reprennent, dans leur nouvel ordre, les places qu'ils occupaient ; les autres ne bougent pas.
+ * Ex. : on réordonne dans « À faire » les seuls costumes affichés, sans déplacer ceux en projet.
+ */
+export function reordonnerParmi(liste: Ligne[], partie: Ligne[]): Ligne[] {
+  const ids = new Set(partie.map(l => l.id));
+  let i = 0;
+  return liste.map(l => (ids.has(l.id) ? partie[i++] : l));
+}
+
 export function costumes(d: Donnees): Ligne[] {
   return vivants(d.Costumes).sort(parOrdre);
 }

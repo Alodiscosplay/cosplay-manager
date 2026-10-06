@@ -1,11 +1,13 @@
-import { useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
+import Sortable from 'sortablejs';
 import { donnees, jour, faire } from '../store/store';
 import { aFaire, tailleRepli, texteAttente, type ElementAFaire } from '../logique/disponibilite';
 import { alertes } from '../logique/planning';
-import { costumes, ligne, tous, ordreSuivant } from '../logique/acces';
+import { costumes, ligne, tous, ordreSuivant, reordonnerParmi } from '../logique/acces';
 import { jourCourt, lireJour, relatif } from '../logique/dates';
 import { bool, txtBool, type Ligne } from '../modele/schema';
-import { cocherEtape, nouvelId, supprimer } from '../store/operations';
+import { cocherEtape, nouvelId, supprimer, reordonner } from '../store/operations';
+import { annulerDeplacementDom } from '../composants/glisser';
 import { Case, Feuille, Champ, Texte, ChoixDate, Selection, Vide } from '../composants/base';
 import { Icone } from '../composants/Icone';
 import { IndicateurSync } from '../app';
@@ -40,6 +42,27 @@ export function PageAFaire() {
   };
 
   const n = tailleRepli(r.repli);
+
+  // Les costumes se glissent par ordre de priorité. L'ordre est celui des costumes (le même que sur
+  // l'accueil) ; ceux qui ne sont pas affichés ici gardent leur place.
+  const groupes = [...parCostume.values()];
+  const listeCostumes = useRef<HTMLDivElement>(null);
+  const cleGroupes = groupes.map(g => g.costume.id).join(',');
+  useEffect(() => {
+    if (!listeCostumes.current || groupes.length < 2) return;
+    const s = Sortable.create(listeCostumes.current, {
+      handle: '.poignee-costume', draggable: '.groupe-afaire', animation: 150,
+      onEnd: evt => {
+        annulerDeplacementDom(evt);
+        if (evt.oldIndex === evt.newIndex) return;
+        const affiches = groupes.map(g => donnees.value.Costumes[g.costume.id]);
+        const [bouge] = affiches.splice(evt.oldIndex!, 1);
+        affiches.splice(evt.newIndex!, 0, bouge);
+        faire(reordonner('Costumes', reordonnerParmi(costumes(donnees.value), affiches)));
+      },
+    });
+    return () => s.destroy();
+  }, [cleGroupes]);
 
   return (
     <div class="page">
@@ -78,20 +101,6 @@ export function PageAFaire() {
         </section>
       )}
 
-      {[...parCostume.values()].map(({ costume, pieces }) => (
-        <section class="groupe-afaire">
-          <h2><a href={lienCostume(costume.id)}>{costume.nom}</a></h2>
-          {[...pieces.values()].map(elements => (
-            <div class="bloc-afaire">
-              <h3>{elements[0].piece.nom}</h3>
-              <ul class="etapes">
-                {elements.map(e => <ElementLigne e={e} />)}
-              </ul>
-            </div>
-          ))}
-        </section>
-      ))}
-
       <section class="groupe-afaire">
         <h2>Tâches libres</h2>
         <ul class="etapes">
@@ -102,6 +111,25 @@ export function PageAFaire() {
           <input value={nouvelle} placeholder="Ajouter une tâche" aria-label="Nouvelle tâche libre" onInput={e => setNouvelle((e.target as HTMLInputElement).value)} />
         </form>
       </section>
+
+      <div class="costumes-afaire" ref={listeCostumes}>
+        {groupes.map(({ costume, pieces }) => (
+          <section class="groupe-afaire" key={costume.id}>
+            <h2>
+              {groupes.length > 1 && <span class="poignee poignee-costume" aria-label="Déplacer le costume" title="Glisser pour changer la priorité"><Icone nom="poignee" taille={18} /></span>}
+              <a href={lienCostume(costume.id)}>{costume.nom}</a>
+            </h2>
+            {[...pieces.values()].map(elements => (
+              <div class="bloc-afaire">
+                <h3>{elements[0].piece.nom}</h3>
+                <ul class="etapes">
+                  {elements.map(e => <ElementLigne e={e} />)}
+                </ul>
+              </div>
+            ))}
+          </section>
+        ))}
+      </div>
 
       {n > 0 && (
         <details class="repli">
