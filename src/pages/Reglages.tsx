@@ -23,6 +23,7 @@ export function PageReglages() {
       <section class="carte-reglage">
         <h2>À propos</h2>
         <p class="petit-texte">Cosplay Manager — tes données restent dans ton propre Google Drive, dans un espace caché réservé à l'appli, ou sur cet appareil en mode démo. Tes photos restent sur l'appareil, avec une copie sur ton Drive si tu le choisis. L'appli n'a accès à aucun autre fichier.</p>
+        <p class="petit-texte"><a href={`${import.meta.env.BASE_URL}confidentialite.html`} target="_blank" rel="noopener">Politique de confidentialité</a></p>
       </section>
     </div>
   );

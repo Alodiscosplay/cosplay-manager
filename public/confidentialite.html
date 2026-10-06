@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cosplay Manager — Politique de confidentialité</title>
+  <link rel="icon" href="icone.svg">
+  <style>
+    :root { color-scheme: light dark; --fond: #faf7fc; --texte: #2a2233; --doux: #6b6275; --accent: #6b3fa0; }
+    @media (prefers-color-scheme: dark) { :root { --fond: #1b1720; --texte: #ece6f2; --doux: #a89fb3; --accent: #c7a4f0; } }
+    body { margin: 0; background: var(--fond); color: var(--texte); font: 16px/1.6 system-ui, sans-serif; }
+    main { max-width: 680px; margin: 0 auto; padding: 32px 16px 64px; }
+    h1 { font-size: 1.6rem; margin: 0 0 4px; }
+    h2 { font-size: 1.1rem; margin: 28px 0 6px; }
+    p, li { margin: 6px 0; }
+    .doux { color: var(--doux); font-size: .9rem; }
+    a { color: var(--accent); }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Cosplay Manager — Politique de confidentialité</h1>
+  <p class="doux">Version de test · mise à jour le 6 octobre 2026</p>
+
+  <p>Cosplay Manager est une application de planification et de suivi de la création de cosplays. Elle est
+  actuellement en phase de test auprès d'un groupe restreint d'utilisateurs. Cette page décrit le
+  fonctionnement de cette version ; elle sera mise à jour avant toute évolution de l'application ou de son
+  mode de diffusion.</p>
+
+  <h2>Fonctionnement de la version actuelle</h2>
+  <ul>
+    <li>L'application ne dispose d'aucun serveur propre : les données ne transitent ni par l'éditeur de
+      l'application, ni par un tiers.</li>
+    <li>Elle n'affiche aucune publicité et ne mesure pas l'audience.</li>
+  </ul>
+
+  <h2>Données utilisées</h2>
+  <ul>
+    <li><strong>Adresse e-mail et nom du compte Google</strong> : affichage du compte connecté, et séparation
+      des données lorsque plusieurs comptes utilisent le même appareil.</li>
+    <li><strong>Un fichier de données dans le Google Drive de l'utilisateur</strong>, rangé dans l'espace réservé
+      à l'application. Ce fichier n'est pas visible dans le Drive et aucune autre application n'y a accès. Il
+      contient les costumes, pièces, étapes, achats et réglages saisis dans l'application.</li>
+    <li><strong>Des fichiers créés par l'application dans le Google Drive</strong>, uniquement à la demande de
+      l'utilisateur : le dossier des copies de photos et les dossiers WIP envoyés vers Google Slides.</li>
+  </ul>
+  <p>L'application n'a accès à aucun autre fichier du Google Drive.</p>
+
+  <h2>Lieux de stockage</h2>
+  <ul>
+    <li><strong>L'appareil</strong>, dans le stockage du navigateur, ce qui permet l'utilisation hors ligne. Les
+      photos y restent, sauf si l'utilisateur active la copie vers son Drive.</li>
+    <li><strong>Le Google Drive de l'utilisateur</strong>, comme décrit ci-dessus, pour retrouver les données sur
+      ses autres appareils.</li>
+  </ul>
+  <p>Les pages de l'application sont hébergées par GitHub Pages, qui peut conserver des journaux techniques de
+  connexion (comme l'adresse IP) selon sa propre politique de confidentialité.</p>
+
+  <h2>Suppression des données</h2>
+  <ul>
+    <li><strong>Sur un appareil</strong> : Réglages › Se déconnecter, puis effacement des données du site dans le
+      navigateur.</li>
+    <li><strong>Fichier de données</strong> : dans Google Drive, Paramètres › Gérer les applications ›
+      Cosplay Manager › Options › Supprimer les données d'application cachées.</li>
+    <li><strong>Photos et dossiers WIP</strong> : fichiers ordinaires du Drive, supprimables comme les autres.</li>
+    <li><strong>Retrait de l'accès</strong> de l'application au compte Google :
+      <a href="https://myaccount.google.com/permissions">myaccount.google.com/permissions</a>.</li>
+  </ul>
+
+  <h2>Données Google</h2>
+  <p>L'utilisation des informations reçues des API Google respecte le
+  <a href="https://developers.google.com/terms/api-services-user-data-policy">règlement sur les données utilisateur des services d'API Google</a>,
+  y compris ses exigences d'usage limité. Ces données ne sont ni vendues, ni partagées, ni utilisées à
+  d'autres fins que le fonctionnement de l'application.</p>
+
+  <h2>Contact</h2>
+  <p>Toute question peut être adressée à
+  <a href="mailto:cosplay-manager@googlegroups.com">cosplay-manager@googlegroups.com</a>.</p>
+
+  <p><a href="./">← Retour à l'application</a></p>
+</main>
+</body>
+</html>
