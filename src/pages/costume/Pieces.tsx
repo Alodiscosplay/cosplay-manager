@@ -11,10 +11,10 @@ import { DUREES, NOMS_DUREES, bool, txtBool, type Duree, type Ligne } from '../.
 import { creerPiece, creerPiste, creerEtape, cocherEtape, deplacerEtape, reordonner, enchainerPistes } from '../../store/operations';
 import { Barre, Pct, Puce, Case, Menu, Vide } from '../../composants/base';
 import { Icone } from '../../composants/Icone';
-import { EditeurEtape, EditeurPiece, EditeurPiste, CollerListe, ChoixModele, RattacherFournitures, nbFournituresHorsPieces } from './editeurs';
+import { EditeurEtape, EditeurPiece, EditeurPiste, ChoixModele, RattacherFournitures, nbFournituresHorsPieces } from './editeurs';
 import { maj } from '../Costume';
 
-type Ouvert = { type: 'etape' | 'piece' | 'piste' | 'coller' | 'modele' | 'fournitures' | 'fournitures-creation'; id?: string } | null;
+type Ouvert = { type: 'etape' | 'piece' | 'piste' | 'modele' | 'fournitures' | 'fournitures-creation'; id?: string } | null;
 
 export function OngletPieces({ costume }: { costume: Ligne }) {
   const d = donnees.value;
@@ -69,7 +69,6 @@ export function OngletPieces({ costume }: { costume: Ligne }) {
       {ouvert?.type === 'etape' && <EditeurEtape id={ouvert.id!} onFermer={() => setOuvert(null)} />}
       {ouvert?.type === 'piece' && <EditeurPiece id={ouvert.id!} onFermer={() => setOuvert(null)} />}
       {ouvert?.type === 'piste' && <EditeurPiste id={ouvert.id!} onFermer={() => setOuvert(null)} />}
-      {ouvert?.type === 'coller' && <CollerListe costumeId={costume.id} pieceId={ouvert.id} onFermer={() => setOuvert(null)} />}
       {ouvert?.type === 'modele' && <ChoixModele pieceId={ouvert.id!} onFermer={() => setOuvert(null)} />}
       {(ouvert?.type === 'fournitures' || ouvert?.type === 'fournitures-creation') && (
         <RattacherFournitures pieceId={ouvert.id!} apresCreation={ouvert.type === 'fournitures-creation'} onFermer={() => setOuvert(null)} />
@@ -148,7 +147,6 @@ function CartePiece({ piece, ouvrir }: { piece: Ligne; ouvrir: (o: Ouvert) => vo
             { texte: 'Modifier la pièce', icone: 'crayon', faire: () => ouvrir({ type: 'piece', id: piece.id }) },
             { texte: 'Fournitures de la pièce', icone: 'achats', faire: () => ouvrir({ type: 'fournitures', id: piece.id }) },
             { texte: 'Ajouter une étape depuis un modèle', icone: 'calques', faire: () => ouvrir({ type: 'modele', id: piece.id }) },
-            { texte: 'Coller des sous-étapes', icone: 'coller', faire: () => ouvrir({ type: 'coller', id: piece.id }) },
             ...(pistes.length > 1 ? [enchainees
               ? { texte: 'Rendre les étapes parallèles', icone: 'calques', faire: () => faire(enchainerPistes(d, piece.id, false), 'Étapes parallèles') }
               : { texte: 'Enchaîner les étapes', icone: 'vers', faire: () => faire(enchainerPistes(d, piece.id), 'Étapes enchaînées') }] : []),

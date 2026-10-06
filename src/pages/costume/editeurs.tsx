@@ -2,14 +2,14 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import Sortable from 'sortablejs';
 import { donnees, faire, jour } from '../../store/store';
-import { piecesDe, pistesDe, etapesDePiste, ligne, tous, idsAttendus, nomAttendu, ordreSuivant, fournituresDe, piecesDeFourniture } from '../../logique/acces';
+import { piecesDe, pistesDe, etapesDePiste, tous, idsAttendus, nomAttendu, ordreSuivant, fournituresDe, piecesDeFourniture } from '../../logique/acces';
 import { cleNom } from '../../logique/budget';
 import { creeraitBoucle, statutStockePiece, champsStatutPiece, pieceTerminee } from '../../logique/disponibilite';
-import { analyserListe, compter, versTexte } from '../../logique/collerListe';
+import { analyserListe, versTexte } from '../../logique/collerListe';
 import { planifierCostume, ordrePlanning, deadlineCostume, deadlinePiece, etapeFinie, finPlanifiable } from '../../logique/planning';
 import { jourCourt, lireJour, ecartJours } from '../../logique/dates';
 import { DUREES, NOMS_DUREES, STATUTS_PIECE, bool, liste, txtListe, type Donnees, type Duree, type Ligne, type NomTable } from '../../modele/schema';
-import { supprimer, appliquerListe, insererModele, ajouterModeleDansPiste, deplacerEtape, cocherEtape, appliquerPlan, effacerPlanning, nouvelId } from '../../store/operations';
+import { supprimer, insererModele, ajouterModeleDansPiste, deplacerEtape, cocherEtape, appliquerPlan, effacerPlanning, nouvelId } from '../../store/operations';
 import { Feuille, Champ, Texte, ChoixDate, Selection } from '../../composants/base';
 import { maj } from '../Costume';
 import { Icone } from '../../composants/Icone';
@@ -217,35 +217,6 @@ export function RattacherFournitures({ pieceId, onFermer, apresCreation }: { pie
 /** Nombre de fournitures du costume rattachées à aucune pièce. */
 export function nbFournituresHorsPieces(d: typeof donnees.value, costumeId: string): number {
   return fournituresDe(d, costumeId).filter(f => !piecesDeFourniture(d, f).length).length;
-}
-
-// ---------- Coller une liste ----------
-
-export function CollerListe({ costumeId, pieceId, onFermer }: { costumeId: string; pieceId?: string; onFermer: () => void }) {
-  const [texte, setTexte] = useState('');
-  const d = donnees.value;
-  const l = analyserListe(texte);
-  const n = compter(l);
-  const piece = pieceId ? ligne(d, 'Pieces', pieceId) : undefined;
-  const sansPiece = l.pieces[0] && !l.pieces[0].nom ? l.pieces[0].pistes.reduce((s, p) => s + p.etapes.length, 0) : 0;
-  const ajouter = () => {
-    faire(appliquerListe(d, l, costumeId, pieceId), `${n.etapes} sous-étape${n.etapes > 1 ? 's' : ''} ajoutée${n.etapes > 1 ? 's' : ''}`);
-    onFermer();
-  };
-  return (
-    <Feuille titre={piece ? `Coller des sous-étapes dans « ${piece.nom} »` : 'Coller une liste'} large onFermer={onFermer} pied={<>
-      <button class="bouton" onClick={onFermer}>Annuler</button>
-      <button class="bouton principal" disabled={!n.etapes && !n.pieces} onClick={ajouter}>Ajouter</button>
-    </>}>
-      <p class="petit-texte">Une sous-étape par ligne. <code>## Nom</code> crée une pièce, <code>### Nom</code> une étape (les étapes avancent en parallèle). Une durée entre parenthèses en fin de ligne : <code>(rapide)</code>, <code>(long)</code>, <code>(très long)</code>.</p>
-      <textarea class="zone-collage" rows={12} autoFocus value={texte} onInput={e => setTexte((e.target as HTMLTextAreaElement).value)}
- />
-      <p class="apercu" aria-live="polite">
-        {n.pieces > 0 && `${n.pieces} pièce${n.pieces > 1 ? 's' : ''} · `}{n.etapes} sous-étape{n.etapes > 1 ? 's' : ''}
-        {sansPiece > 0 && !piece && ` · ${sansPiece} sans « ## » iront dans une nouvelle pièce`}
-      </p>
-    </Feuille>
-  );
 }
 
 // ---------- Modèles ----------

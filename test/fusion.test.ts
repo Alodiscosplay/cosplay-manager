@@ -70,3 +70,19 @@ describe('fusion appareil ↔ fichier de données', () => {
     expect(lireFichier('pas du JSON')).toEqual({});
   });
 });
+
+describe('deux appareils, même costume, pièces différentes', () => {
+  it('le téléphone modifie sans avoir vu la modif du PC : les deux sont gardées', () => {
+    const et = (id: string, piece: string, fait: string, maj: string): Ligne => ({ id, maj, supprime: '', piece_id: piece, titre: id, fait });
+    // Le PC a coché une sous-étape de la jupe et l'a déjà envoyée dans le fichier.
+    const fichier = { Etapes: { jupe1: et('jupe1', 'jupe', 'oui', '20'), corset1: et('corset1', 'corset', '', '10') } };
+    // Le téléphone, pas encore synchronisé, coche une sous-étape du corset.
+    const tel = donneesVides();
+    tel.Etapes.jupe1 = et('jupe1', 'jupe', '', '10');
+    tel.Etapes.corset1 = et('corset1', 'corset', 'oui', '21');
+    const r = fusionner(tel, fichier, { [clePendant('Etapes', 'corset1')]: '21' });
+    expect(r.donnees.Etapes.jupe1.fait).toBe('oui');
+    expect(r.donnees.Etapes.corset1.fait).toBe('oui');
+    expect(r.aEnvoyer).toBe(true);
+  });
+});
