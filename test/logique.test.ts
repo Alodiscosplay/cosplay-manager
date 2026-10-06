@@ -9,7 +9,7 @@ import { effacerPlanning } from '../src/store/operations';
 import { quantiteNombre, regrouperAchats, budgetCostume, totalCommande, regrouperParNom, texteQuantites } from '../src/logique/budget';
 import { analyserListe, versTexte, modeleVersTexte, texteVersModele } from '../src/logique/collerListe';
 import { changementsImport, enchainerPistes, supprimer, viderAnciensSupprimes, cocherEtape, creerCommandes, changerStatutCommande, appliquerListe, insererModele, deplacerEtape, creerCostume } from '../src/store/operations';
-import { etapesDePiste, pistesDe, piecesDe, etapesDePiece, piecesDeFourniture, reordonnerParmi } from '../src/logique/acces';
+import { etapesDePiste, pistesDe, piecesDe, etapesDePiece, piecesDeFourniture, reordonnerParmi, costumesParPriorite } from '../src/logique/acces';
 
 const titres = (r: ReturnType<typeof aFaire>) => r.elements.map(e => e.etape.titre);
 
@@ -527,5 +527,20 @@ describe('priorité des costumes dans À faire', () => {
     // Affichés : mary puis ariel ; on remonte ariel avant mary.
     const r = reordonnerParmi(tous, [l('ariel'), l('mary')]);
     expect(r.map((x: { id: string }) => x.id)).toEqual(['ariel-projet', 'ariel', 'chapeau-projet', 'mary']);
+  });
+});
+
+describe('deux ordres de costumes', () => {
+  it('la priorité de À faire est indépendante de l’ordre de la page Costumes', () => {
+    const d = vide();
+    d.Costumes = {
+      mary: { id: 'mary', nom: 'Mary', ordre: '1', priorite: '2' },
+      ariel: { id: 'ariel', nom: 'Ariel', ordre: '2', priorite: '1' },
+      neuf: { id: 'neuf', nom: 'Neuf', ordre: '3', priorite: '' },
+    } as never;
+    expect(costumesParPriorite(d).map(c => c.id)).toEqual(['ariel', 'mary', 'neuf']);
+    // Sans aucune priorité posée, on suit l'ordre de la page Costumes.
+    for (const c of Object.values(d.Costumes)) c.priorite = '';
+    expect(costumesParPriorite(d).map(c => c.id)).toEqual(['mary', 'ariel', 'neuf']);
   });
 });

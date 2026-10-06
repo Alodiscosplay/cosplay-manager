@@ -95,9 +95,12 @@ export function deplacerEtape(d: Donnees, etapeId: string, pisteId: string, inde
   return ch;
 }
 
-/** Renumérote une liste de lignes selon l'ordre donné (pièces, pistes, costumes…). */
-export function reordonner(table: NomTable, lignes: Ligne[]): Changement[] {
-  return lignes.flatMap((l, i) => (l.ordre === String(i + 1) ? [] : [{ table, id: l.id, champs: { ordre: String(i + 1) } }]));
+/**
+ * Renumérote une liste de lignes selon l'ordre donné (pièces, pistes, costumes…). Le champ est `ordre`,
+ * ou `priorite` pour l'ordre des costumes propre à « À faire ».
+ */
+export function reordonner(table: NomTable, lignes: Ligne[], champ: 'ordre' | 'priorite' = 'ordre'): Changement[] {
+  return lignes.flatMap((l, i) => (l[champ] === String(i + 1) ? [] : [{ table, id: l.id, champs: { [champ]: String(i + 1) } }]));
 }
 
 /** Crée pièces, pistes et étapes à partir d'un texte collé. `pieceId` reçoit les étapes écrites avant tout « ## ». */

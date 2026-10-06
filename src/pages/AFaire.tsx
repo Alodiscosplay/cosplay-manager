@@ -3,7 +3,7 @@ import Sortable from 'sortablejs';
 import { donnees, jour, faire } from '../store/store';
 import { aFaire, tailleRepli, texteAttente, type ElementAFaire } from '../logique/disponibilite';
 import { alertes } from '../logique/planning';
-import { costumes, ligne, tous, ordreSuivant, reordonnerParmi } from '../logique/acces';
+import { costumes, costumesParPriorite, ligne, tous, ordreSuivant, reordonnerParmi } from '../logique/acces';
 import { jourCourt, lireJour, relatif } from '../logique/dates';
 import { bool, txtBool, type Ligne } from '../modele/schema';
 import { cocherEtape, nouvelId, supprimer, reordonner } from '../store/operations';
@@ -43,9 +43,10 @@ export function PageAFaire() {
 
   const n = tailleRepli(r.repli);
 
-  // Les costumes se glissent par ordre de priorité. L'ordre est celui des costumes (le même que sur
-  // l'accueil) ; ceux qui ne sont pas affichés ici gardent leur place.
-  const groupes = [...parCostume.values()];
+  // Les costumes se glissent par ordre de priorité, propre à cette page (la page Costumes a le sien) ;
+  // ceux qui ne sont pas affichés ici gardent leur place.
+  const rang = new Map(costumesParPriorite(d).map((c, i) => [c.id, i]));
+  const groupes = [...parCostume.values()].sort((a, b) => rang.get(a.costume.id)! - rang.get(b.costume.id)!);
   const listeCostumes = useRef<HTMLDivElement>(null);
   const cleGroupes = groupes.map(g => g.costume.id).join(',');
   useEffect(() => {
@@ -58,7 +59,7 @@ export function PageAFaire() {
         const affiches = groupes.map(g => donnees.value.Costumes[g.costume.id]);
         const [bouge] = affiches.splice(evt.oldIndex!, 1);
         affiches.splice(evt.newIndex!, 0, bouge);
-        faire(reordonner('Costumes', reordonnerParmi(costumes(donnees.value), affiches)));
+        faire(reordonner('Costumes', reordonnerParmi(costumesParPriorite(donnees.value), affiches), 'priorite'));
       },
     });
     return () => s.destroy();

@@ -1,11 +1,13 @@
-import { useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
+import Sortable from 'sortablejs';
 import { donnees, jour, faire } from '../store/store';
-import { costumes, piecesDe, ligne } from '../logique/acces';
+import { costumes, piecesDe, ligne, reordonnerParmi } from '../logique/acces';
 import { avancementCostume } from '../logique/avancement';
 import { statutCostume, pieceTerminee } from '../logique/disponibilite';
 import { deadlineCostume } from '../logique/planning';
 import { relatif, jourCourt } from '../logique/dates';
-import { creerCostume } from '../store/operations';
+import { creerCostume, reordonner } from '../store/operations';
+import { annulerDeplacementDom } from '../composants/glisser';
 import { lienCostume } from '../routeur';
 import { FicheCostume } from './Costume';
 import { ImageCadree } from '../composants/Cadrage';
@@ -46,7 +48,7 @@ export function Accueil() {
         return (
           <section class="groupe">
             <h2 class="groupe-titre">{titre} <span class="compteur">{groupe.length}</span></h2>
-            <div class="grille-cartes">{groupe.map(c => <CarteCostume c={c} />)}</div>
+            <GrilleCostumes groupe={groupe} />
           </section>
         );
       })}
@@ -58,7 +60,29 @@ export function Accueil() {
   );
 }
 
-function CarteCostume({ c }: { c: Ligne }) {
+/** Les cartes d'un groupe, réordonnables en glissant leur poignée (ordre propre à cette page). */
+function GrilleCostumes({ groupe }: { groupe: Ligne[] }) {
+  const grille = useRef<HTMLDivElement>(null);
+  const cle = groupe.map(c => c.id).join(',');
+  useEffect(() => {
+    if (!grille.current || groupe.length < 2) return;
+    const s = Sortable.create(grille.current, {
+      handle: '.poignee-carte', draggable: '.carte-costume', animation: 150,
+      onEnd: evt => {
+        annulerDeplacementDom(evt);
+        if (evt.oldIndex === evt.newIndex) return;
+        const affiches = groupe.map(c => donnees.value.Costumes[c.id]);
+        const [bouge] = affiches.splice(evt.oldIndex!, 1);
+        affiches.splice(evt.newIndex!, 0, bouge);
+        faire(reordonner('Costumes', reordonnerParmi(costumes(donnees.value), affiches)));
+      },
+    });
+    return () => s.destroy();
+  }, [cle]);
+  return <div class="grille-cartes" ref={grille}>{groupe.map(c => <CarteCostume key={c.id} c={c} deplacable={groupe.length > 1} />)}</div>;
+}
+
+function CarteCostume({ c, deplacable }: { c: Ligne; deplacable?: boolean }) {
   const d = donnees.value;
   const a = avancementCostume(d, c.id);
   const dl = deadlineCostume(d, c);
@@ -68,6 +92,10 @@ function CarteCostume({ c }: { c: Ligne }) {
   const nbTerminees = pieces.filter(p => pieceTerminee(d, p.id)).length;
   return (
     <a class="carte-costume" href={lienCostume(c.id)}>
+      {deplacable && (
+        <span class="poignee poignee-carte" aria-label={`Déplacer ${c.nom}`} title="Glisser pour réordonner"
+          onClick={e => { e.preventDefault(); e.stopPropagation(); }}><Icone nom="poignee" taille={18} /></span>
+      )}
       <div class="carte-image">{c.image_ref ? <ImageCadree id={c.image_ref} cadrage={c.cadrage} alt={`Référence ${c.nom}`} /> : <div class="photo-vide"><span aria-hidden="true">✂</span></div>}</div>
       <div class="carte-corps">
         <h3>{c.nom}</h3>

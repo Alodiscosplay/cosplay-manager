@@ -43,6 +43,15 @@ export function costumes(d: Donnees): Ligne[] {
   return vivants(d.Costumes).sort(parOrdre);
 }
 
+/**
+ * Les costumes dans l'ordre de priorité de « À faire », réglé à part de l'ordre de la page Costumes.
+ * Un costume jamais placé (priorité vide) vient après les autres, dans l'ordre de la page Costumes.
+ */
+export function costumesParPriorite(d: Donnees): Ligne[] {
+  const rang = (c: Ligne) => num(c.priorite, Number.MAX_SAFE_INTEGER);
+  return costumes(d).sort((a, b) => rang(a) - rang(b));
+}
+
 export function piecesDe(d: Donnees, costumeId: string): Ligne[] {
   return vivants(d.Pieces).filter(p => p.costume_id === costumeId).sort(parOrdre);
 }
