@@ -18,7 +18,7 @@ import { OngletPhotos } from './costume/Photos';
 import { OngletBudget } from './costume/Budget';
 import { OngletPlanning } from './costume/Planning';
 import { OngletWip } from './costume/Wip';
-import { OngletArchiver } from './costume/Archiver';
+import { OngletSauvegarde } from './costume/Sauvegarde';
 
 const purgerNouveau = (id: string) => [purger('Costumes', donnees.value.Costumes[id])];
 
@@ -46,7 +46,7 @@ export function PageCostume({ id, onglet = 'pieces' }: { id: string; onglet?: st
     ...(suivi ? [['budget', 'Budget'] as [string, string]] : []),
     ...(planifie ? [['planning', 'Planning'] as [string, string]] : []),
     ['wip', 'Dossier WIP'],
-    ...(sc === 'terminé' ? [['archiver', 'Archiver'] as [string, string]] : []),
+    ['sauvegarde', 'Sauvegarde'],
   ];
 
   // Onglet demandé mais masqué (planning non suivi, par exemple) : on retombe sur les pièces.
@@ -109,7 +109,7 @@ export function PageCostume({ id, onglet = 'pieces' }: { id: string; onglet?: st
       {vu === 'budget' && <OngletBudget costume={c} />}
       {vu === 'planning' && <OngletPlanning costume={c} />}
       {vu === 'wip' && <OngletWip costume={c} />}
-      {vu === 'archiver' && <OngletArchiver costume={c} />}
+      {vu === 'sauvegarde' && <OngletSauvegarde costume={c} />}
 
       {fiche && <FicheCostume id={id} onFermer={() => setFiche(false)} />}
       {menuImage && (

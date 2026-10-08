@@ -1,13 +1,13 @@
 // État de l'appli : données réactives, enregistrement local, synchro avec le fichier caché du Drive, annulation.
 import { signal } from '@preact/signals';
 import { type Donnees, type NomTable, donneesVides, NOMS_TABLES, VERSION_SCHEMA, vivant } from '../modele/schema';
-import { appliquerChangements, viderAnciensSupprimes, type Changement } from './operations';
-import { ouvrirBase, lireKv, ecrireKv, type Base, lirePhoto, ecrirePhoto } from './idb';
+import { appliquerChangements, viderAnciensSupprimes, supprimer, type Changement } from './operations';
+import { ouvrirBase, lireKv, ecrireKv, type Base, lirePhoto, ecrirePhoto, effacerPhoto } from './idb';
 import { activationsDuJour } from '../logique/activation';
 import { aujourdhui } from '../logique/dates';
 import { MODELES_PAR_DEFAUT } from '../modele/modelesParDefaut';
 import { type Pendants, clePendant, fusionner, lireFichier, versFichier } from '../sync/fusion';
-import { trouverDonnees, lireDonnees, versionDonnees, ecrireDonnees, envoyerPhoto, nomDossierPhotos, nommerDossierPhotos, dossierRange, dossierDe, deplacer, type Emplacement, type PlaceDossier } from '../sync/drive';
+import { trouverDonnees, lireDonnees, versionDonnees, ecrireDonnees, envoyerPhoto, nomDossierPhotos, nommerDossierPhotos, dossierRange, dossierDe, deplacer, dossierDeSauvegarde, deposerFichier, supprimerFichier, type Emplacement, type PlaceDossier } from '../sync/drive';
 import { ErreurConnexion, ErreurReseau, ErreurIntrouvable, jetonValide, emailConnu } from '../sync/google';
 import { donneesDemo } from '../demo/donneesDemo';
 
@@ -298,14 +298,15 @@ function cheminPhoto(d: Donnees, costumeId: string, pieceId: string, reference: 
  * toutes sont rangées par costume puis Références / WIP puis pièce. Une photo changée de pièce ou de
  * type, un costume ou une pièce renommés : le Drive suit. Un échec de rangement n'empêche pas la synchro.
  */
-async function envoyerPhotosEnAttente(): Promise<void> {
-  if (!base || !meta.emplacement || meta.photosDrive !== true) return;
+async function envoyerPhotosEnAttente(costumeId?: string): Promise<void> {
+  // Sans copie Drive cochée, rien ne part — sauf pour une sauvegarde sur le Drive d'un costume.
+  if (!base || !meta.emplacement || (meta.photosDrive !== true && !costumeId)) return;
   const e = meta.emplacement;
   e.places ??= {};
   const d = donnees.value;
   const voulues = new Map<string, PlaceDossier[]>();
-  for (const p of Object.values(d.Photos)) if (p.drive_id && p.costume_id && vivant(p)) voulues.set(p.drive_id, cheminPhoto(d, p.costume_id, p.piece_id, p.type === 'reference'));
-  for (const c of Object.values(d.Costumes)) if (c.image_ref && vivant(c) && !voulues.has(c.image_ref)) voulues.set(c.image_ref, cheminPhoto(d, c.id, '', true));
+  for (const p of Object.values(d.Photos)) if (p.drive_id && p.costume_id && vivant(p) && (!costumeId || p.costume_id === costumeId)) voulues.set(p.drive_id, cheminPhoto(d, p.costume_id, p.piece_id, p.type === 'reference'));
+  for (const c of Object.values(d.Costumes)) if (c.image_ref && vivant(c) && (!costumeId || c.id === costumeId) && !voulues.has(c.image_ref)) voulues.set(c.image_ref, cheminPhoto(d, c.id, '', true));
   for (const [id, chemin] of voulues) {
     try {
       const dossier = await dossierRange(e, chemin);
@@ -339,6 +340,87 @@ async function envoyerPhotosEnAttente(): Promise<void> {
       console.warn('Rangement des photos :', x);
     }
   }
+}
+
+// ---------- Sauvegarde d'un costume ----------
+
+/** Exécute `f` sans chevaucher une synchro, qui envoie et range elle aussi les photos. */
+async function horsSynchro<T>(f: () => Promise<T>): Promise<T> {
+  while (enCours) await new Promise(ok => setTimeout(ok, 200));
+  enCours = true;
+  try {
+    return await f();
+  } finally {
+    enCours = false;
+    await enregistrer();
+    if (relancer) { relancer = false; planifierSync(500); }
+  }
+}
+
+/**
+ * Avant une sauvegarde sur le Drive : toutes les photos du costume y sont envoyées et rangées, quel que
+ * soit le réglage de copie. Renvoie le nombre de photos restées sur l'appareil seulement (échec d'envoi).
+ */
+export function envoyerPhotosDuCostume(costumeId: string): Promise<number> {
+  return horsSynchro(async () => {
+    if (!jetonValide()) throw new ErreurConnexion();
+    meta.emplacement ??= {};
+    await envoyerPhotosEnAttente(costumeId);
+    const d = donnees.value;
+    const c = d.Costumes[costumeId];
+    return Object.values(d.Photos).filter(p => p.costume_id === costumeId && vivant(p) && p.drive_id?.startsWith('local:')).length
+      + (c?.image_ref?.startsWith('local:') ? 1 : 0);
+  });
+}
+
+/** Dépose les fichiers d'une sauvegarde dans « Sauvegardes › nomDossier » du dossier du costume ; renvoie ce dossier. */
+export function deposerSauvegarde(costumeId: string, nomDossier: string, fichiers: { nom: string; blob: Blob; donnees?: boolean }[]): Promise<string> {
+  return horsSynchro(async () => {
+    if (!jetonValide()) throw new ErreurConnexion();
+    const e = (meta.emplacement ??= {});
+    const d = donnees.value;
+    const chemin = [cheminPhoto(d, costumeId, '', true)[0], { role: 'sauvegardes', ref: costumeId, nom: 'Sauvegardes' }];
+    let parent: string;
+    try {
+      parent = await dossierRange(e, chemin);
+    } catch (x) {
+      if (!(x instanceof ErreurIntrouvable)) throw x;
+      e.dossiers = {}; e.photosId = undefined; // un dossier supprimé à la main : on le retrouve ou le recrée
+      parent = await dossierRange(e, chemin);
+    }
+    const dossier = await dossierDeSauvegarde(nomDossier, parent);
+    for (const f of fichiers) await deposerFichier(f.nom, f.blob, dossier, f.donnees ? { costume: d.Costumes[costumeId]?.nom ?? '' } : undefined);
+    return dossier;
+  });
+}
+
+/**
+ * Retire des photos de l'appli après une sauvegarde, pour libérer de la place. Sauvegarde sur l'appareil
+ * (ZIP) : leurs copies sont supprimées du Drive. Sauvegarde sur le Drive : elles y restent, rangées dans
+ * le dossier de la sauvegarde. Dans les deux cas, elles quittent l'appareil.
+ */
+export function retirerPhotos(photoIds: string[], lieu: 'appareil' | 'drive', dossierSauvegarde?: string): Promise<void> {
+  return horsSynchro(async () => {
+    const e = (meta.emplacement ??= {});
+    for (const pid of photoIds) {
+      const p = donnees.value.Photos[pid];
+      if (!p) continue;
+      const id = p.drive_id;
+      if (mode.value === 'google' && id && !id.startsWith('local:')) {
+        if (!jetonValide()) throw new ErreurConnexion();
+        if (lieu === 'drive' && dossierSauvegarde) {
+          let actuel: string | undefined | null = e.places?.[id];
+          if (!actuel) actuel = await dossierDe(id).catch(x => { if (x instanceof ErreurIntrouvable) return null; throw x; });
+          if (actuel !== null && actuel !== dossierSauvegarde) await deplacer(id, dossierSauvegarde, actuel);
+        } else {
+          await supprimerFichier(id);
+        }
+        if (e.places) delete e.places[id];
+      }
+      if (base && id) await effacerPhoto(base, id);
+      faire(supprimer(donnees.value, 'Photos', pid));
+    }
+  });
 }
 
 // ---------- Événements du navigateur ----------

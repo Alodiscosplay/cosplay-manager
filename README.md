@@ -11,7 +11,7 @@ Planifier et suivre la création de ses cosplays, pièce par pièce, étape par 
 - **Coller une liste** (`## Pièce`, `### Étape`, une sous-étape par ligne, `(long)` en fin de ligne) et **modèles d'étapes** (Impression 3D, Perruque…) : pas besoin d'IA pour tout saisir vite.
 - **Achats** : liste de courses commune à tous les costumes, groupée par fournisseur ; une commande peut regrouper les fournitures de plusieurs costumes. Budget facultatif par costume.
 - **Photos d'avancement** → **dossier WIP** en PowerPoint (ou Google Slides), généré dans le navigateur.
-- **Archiver** un costume terminé : un ZIP sur l'ordinateur (données réimportables, fiche HTML lisible, photos), puis les photos quittent le Drive. Réimportable.
+- **Sauvegarder** un costume à tout moment, sur l'appareil (ZIP : données réimportables, fiche HTML lisible, photos) ou sur le Drive (dossier « Sauvegardes » du costume, photos laissées à côté) ; puis, au choix, **libérer de la place** en retirant des photos de l'appli. Un costume terminé s'**archive** par le même chemin. Réimportable depuis un ZIP ou depuis le Drive.
 - **Mode démo** sans compte, pour essayer.
 
 ## Où sont les données

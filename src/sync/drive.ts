@@ -158,6 +158,42 @@ export async function dossierRange(e: Emplacement, chemin: PlaceDossier[]): Prom
   return parent;
 }
 
+// ---------- Sauvegardes d'un costume (dossier « Sauvegardes » du costume) ----------
+
+/** Un sous-dossier daté pour une sauvegarde, dans le dossier `parent`. */
+export async function dossierDeSauvegarde(nom: string, parent: string): Promise<string> {
+  return creerDossier(nom, 'sauvegarde-dossier', parent);
+}
+
+/**
+ * Dépose un fichier d'une sauvegarde. Les données réimportables (`costume.json`) portent le marqueur
+ * « sauvegarde » et le nom du costume : c'est par eux qu'on les retrouve pour un réimport.
+ */
+export async function deposerFichier(nom: string, blob: Blob, parent: string, donnees?: { costume: string }): Promise<string> {
+  const props: Record<string, string> = { [CLE]: donnees ? 'sauvegarde' : 'sauvegarde-fichier' };
+  if (donnees) props.costume = donnees.costume.slice(0, 80);
+  return envoyerMultipart({ name: nom, parents: [parent], mimeType: blob.type || undefined, appProperties: props }, blob);
+}
+
+export interface SauvegardeDrive { id: string; costume: string; date: string }
+
+/** Les sauvegardes de costume présentes sur le Drive, les plus récentes d'abord. */
+export async function listerSauvegardes(): Promise<SauvegardeDrive[]> {
+  const q = encodeURIComponent(`appProperties has { key='${CLE}' and value='sauvegarde' } and trashed=false`);
+  const r = await gjson<{ files: { id: string; createdTime: string; appProperties?: Record<string, string> }[] }>(
+    `${DRIVE}?q=${q}&fields=files(id,createdTime,appProperties)&orderBy=createdTime desc&pageSize=200&spaces=drive`);
+  return r.files.map(f => ({ id: f.id, costume: f.appProperties?.costume ?? '', date: f.createdTime }));
+}
+
+/** Met un fichier dans la corbeille du Drive (récupérable 30 jours depuis le Drive). */
+export async function mettreALaCorbeille(id: string): Promise<void> {
+  try {
+    await gjson(`${DRIVE}/${id}?fields=id`, { method: 'PATCH', body: JSON.stringify({ trashed: true }) });
+  } catch (e) {
+    if (!(e instanceof ErreurIntrouvable)) throw e;
+  }
+}
+
 /** Le dossier où se trouve un fichier. */
 export async function dossierDe(id: string): Promise<string | undefined> {
   return (await gjson<{ parents?: string[] }>(`${DRIVE}/${id}?fields=parents`)).parents?.[0];

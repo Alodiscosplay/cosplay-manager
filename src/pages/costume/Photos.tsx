@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'preact/hooks';
-import { donnees, faire, jour, photosSurDrive } from '../../store/store';
+import { donnees, faire, jour, mode, montrerToast, photosSurDrive } from '../../store/store';
+import { mettreALaCorbeille } from '../../sync/drive';
 import { photosDe, piecesDe, pistesDe, etapesDePiste, ligne } from '../../logique/acces';
 import { jourCourt } from '../../logique/dates';
 import { bool, txtBool, OUI, vivant, type Ligne } from '../../modele/schema';
 import { nouvelId, supprimer } from '../../store/operations';
 import { ajouterImage } from '../../store/photos';
-import { PhotoImg, Feuille, Champ, Texte, ChoixDate, Selection, Vide, Puce } from '../../composants/base';
+import { PhotoImg, Feuille, Champ, Texte, ChoixDate, Selection, Vide, Puce, Confirmer } from '../../composants/base';
 import { Icone } from '../../composants/Icone';
 import { maj } from '../Costume';
 
@@ -117,6 +118,8 @@ function EditeurPhoto({ id, costume, parcours, onAller, onFermer }: {
   }, [precedente, suivante]);
   // Valide le champ en cours (légende) avant de changer de photo.
   const aller = (x: string) => { (document.activeElement as HTMLElement | null)?.blur(); onAller(x); };
+  const [suppression, setSuppression] = useState(false);
+  const [aussiDrive, setAussiDrive] = useState(false);
   const p = d.Photos[id];
   if (!p) return null;
   const m = (champs: Record<string, string>) => maj('Photos', id, champs);
@@ -126,9 +129,15 @@ function EditeurPhoto({ id, costume, parcours, onAller, onFermer }: {
   // Étape choisie : la sienne, ou celle de la sous-étape (photos rattachées avant l'ajout du choix d'étape).
   const pisteId = p.piste_id || ligne(d, 'Etapes', p.etape_id)?.piste_id || '';
   const sousEtapes = pisteId ? etapesDePiste(d, pisteId) : [];
+  const copieDrive = mode.value === 'google' && !!p.drive_id && !p.drive_id.startsWith('local:');
+  const supprimerPhoto = (aussiDrive: boolean) => {
+    if (aussiDrive) mettreALaCorbeille(p.drive_id).catch((e: Error) => montrerToast(`Copie du Drive non supprimée : ${e.message}`));
+    faire(supprimer(donnees.value, 'Photos', id), 'Photo supprimée');
+    onFermer();
+  };
   return (
     <Feuille titre="Photo" large onFermer={onFermer} pied={<>
-      <button class="bouton danger" onClick={() => { faire(supprimer(donnees.value, 'Photos', id), 'Photo supprimée'); onFermer(); }}>Supprimer</button>
+      <button class="bouton danger" onClick={() => setSuppression(true)}>Supprimer</button>
       <button class="bouton principal" onClick={onFermer}>Terminé</button>
     </>}>
       <div class="photo-grande">
@@ -172,6 +181,16 @@ function EditeurPhoto({ id, costume, parcours, onAller, onFermer }: {
         <span>Dans le dossier WIP</span>
       </label>}
       <button class="bouton" onClick={() => { maj('Costumes', costume.id, { image_ref: p.drive_id }); onFermer(); }}>Utiliser comme image de référence</button>
+      {suppression && (
+        <Confirmer titre="Supprimer cette photo ?" bouton="Supprimer" danger onNon={() => setSuppression(false)} onOui={() => supprimerPhoto(copieDrive && aussiDrive)}
+          texte={<>
+            <p>Elle quitte l'appli et cet appareil.</p>
+            {copieDrive && (
+              <label class="interrupteur"><input type="checkbox" checked={aussiDrive} onChange={e => setAussiDrive((e.target as HTMLInputElement).checked)} />
+                <span>Supprimer aussi sa copie sur mon Drive <span class="petit-texte">(elle va dans la corbeille du Drive, récupérable 30 jours)</span></span></label>
+            )}
+          </>} />
+      )}
     </Feuille>
   );
 }
