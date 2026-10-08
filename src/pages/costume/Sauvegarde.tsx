@@ -27,7 +27,7 @@ export function OngletSauvegarde({ costume }: { costume: Ligne }) {
   const d = donnees.value;
   const google = mode.value === 'google';
   const photos = photosDe(d, costume.id);
-  const [lieu, setLieu] = useState<Lieu>(google ? 'drive' : 'appareil');
+  const [lieu, setLieu] = useState<Lieu>('appareil');
   const [avecWip, setAvecWip] = useState(photos.some(p => bool(p.dans_wip)));
   const [etat, setEtat] = useState('');
   const [erreur, setErreur] = useState('');
@@ -114,14 +114,14 @@ export function OngletSauvegarde({ costume }: { costume: Ligne }) {
     <section class="onglet-sauvegarde">
       <div class="carte-reglage">
         <h2>Sauvegarder ce costume</h2>
-        <p class="petit-texte">Une copie complète : les données (réimportables), une fiche lisible hors appli et les photos. Rien n'est retiré de l'appli.</p>
+        <p class="petit-texte">Tout le costume réuni : les données (réimportables), une fiche lisible hors appli et toutes les photos. De quoi le garder sur le téléphone, le transférer sur un ordinateur, puis libérer de la place. Rien n'est retiré de l'appli sans ton accord.</p>
         {google && (
           <fieldset class="choix-lieu">
             <legend class="champ-label">Où ?</legend>
-            <label class="interrupteur"><input type="radio" name="lieu" checked={lieu === 'drive'} onChange={() => setLieu('drive')} />
-              <span>Sur mon Drive <span class="petit-texte">— dans le dossier du costume, à côté de ses photos ; rien à télécharger</span></span></label>
             <label class="interrupteur"><input type="radio" name="lieu" checked={lieu === 'appareil'} onChange={() => setLieu('appareil')} />
-              <span>Sur cet appareil <span class="petit-texte">— un fichier ZIP téléchargé, photos comprises</span></span></label>
+              <span>Sur cet appareil <span class="petit-texte">— un seul fichier ZIP avec tout, photos comprises, à garder ou à transférer</span></span></label>
+            <label class="interrupteur"><input type="radio" name="lieu" checked={lieu === 'drive'} onChange={() => setLieu('drive')} />
+              <span>Sur mon Drive <span class="petit-texte">— dans le dossier du costume, à côté de ses photos ; prend de la place sur le Drive</span></span></label>
           </fieldset>
         )}
         <label class="interrupteur"><input type="checkbox" checked={avecWip} onChange={e => setAvecWip((e.target as HTMLInputElement).checked)} /><span>Inclure le dossier WIP (PowerPoint)</span></label>
