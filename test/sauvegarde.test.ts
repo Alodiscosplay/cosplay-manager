@@ -29,7 +29,7 @@ describe('sauvegarde d’un costume', () => {
   });
 
   it('garde l’historique des sauvegardes et compte les photos retirées sur la dernière', () => {
-    let c: Ligne = { id: 'c', sauvegardes: '' };
+    let c: Ligne = { id: 'c', maj: '', supprime: '', sauvegardes: '' };
     const appliquer = (ch: { champs: Record<string, string> }) => { c = { ...c, ...ch.champs }; };
     appliquer(noterSauvegarde(c, { date: '2026-10-01T10:00', lieu: 'appareil', retirees: 0 }));
     appliquer(noterSauvegarde(c, { date: '2026-10-08T10:00', lieu: 'drive', retirees: 0 }));
