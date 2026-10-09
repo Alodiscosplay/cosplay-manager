@@ -60,7 +60,7 @@ describe('réimport d’une sauvegarde sur l’appareil : ZIP, dossier décompre
     const zip = new Zip();
     zip.file('Ariel/costume.json', JSON.stringify(contenuZip));
     zip.file('Ariel/photos/robe/1.jpg', 'jpg');
-    const f = new File([await zip.generateAsync({ type: 'uint8array' })], 'ariel.zip');
+    const f = new File([await zip.generateAsync({ type: 'arraybuffer' })], 'ariel.zip');
     const r = await lireSauvegarde([f], donneesVides());
     expect(r.photos.map(p => !!p.blob)).toEqual([true]);
   });
