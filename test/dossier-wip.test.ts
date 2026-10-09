@@ -51,7 +51,7 @@ describe('dossier WIP : le plan suit ce qu’on a demandé', () => {
 
   it('produit un fichier PowerPoint', async () => {
     const { d, c } = donnees();
-    const b = await genererWip(d, c.id, lireReglagesWip(d, c), { pseudo: 'Alodis' });
+    const b = await genererWip(d, c.id, lireReglagesWip(d, c), { pseudo: 'Pseudo' });
     expect(b.size).toBeGreaterThan(10_000);
   });
 
