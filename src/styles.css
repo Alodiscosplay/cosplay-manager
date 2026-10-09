@@ -61,7 +61,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 }
 input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); width: 20px; height: 20px; margin: 0; flex: none; }
 code { background: var(--surface-2); padding: 1px 5px; border-radius: 5px; font-size: .9em; }
-.cache { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.cache { position: absolute; width: 1px !important; height: 1px !important; min-width: 0 !important; padding: 0 !important; overflow: hidden; opacity: 0; pointer-events: none; }
 .icone { flex: none; }
 .petit-texte { font-size: .85rem; color: var(--doux); }
 .erreur { color: var(--rouge); }
@@ -603,3 +603,7 @@ dialog.feuille::backdrop { background: rgb(20 12 28 / 45%); }
 .tuile-retrait.cochee { border-color: var(--rouge); }
 .tuile-retrait img, .tuile-retrait .photo-vide { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 6px; display: block; }
 .tuile-retrait input { position: absolute; top: 8px; left: 8px; width: 20px; height: 20px; accent-color: var(--rouge); }
+
+.zone-depot { border: 2px dashed var(--bord); border-radius: var(--rayon); padding: 24px 16px; margin: 8px 0 12px; display: flex; flex-direction: column; align-items: center; gap: 6px; color: var(--doux); text-align: center; }
+.zone-depot p { margin: 0; }
+.zone-depot.survol { border-color: var(--accent); color: var(--accent); background: var(--surface-2); }
