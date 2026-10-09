@@ -6,9 +6,10 @@ import Sortable from 'sortablejs';
 import { donnees, mode, dossierDuCostume, montrerToast } from '../../store/store';
 import { piecesDe, photosDe, fournituresDe } from '../../logique/acces';
 import { liste, type Ligne } from '../../modele/schema';
-import { genererWip, lireReglagesWip, photosWip, partieDe, planWip, profilDe, PARTIES, ORIGINES, VUES, type ReglagesWip } from '../../export/dossierWip';
+import { genererWip, lireReglagesWip, photosWip, partieDe, planWip, ajusterWip, profilDe, PARTIES, ORIGINES, VUES, type ReglagesWip } from '../../export/dossierWip';
 import { versGoogleSlides } from '../../sync/drive';
 import { telechargerBlob, nomFichier, Feuille, Champ, Texte, Selection, PhotoImg } from '../../composants/base';
+import { jourCourt } from '../../logique/dates';
 import { annulerDeplacementDom } from '../../composants/glisser';
 import { Icone } from '../../composants/Icone';
 import { estReference } from './Photos';
@@ -24,20 +25,27 @@ export function OngletWip({ costume }: { costume: Ligne }) {
   const [erreur, setErreur] = useState('');
   const [choixPhoto, setChoixPhoto] = useState<{ cle: string; cote: 'ref' | 'res' } | null>(null);
   const google = mode.value === 'google';
-  const nbPages = planWip(d, costume, r).diapos.length;
+  const aj = ajusterWip(d, costume, r);
+  const lien = lireLien(costume);
 
-  const generer = async (versSlides: boolean) => {
+  const generer = async (versSlides: boolean, seulement?: string[]) => {
     setErreur('');
     try {
       const dd = donnees.value;
-      const blob = await genererWip(dd, costume.id, lireReglagesWip(dd, dd.Costumes[costume.id]), profilDe(dd), setEtat);
-      const nom = `Dossier WIP – ${costume.nom} – ${new Date().toLocaleDateString('fr-FR')}`;
+      const blob = await genererWip(dd, costume.id, lireReglagesWip(dd, dd.Costumes[costume.id]), profilDe(dd), setEtat, seulement);
+      const noms = (seulement ?? []).map(id => dd.Pieces[id]?.nom ?? 'Photos sans pièce').join(', ');
+      const nom = seulement ? `Pages à importer – ${noms}` : `Dossier WIP – ${costume.nom} – ${new Date().toLocaleDateString('fr-FR')}`;
       if (versSlides) {
         setEtat('Envoi vers Google Slides');
         const url = await versGoogleSlides(blob, nom, await dossierDuCostume(costume.id));
         window.open(url, '_blank', 'noopener');
-        montrerToast('Dossier WIP créé dans Google Slides, dans le dossier du costume');
-      } else telechargerBlob(blob, `${nomFichier(costume.nom)}-dossier-WIP.pptx`);
+        // L'appli retient le dossier et les pièces qu'il contient, pour proposer ensuite d'en ajouter.
+        const cr = lireReglagesWip(dd, dd.Costumes[costume.id]);
+        const dedans = seulement ?? cr.ordre.filter(id => !cr.exclues.includes(id));
+        const l = seulement && lien ? { ...lien, pieces: [...new Set([...lien.pieces, ...dedans])] } : { url, cree: new Date().toISOString(), pieces: dedans };
+        maj('Costumes', costume.id, { wip_slides: JSON.stringify(l) });
+        montrerToast(seulement ? 'Pages créées : importe-les dans ton dossier (Fichier › Importer des diapositives)' : 'Dossier WIP créé dans Google Slides, dans le dossier du costume');
+      } else telechargerBlob(blob, `${nomFichier(costume.nom)}-${seulement ? 'pages-a-importer' : 'dossier-WIP'}.pptx`);
     } catch (e) {
       setErreur((e as Error).message);
     } finally { setEtat(''); }
@@ -98,21 +106,34 @@ export function OngletWip({ costume }: { costume: Ligne }) {
       </div>
 
       <div class="carte-reglage">
-        <fieldset class="choix-segments">
-          <legend>Photos par page</legend>
-          {([2, 4, 6] as const).map(n => (
-            <label><input type="radio" name="par-page" checked={r.parPage === n} onChange={() => regler({ parPage: n })} /><span>{n}</span></label>
-          ))}
-        </fieldset>
-        <p class="petit-texte">Environ {nbPages} page{nbPages > 1 ? 's' : ''}.</p>
+        <h2>{lien ? 'Recréer le dossier complet' : 'Créer le dossier'}</h2>
+        <div class="deux-colonnes">
+          <fieldset class="choix-segments">
+            <legend>Photos par page</legend>
+            {([2, 4, 6] as const).map(n => (
+              <label><input type="radio" name="par-page" checked={r.parPage === n} onChange={() => regler({ parPage: n })} /><span>{n}</span></label>
+            ))}
+          </fieldset>
+          <Champ label="Nombre de pages maximum" aide="Facultatif : la limite du règlement du concours.">
+            <Texte type="number" valeur={r.pagesMax ? String(r.pagesMax) : ''} placeholder="Pas de limite" onValider={v => regler({ pagesMax: Math.max(0, Math.round(Number(v) || 0)) })} />
+          </Champ>
+        </div>
+        <p class="petit-texte">{aj.pages} page{aj.pages > 1 ? 's' : ''}{r.pagesMax ? ` pour ${r.pagesMax} au maximum` : ''}.
+          {!aj.impossible && aj.reglages.parPage !== r.parPage && ` Pour tenir, ${aj.reglages.parPage} photos par page.`}
+          {!aj.impossible && aj.retirees > 0 && ` ${aj.retirees} photo${aj.retirees > 1 ? 's' : ''} laissée${aj.retirees > 1 ? 's' : ''} de côté : celles qui restent sont réparties sur toute la fabrication de chaque pièce.`}</p>
+        {aj.impossible && <p class="erreur">Même avec une seule page par pièce, le dossier dépasse {r.pagesMax} pages : exclus des pièces, des comparaisons ou les intercalaires.</p>}
         <div class="ligne-actions">
-          {google && <button class="bouton principal" disabled={!!etat} onClick={() => void generer(true)}><Icone nom="diapo" />Créer dans Google Slides</button>}
+          {google && <button class="bouton principal" disabled={!!etat} onClick={() => void generer(true)}><Icone nom="diapo" />{lien ? 'Créer un nouveau dossier dans Google Slides' : 'Créer dans Google Slides'}</button>}
           <button class={`bouton${google ? '' : ' principal'}`} disabled={!!etat} onClick={() => void generer(false)}><Icone nom="telecharger" />Télécharger (PowerPoint)</button>
         </div>
-        {google && <p class="petit-texte">Le dossier est créé dans le dossier du costume sur ton Drive, et s'ouvre dans Google Slides : tu peux le retoucher, puis le télécharger en PDF pour le concours.</p>}
+        {google && <p class="petit-texte">{lien
+          ? "Un nouveau dossier est créé à côté de l'ancien : tes retouches dans l'ancien restent intactes."
+          : "Le dossier est créé dans le dossier du costume sur ton Drive, et s'ouvre dans Google Slides : tu peux le retoucher, puis le télécharger en PDF pour le concours."}</p>}
         {etat && <p class="petit-texte" role="status">{etat}…</p>}
         {erreur && <p class="erreur" role="alert">{erreur}</p>}
       </div>
+
+      {google && lien && <AjouterPages costume={costume} r={r} lien={lien} occupe={!!etat} onCreer={ids => void generer(true, ids)} />}
 
       {choixPhoto && (
         <ChoixPhotoWip costume={costume} actuelle={r.paires[choixPhoto.cle]?.[choixPhoto.cote]} reference={choixPhoto.cote === 'ref'}
@@ -120,6 +141,42 @@ export function OngletWip({ costume }: { costume: Ligne }) {
           onFermer={() => setChoixPhoto(null)} />
       )}
     </section>
+  );
+}
+
+interface LienSlides { url: string; cree: string; pieces: string[] }
+
+/** Le dossier Google Slides déjà créé pour ce costume, s'il y en a un. */
+function lireLien(c: Ligne): LienSlides | null {
+  try { const l = JSON.parse(c.wip_slides || 'null'); return l?.url ? l : null; } catch { return null; }
+}
+
+/**
+ * Ajouter des pièces à un dossier déjà créé sans toucher à ce qu'il contient : l'appli crée une petite
+ * présentation avec leurs seules pages, que l'on importe dans son dossier depuis Google Slides. (Écrire
+ * directement dans le dossier obligerait à rendre les photos publiques : Google l'exige pour les insérer.)
+ */
+function AjouterPages({ costume, r, lien, occupe, onCreer }: { costume: Ligne; r: ReglagesWip; lien: LienSlides; occupe: boolean; onCreer: (ids: string[]) => void }) {
+  const d = donnees.value;
+  const avecPages = r.ordre.filter(id => planWip(d, costume, r, { seulement: [id] }).diapos.length > 0);
+  const [choix, setChoix] = useState<Set<string>>(() => new Set(avecPages.filter(id => !lien.pieces.includes(id))));
+  const nom = (id: string) => d.Pieces[id]?.nom ?? 'Photos sans pièce';
+  return (
+    <div class="carte-reglage">
+      <h2>Mon dossier dans Google Slides</h2>
+      <p><a class="bouton" href={lien.url} target="_blank" rel="noopener"><Icone nom="diapo" />Ouvrir mon dossier</a> <span class="petit-texte">créé le {jourCourt(lien.cree.slice(0, 10), '')}</span></p>
+      <h3 class="champ-label">Ajouter des pages, sans toucher au reste</h3>
+      <ul class="liste-ajout-pages">
+        {avecPages.map(id => (
+          <li><label class="case-ligne">
+            <input type="checkbox" checked={choix.has(id)} onChange={e => { const s = new Set(choix); (e.target as HTMLInputElement).checked ? s.add(id) : s.delete(id); setChoix(s); }} />
+            <span>{nom(id)}{lien.pieces.includes(id) ? <span class="petit-texte"> — déjà dans le dossier</span> : <span class="petit-texte"> — pas encore dans le dossier</span>}</span>
+          </label></li>
+        ))}
+      </ul>
+      <button class="bouton principal" disabled={occupe || !choix.size} onClick={() => onCreer(r.ordre.filter(id => choix.has(id)))}>Créer les pages à importer</button>
+      <p class="petit-texte">Une petite présentation s'ouvre avec les pages de ces pièces. Dans ton dossier, place-toi où tu veux les ajouter, puis <strong>Fichier › Importer des diapositives</strong> : choisis « Pages à importer… », sélectionne toutes ses diapositives, et importe-les. Tes retouches restent intactes.</p>
+    </div>
   );
 }
 

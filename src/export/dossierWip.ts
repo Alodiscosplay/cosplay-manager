@@ -26,6 +26,7 @@ export interface ReglagesWip {
   ordre: string[];          // ids des pièces dans l'ordre voulu ('' = photos sans pièce)
   exclues: string[];
   parPage: 2 | 4 | 6;
+  pagesMax: number;         // 0 = pas de limite
   paires: Record<string, { ref?: string; res?: string }>; // clé de VUES → ids de photos (drive_id)
 }
 
@@ -37,7 +38,7 @@ export function lireReglagesWip(d: Donnees, c: Ligne): ReglagesWip {
   return {
     identite: r.identite ?? true, comparaisons: r.comparaisons ?? true, intercalaires: r.intercalaires ?? true,
     sommaire: r.sommaire ?? true, recherche: r.recherche ?? false,
-    ordre, exclues: r.exclues ?? [], parPage: r.parPage ?? 4, paires: r.paires ?? {},
+    ordre, exclues: r.exclues ?? [], parPage: r.parPage ?? 4, pagesMax: r.pagesMax ?? 0, paires: r.paires ?? {},
   };
 }
 
@@ -103,39 +104,95 @@ type Diapo =
   | { t: 'intercalaire'; titre: string } | { t: 'comparaison'; cle: string }
   | { t: 'piece'; pieceId: string; photos: Ligne[]; suite: boolean };
 
-export function planWip(d: Donnees, c: Ligne, r: ReglagesWip): { diapos: Diapo[]; sections: [string, number][] } {
-  const diapos: Diapo[] = [{ t: 'couverture' }, r.identite ? { t: 'identite' } : { t: 'personnage' }];
+/**
+ * Options du plan : `seulement` = les pages de ces pièces et rien d'autre (pages à ajouter à un dossier
+ * déjà créé) ; `limites` = nombre de photos gardées par pièce (pour tenir dans un nombre de pages).
+ */
+export interface OptionsPlan { seulement?: string[]; limites?: Record<string, number> }
+
+/** Garde n photos réparties sur toute la fabrication, la première et la dernière comprises. */
+export function repartir<T>(l: T[], n: number): T[] {
+  if (n >= l.length) return l;
+  if (n <= 0) return [];
+  if (n === 1) return [l[0]];
+  const pas = (l.length - 1) / (n - 1);
+  return Array.from({ length: n }, (_, i) => l[Math.round(i * pas)]);
+}
+
+const premierePage = (parPage: number) => (parPage === 2 ? 2 : 4);
+
+export function planWip(d: Donnees, c: Ligne, r: ReglagesWip, o: OptionsPlan = {}): { diapos: Diapo[]; sections: [string, number][] } {
+  const seul = o.seulement;
+  const diapos: Diapo[] = seul ? [] : [{ t: 'couverture' }, r.identite ? { t: 'identite' } : { t: 'personnage' }];
   const sections: [string, number][] = [];
-  if (r.sommaire) diapos.push({ t: 'sommaire' });
+  if (r.sommaire && !seul) diapos.push({ t: 'sommaire' });
   const section = (titre: string) => { sections.push([titre, diapos.length + 1]); if (r.intercalaires) diapos.push({ t: 'intercalaire', titre }); };
-  if (r.recherche && (c.recherche ?? '').trim()) { sections.push(['Recherches et références', diapos.length + 1]); diapos.push({ t: 'recherche' }); }
+  if (!seul && r.recherche && (c.recherche ?? '').trim()) { sections.push(['Recherches et références', diapos.length + 1]); diapos.push({ t: 'recherche' }); }
   const paires = VUES.filter(v => r.paires[v.cle]?.ref || r.paires[v.cle]?.res);
-  if (r.comparaisons && paires.length) {
+  if (!seul && r.comparaisons && paires.length) {
     section('Images et photos globales');
     for (const v of paires) diapos.push({ t: 'comparaison', cle: v.cle });
   }
-  const retenues = r.ordre.filter(id => !r.exclues.includes(id));
+  const retenues = seul ? r.ordre.filter(id => seul.includes(id)) : r.ordre.filter(id => !r.exclues.includes(id));
   for (const [partie, nom] of PARTIES) {
     const pieces = retenues.filter(id => partieDe(id ? ligne(d, 'Pieces', id) : undefined) === partie);
     const pages: Diapo[] = [];
     for (const id of pieces) {
       const p = id ? ligne(d, 'Pieces', id) : undefined;
-      const photos = photosWip(d, c.id, id);
+      const photos = repartir(photosWip(d, c.id, id), o.limites?.[id] ?? Infinity);
       const texte = !!(p?.materiaux || p?.techniques || p?.patron);
       if (!photos.length && !texte) continue;
       // La première page porte les textes et peu de photos ; les suivantes, des photos seulement.
-      const premiere = Math.min(photos.length, r.parPage === 2 ? 2 : 4);
+      const premiere = Math.min(photos.length, premierePage(r.parPage));
       pages.push({ t: 'piece', pieceId: id, photos: photos.slice(0, premiere), suite: false });
       for (let i = premiere; i < photos.length; i += r.parPage) pages.push({ t: 'piece', pieceId: id, photos: photos.slice(i, i + r.parPage), suite: true });
     }
     if (!pages.length) continue;
-    section(`WIP ${nom}`);
+    if (!seul) section(`WIP ${nom}`);
     diapos.push(...pages);
   }
   return { diapos, sections };
 }
 
-export async function genererWip(d: Donnees, costumeId: string, r: ReglagesWip, profil: Profil, progres?: (texte: string) => void): Promise<Blob> {
+export interface Ajustement { reglages: ReglagesWip; limites: Record<string, number>; retirees: number; pages: number; impossible: boolean }
+
+/**
+ * Faire tenir le dossier dans `pagesMax` pages : d'abord plus de photos par page (4, puis 6), puis moins
+ * de photos sur les pièces qui en ont le plus — gardées réparties sur toute la fabrication. Si même une
+ * page par pièce ne suffit pas, `impossible` : il faut exclure des pièces ou des comparaisons.
+ */
+export function ajusterWip(d: Donnees, c: Ligne, r: ReglagesWip): Ajustement {
+  const compte = (rr: ReglagesWip, lim: Record<string, number>) => planWip(d, c, rr, { limites: lim }).diapos.length;
+  const max = r.pagesMax;
+  const sans = { reglages: r, limites: {}, retirees: 0, pages: compte(r, {}), impossible: false };
+  if (!max || sans.pages <= max) return sans;
+  for (const pp of ([4, 6] as const).filter(x => x > r.parPage)) {
+    const rr = { ...r, parPage: pp };
+    const n = compte(rr, {});
+    if (n <= max) return { reglages: rr, limites: {}, retirees: 0, pages: n, impossible: false };
+  }
+  const rr = { ...r, parPage: Math.max(r.parPage, 6) as 2 | 4 | 6 };
+  const ids = rr.ordre.filter(id => !rr.exclues.includes(id));
+  const total = Object.fromEntries(ids.map(id => [id, photosWip(d, c.id, id).length]));
+  const lim: Record<string, number> = { ...total };
+  const prem = premierePage(rr.parPage);
+  let pages = compte(rr, lim);
+  while (pages > max) {
+    // La pièce qui a le plus de photos au-delà de sa première page perd une page de photos.
+    const id = ids.filter(x => lim[x] > prem).sort((a, b) => lim[b] - lim[a])[0];
+    if (id === undefined) break;
+    lim[id] -= (lim[id] - prem) % rr.parPage || rr.parPage;
+    pages = compte(rr, lim);
+  }
+  const retirees = ids.reduce((s, id) => s + total[id] - lim[id], 0);
+  return { reglages: rr, limites: lim, retirees, pages, impossible: pages > max };
+}
+
+/**
+ * Le diaporama. Sans `seulement` : le dossier complet, ajusté à la limite de pages. Avec : seulement les
+ * pages de ces pièces, à importer dans un dossier déjà créé (Fichier › Importer des diapositives).
+ */
+export async function genererWip(d: Donnees, costumeId: string, r0: ReglagesWip, profil: Profil, progres?: (texte: string) => void, seulement?: string[]): Promise<Blob> {
   const { default: PptxGenJS } = await import('pptxgenjs');
   const c = ligne(d, 'Costumes', costumeId)!;
   const ACCENT = couleurHex(c);
@@ -147,7 +204,9 @@ export async function genererWip(d: Donnees, costumeId: string, r: ReglagesWip, 
     objects: [{ rect: { x: 0, y: 0, w: L, h: 0.12, fill: { color: ACCENT } } }],
     slideNumber: { x: L - 0.9, y: H - 0.45, fontSize: 10, color: DOUX },
   });
-  const { diapos, sections } = planWip(d, c, r);
+  const aj = seulement ? null : ajusterWip(d, c, r0);
+  const r = aj?.reglages ?? r0;
+  const { diapos, sections } = planWip(d, c, r, { seulement, limites: aj?.limites });
   const ref = await image(c.image_ref);
   const perso = [c.personnage, c.oeuvre].filter(Boolean).join(' — ');
   const titrePage = (s: ReturnType<typeof pptx.addSlide>, t: string) =>
@@ -237,7 +296,9 @@ export async function genererWip(d: Donnees, costumeId: string, r: ReglagesWip, 
             if (!large) x0 = 5.4;
           }
         }
-        await grillePhotos(s, d, dia.photos, p, x0, L - x0 - 0.5, photosWip(d, costumeId, dia.pieceId));
+        // Numérotation continue sur les pages de la pièce (photos retenues seulement).
+        const siennes = diapos.flatMap(x => (x.t === 'piece' && x.pieceId === dia.pieceId ? x.photos : []));
+        await grillePhotos(s, d, dia.photos, p, x0, L - x0 - 0.5, siennes);
         break;
       }
     }

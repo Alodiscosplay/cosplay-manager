@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { construire } from './aide';
-import { planWip, lireReglagesWip, genererWip, couleurHex } from '../src/export/dossierWip';
+import { planWip, lireReglagesWip, genererWip, couleurHex, ajusterWip, repartir } from '../src/export/dossierWip';
 import type { Ligne } from '../src/modele/schema';
 
 const donnees = () => {
@@ -67,5 +67,36 @@ describe('partie d’une pièce', () => {
     const p = (nom: string, partie_wip = '') => ({ id: 'x', maj: '', supprime: '', nom, partie_wip });
     expect([partieDe(p('Perruque')), partieDe(p('Wig casque')), partieDe(p('Maquillage')), partieDe(p('Corset')), partieDe(p('Perruque', 'divers')), partieDe(p('Ombrelle')), partieDe(p('Sac à main'))])
       .toEqual(['wig', 'wig', 'makeup', 'costume', 'divers', 'props', 'props']);
+  });
+});
+
+describe('dossier WIP : limite de pages et pages à ajouter', () => {
+  it('garde des photos réparties sur toute la fabrication', () => {
+    expect(repartir([1, 2, 3, 4, 5, 6, 7, 8, 9], 3)).toEqual([1, 5, 9]);
+    expect(repartir([1, 2], 5)).toEqual([1, 2]);
+  });
+
+  it('sans limite, rien ne change ; avec, plus de photos par page puis moins de photos', () => {
+    const { d, c, ids } = donnees();
+    for (let i = 8; i <= 20; i++) d.Photos[`c${i}`] = { id: `c${i}`, maj: '', supprime: '', costume_id: c.id, piece_id: ids['Corset'], drive_id: `x${i}`, date: '2026-09-15', dans_wip: 'oui' } as never;
+    const r = { ...lireReglagesWip(d, c), parPage: 2 as const };
+    expect(ajusterWip(d, c, r).pages).toBe(planWip(d, c, r).diapos.length);
+    // 20 photos du corset, 2 par page : bien trop ; à 8 pages, l'appli passe à 6 par page puis retire des photos.
+    const a = ajusterWip(d, c, { ...r, pagesMax: 8 });
+    expect(a.pages).toBeLessThanOrEqual(8);
+    expect(a.reglages.parPage).toBe(6);
+    expect(a.retirees).toBeGreaterThan(0);
+    expect(a.impossible).toBe(false);
+  });
+
+  it('signale quand même une page par pièce ne tient pas', () => {
+    const { d, c } = donnees();
+    expect(ajusterWip(d, c, { ...lireReglagesWip(d, c), pagesMax: 3 }).impossible).toBe(true);
+  });
+
+  it('pages à ajouter : seulement celles des pièces choisies, sans couverture ni intercalaire', () => {
+    const { d, c, ids } = donnees();
+    const p = planWip(d, c, lireReglagesWip(d, c), { seulement: [ids['Perruque']] });
+    expect(p.diapos.map(x => x.t)).toEqual(['piece']);
   });
 });
