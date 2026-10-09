@@ -4,10 +4,11 @@
 //    (les données gardent leurs identifiants Drive, ce qui permet le réimport sans les recopier).
 import { type Donnees, type Ligne, type NomTable, bool, liste, txtListe } from '../modele/schema';
 import { ligne, piecesDe, pistesDe, etapesDePiste, fournituresDe, photosDe, tous } from '../logique/acces';
-import { avancementCostume, avancementPiece, formatPct } from '../logique/avancement';
-import { budgetCostume, montant, euros } from '../logique/budget';
-import { jourCourt, lireJour } from '../logique/dates';
-import { blobPhoto } from '../store/photos';
+import { avancementCostume } from '../logique/avancement';
+import { budgetCostume } from '../logique/budget';
+import { lireJour } from '../logique/dates';
+import { blobPhoto, imagePourPdf } from '../store/photos';
+import { fichePdf } from './fichePdf';
 import { nouvelId, purger, type Changement } from '../store/operations';
 import { nomFichier } from '../composants/base';
 import type JSZip from 'jszip';
@@ -22,11 +23,11 @@ interface ContenuArchive {
 }
 
 /** Sauvegarde sur le Drive : les données réimportables et la fiche, sans les photos (déjà sur le Drive). */
-export function fichiersSauvegardeDrive(d: Donnees, costumeId: string): { donnees: Blob; fiche: Blob } {
+export async function fichiersSauvegardeDrive(d: Donnees, costumeId: string): Promise<{ donnees: Blob; fiche: Blob }> {
   const contenu: ContenuArchive = { format: FORMAT, version: 1, exporte_le: new Date().toISOString(), lignes: lignesDuCostume(d, costumeId), fichiers: {}, lieu: 'drive' };
   return {
     donnees: new Blob([JSON.stringify(contenu, null, 2)], { type: 'application/json' }),
-    fiche: new Blob([ficheHtml(d, costumeId, {}, true)], { type: 'text/html' }),
+    fiche: await fichePdf(d, costumeId, imagePourPdf),
   };
 }
 
@@ -72,7 +73,8 @@ export async function construireArchive(d: Donnees, costumeId: string, wip?: Blo
   }
   const contenu: ContenuArchive = { format: FORMAT, version: 1, exporte_le: new Date().toISOString(), lignes, fichiers };
   zip.file('costume.json', JSON.stringify(contenu, null, 2));
-  zip.file('fiche.html', ficheHtml(d, costumeId, fichiers));
+  progres?.('Fiche PDF');
+  zip.file('fiche.pdf', await fichePdf(d, costumeId, imagePourPdf));
   if (wip) zip.file('dossier-WIP.pptx', wip);
   progres?.('Compression');
   const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 3 } });
@@ -164,55 +166,6 @@ export function lireContenu(brut: unknown, d: Donnees): { changements: Changemen
 function sansTechnique(l: Ligne): Record<string, string> {
   const { id: _i, maj: _m, supprime: _s, ...reste } = l;
   return { ...reste };
-}
-
-// ---------- Fiche lisible ----------
-
-const echap = (s: string) => (s ?? '').replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]!));
-
-export function ficheHtml(d: Donnees, costumeId: string, fichiers: Record<string, string>, surDrive = false): string {
-  const c = ligne(d, 'Costumes', costumeId)!;
-  const a = avancementCostume(d, costumeId);
-  const pieces = piecesDe(d, costumeId);
-  const fournitures = fournituresDe(d, costumeId);
-  const photos = photosDe(d, costumeId).filter(p => fichiers[p.drive_id]);
-  const b = budgetCostume(d, costumeId);
-  const ref = c.image_ref && fichiers[c.image_ref];
-
-  const blocPiece = (p: Ligne) => {
-    const ap = avancementPiece(d, p.id);
-    const pistes = pistesDe(d, p.id);
-    return `<section class="piece"><h3>${echap(p.nom)} <small>${formatPct(ap)}${p.patron ? ` · ${echap(p.patron)}` : ''}</small></h3>
-      ${pistes.map(pi => `${pistes.length > 1 || pi.nom ? `<h4>${echap(pi.nom || 'Étape principale')}</h4>` : ''}<ol>${etapesDePiste(d, pi.id).map(e =>
-        `<li class="${bool(e.fait) ? 'fait' : ''}">${bool(e.fait) ? '✓' : '○'} ${echap(e.titre)}${e.fait_le ? ` <small>${jourCourt(e.fait_le, '')}</small>` : ''}${e.detail ? `<br><small>${echap(e.detail)}</small>` : ''}</li>`).join('')}</ol>`).join('')}
-      ${p.notes ? `<p class="notes">${echap(p.notes)}</p>` : ''}
-      <div class="photos">${photos.filter(ph => ph.piece_id === p.id).map(ph => `<figure><img src="${fichiers[ph.drive_id]}" alt=""><figcaption>${jourCourt(ph.date, '')} ${echap(ph.legende ?? '')}</figcaption></figure>`).join('')}</div>
-    </section>`;
-  };
-
-  return `<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${echap(c.nom)} — fiche</title>
-<style>
-body{font-family:system-ui,sans-serif;max-width:960px;margin:0 auto;padding:24px;color:#2b2233;background:#faf7fc;line-height:1.5}
-h1{margin:0}h2{border-bottom:2px solid #6b3fa0;padding-bottom:4px;margin-top:40px}h3 small,h4{color:#6e6478;font-weight:normal}
-.tete{display:flex;gap:24px;align-items:flex-start;flex-wrap:wrap}.tete img{max-width:280px;border-radius:8px}
-ol{padding-left:20px}li.fait{color:#6e6478}.photos{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
-figure{margin:0}figure img{width:100%;border-radius:6px}figcaption{font-size:.85em;color:#6e6478}
-table{border-collapse:collapse;width:100%}td,th{border-bottom:1px solid #e3dcea;padding:6px;text-align:left}.notes{white-space:pre-wrap;color:#6e6478}
-</style></head><body>
-<div class="tete">${ref ? `<img src="${ref}" alt="Image de référence">` : ''}<div>
-<h1>${echap(c.nom)}</h1><p>${echap([c.personnage, c.oeuvre].filter(Boolean).join(' — '))}</p>
-<p><strong>${formatPct(a)}</strong> · ${a.nbFait} sous-étapes faites sur ${a.nb} · ${pieces.length} pièces</p>
-${c.deadline ? `<p>Deadline : ${jourCourt(c.deadline, '')}</p>` : ''}${c.notes ? `<p class="notes">${echap(c.notes)}</p>` : ''}
-<p><small>Fiche enregistrée le ${jourCourt(new Date().toISOString().slice(0, 10), '')} avec Cosplay Manager.${surDrive ? ' Les photos sont dans les dossiers du costume, à côté du dossier « Sauvegardes ».' : ''}</small></p></div></div>
-<h2>Pièces, étapes et sous-étapes</h2>${pieces.map(blocPiece).join('')}
-${photos.some(p => !p.piece_id) ? `<h2>Photos générales</h2><div class="photos">${photos.filter(p => !p.piece_id).map(ph => `<figure><img src="${fichiers[ph.drive_id]}" alt=""><figcaption>${jourCourt(ph.date, '')} ${echap(ph.legende ?? '')}</figcaption></figure>`).join('')}</div>` : ''}
-<h2>Fournitures</h2>${fournitures.length ? `<table><tr><th>Quoi</th><th>Quantité</th><th>Fournisseur</th><th>Prix</th><th>Statut</th></tr>${fournitures.map(f => {
-    const m = montant(f);
-    return `<tr><td>${f.lien ? `<a href="${echap(f.lien)}">${echap(f.libelle)}</a>` : echap(f.libelle)}</td><td>${echap([f.quantite, f.unite].filter(Boolean).join(' '))}</td><td>${echap(ligne(d, 'Fournisseurs', f.fournisseur_id)?.nom ?? '')}</td><td>${m !== null ? euros(m) : ''}</td><td>${echap(f.statut)}</td></tr>`;
-  }).join('')}</table>` : '<p>Aucune.</p>'}
-${bool(c.suivi_budget) ? `<h2>Budget</h2><p>Total des fournitures : <strong>${euros(b.total)}</strong>${b.cible !== null ? ` pour un budget visé de ${euros(b.cible)}` : ''}${b.sansPrix ? ` (${b.sansPrix} sans prix)` : ''}.</p>` : ''}
-</body></html>`;
 }
 
 // ---------- Historique des sauvegardes d'un costume ----------

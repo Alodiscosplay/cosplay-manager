@@ -1,11 +1,11 @@
-// Sauvegarde d'un costume, à tout moment : sur l'appareil (ZIP téléchargé) ou sur le Drive (dossier
-// « Sauvegardes » du costume). Après une sauvegarde, on peut libérer de la place en retirant des photos.
-// Un costume terminé peut aussi être archivé définitivement, par le même chemin.
+// Sauvegarde d'un costume (menu « … » de sa fiche), à tout moment : sur l'appareil (un ZIP qui réunit
+// tout : données réimportables, fiche PDF, photos, dossier WIP s'il y en a un) ou sur le Drive (dossier
+// « Sauvegardes » du costume, photos laissées à côté). Ensuite, on peut libérer de la place en retirant
+// des photos. Un costume terminé s'archive définitivement par le même chemin.
 import { useState } from 'preact/hooks';
-import { donnees, faire, mode, jour, synchroniser, baseLocale, envoyerPhotosDuCostume, deposerSauvegarde, retirerPhotos, montrerToast } from '../../store/store';
+import { donnees, faire, mode, synchroniser, baseLocale, envoyerPhotosDuCostume, deposerSauvegarde, retirerPhotos, montrerToast } from '../../store/store';
 import { effacerPhoto } from '../../store/idb';
 import { photosDe, piecesDe } from '../../logique/acces';
-import { statutCostume } from '../../logique/disponibilite';
 import { jourCourt } from '../../logique/dates';
 import { bool, type Ligne } from '../../modele/schema';
 import { construireArchive, changementsArchivage, fichiersSauvegardeDrive, lireSauvegardes, noterSauvegarde, noterRetrait } from '../../export/archive';
@@ -23,20 +23,20 @@ interface Faite { lieu: Lieu; nom: string; taille?: number; dossier?: string; ma
 const mo = (n: number) => (n < 1024 * 1024 ? `${Math.max(1, Math.round(n / 1024))} Ko` : `${(n / 1024 / 1024).toFixed(1).replace('.', ',')} Mo`);
 const pluriel = (n: number, mot: string) => `${n} ${mot}${n > 1 ? 's' : ''}`;
 
-export function OngletSauvegarde({ costume }: { costume: Ligne }) {
+export function FeuilleSauvegarde({ costume, archive, onFermer }: { costume: Ligne; archive?: boolean; onFermer: () => void }) {
   const d = donnees.value;
   const google = mode.value === 'google';
   const photos = photosDe(d, costume.id);
   const [lieu, setLieu] = useState<Lieu>('appareil');
-  const [avecWip, setAvecWip] = useState(photos.some(p => bool(p.dans_wip)));
   const [etat, setEtat] = useState('');
   const [erreur, setErreur] = useState('');
   const [faite, setFaite] = useState<Faite | null>(null);
   const [choix, setChoix] = useState(false);
   const [confirmerArchive, setConfirmerArchive] = useState(false);
   const [zipArchive, setZipArchive] = useState<Faite | null>(null);
-  const termine = statutCostume(costume, jour.value) === 'terminé';
   const lieuEffectif: Lieu = google ? lieu : 'appareil';
+  // Le dossier WIP suit automatiquement : il est inclus dès qu'une photo y est retenue.
+  const avecWip = photos.some(p => !estReference(p) && bool(p.dans_wip));
 
   /** Produit la sauvegarde au lieu choisi. */
   const produire = async (): Promise<Faite> => {
@@ -52,12 +52,13 @@ export function OngletSauvegarde({ costume }: { costume: Ligne }) {
     }
     setEtat('Envoi des photos sur le Drive');
     const manquantes = await envoyerPhotosDuCostume(costume.id);
-    const f = fichiersSauvegardeDrive(donnees.value, costume.id);
+    setEtat('Fiche PDF');
+    const f = await fichiersSauvegardeDrive(donnees.value, costume.id);
     const nom = new Date().toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' }).replace(/\//g, '-').replace(':', 'h');
     setEtat('Dépôt de la sauvegarde');
     const dossier = await deposerSauvegarde(costume.id, nom, [
       { nom: 'costume.json', blob: f.donnees, donnees: true },
-      { nom: 'fiche.html', blob: f.fiche },
+      { nom: 'fiche.pdf', blob: f.fiche },
       ...(wip ? [{ nom: 'dossier-WIP.pptx', blob: wip }] : []),
     ]);
     return { lieu: 'drive', nom, dossier, manquantes };
@@ -91,6 +92,7 @@ export function OngletSauvegarde({ costume }: { costume: Ligne }) {
       const base = baseLocale();
       if (base) for (const id of toutes) await effacerPhoto(base, id);
       if (google) await synchroniser();
+      onFermer();
       aller('/archives');
     } catch (e) {
       setErreur(`Archivage interrompu : ${(e as Error).message}. Rien n'a été retiré ; tu peux réessayer.`);
@@ -109,12 +111,24 @@ export function OngletSauvegarde({ costume }: { costume: Ligne }) {
   };
 
   const historique = lireSauvegardes(costume).slice().reverse();
+  const contenu = `les données (réimportables), une fiche PDF lisible et toutes les photos${avecWip ? ', ainsi que le dossier WIP' : ''}`;
 
   return (
-    <section class="onglet-sauvegarde">
-      <div class="carte-reglage">
-        <h2>Sauvegarder ce costume</h2>
-        <p class="petit-texte">Tout le costume réuni : les données (réimportables), une fiche lisible hors appli et toutes les photos. De quoi le garder sur le téléphone, le transférer sur un ordinateur, puis libérer de la place. Rien n'est retiré de l'appli sans ton accord.</p>
+    <Feuille titre={archive ? 'Archiver définitivement' : 'Réaliser une sauvegarde'} onFermer={onFermer} pied={
+      faite ? <>
+        <button class="bouton" onClick={onFermer}>Non, c'est tout</button>
+        <button class="bouton principal" disabled={!photos.length} onClick={() => setChoix(true)}>Choisir des photos à retirer</button>
+      </> : <>
+        <button class="bouton" onClick={onFermer}>Annuler</button>
+        {archive
+          ? <button class="bouton danger" disabled={!!etat} onClick={() => setConfirmerArchive(true)}><Icone nom="archive" />Sauvegarder et archiver</button>
+          : <button class="bouton principal" disabled={!!etat} onClick={() => void sauvegarder()}><Icone nom="telecharger" />Sauvegarder</button>}
+      </>
+    }>
+      {!faite && <>
+        <p class="petit-texte">{archive
+          ? `Le costume est terminé. L'archiver réunit tout (${contenu}), puis retire son détail et ses photos de l'appli. Il reste visible dans les Archives, avec un résumé, et peut être réimporté.`
+          : `Tout le costume réuni : ${contenu}. De quoi le garder sur le téléphone, le transférer sur un ordinateur, puis libérer de la place. Rien n'est retiré de l'appli sans ton accord.`}</p>
         {google && (
           <fieldset class="choix-lieu">
             <legend class="champ-label">Où ?</legend>
@@ -124,45 +138,24 @@ export function OngletSauvegarde({ costume }: { costume: Ligne }) {
               <span>Sur mon Drive <span class="petit-texte">— dans le dossier du costume, à côté de ses photos ; prend de la place sur le Drive</span></span></label>
           </fieldset>
         )}
-        <label class="interrupteur"><input type="checkbox" checked={avecWip} onChange={e => setAvecWip((e.target as HTMLInputElement).checked)} /><span>Inclure le dossier WIP (PowerPoint)</span></label>
-        <div class="ligne-actions">
-          <button class="bouton principal" disabled={!!etat} onClick={() => void sauvegarder()}><Icone nom="telecharger" />Sauvegarder</button>
-        </div>
-        {etat && <p class="petit-texte" role="status">{etat}…</p>}
-        {erreur && <p class="erreur" role="alert">{erreur}</p>}
+      </>}
+      {etat && <p class="petit-texte" role="status">{etat}…</p>}
+      {erreur && <p class="erreur" role="alert">{erreur}</p>}
 
-        {faite && (
-          <div class="bandeau-info">
-            <Icone nom="info" taille={16} />
-            <div>
-              <p>{faite.lieu === 'drive'
-                ? <>Sauvegardé sur ton Drive : <strong>Sauvegardes › {faite.nom}</strong>, dans le dossier du costume.</>
-                : <>Fichier téléchargé : <strong>{faite.nom}</strong> · {mo(faite.taille ?? 0)}.</>}</p>
-              {faite.manquantes > 0 && <p class="erreur">{pluriel(faite.manquantes, 'photo')} n'{faite.manquantes > 1 ? 'ont' : 'a'} pas pu être {faite.lieu === 'drive' ? 'envoyée' : 'récupérée'}{faite.manquantes > 1 ? 's' : ''} (hors ligne ?). Réessaie connectée avant de retirer des photos.</p>}
-              <p>Veux-tu libérer de la place en retirant des photos de l'appli ?</p>
-              <div class="ligne-actions">
-                <button class="bouton" onClick={() => setFaite(null)}>Non, c'est tout</button>
-                <button class="bouton principal" disabled={!photos.length} onClick={() => setChoix(true)}>Choisir des photos à retirer</button>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
+      {faite && <>
+        <p>{faite.lieu === 'drive'
+          ? <>Sauvegardé sur ton Drive : <strong>{costume.nom} › Sauvegardes › {faite.nom}</strong>.</>
+          : <>Fichier téléchargé : <strong>{faite.nom}</strong> · {mo(faite.taille ?? 0)}.</>}</p>
+        {faite.manquantes > 0 && <p class="erreur">{pluriel(faite.manquantes, 'photo')} n'{faite.manquantes > 1 ? 'ont' : 'a'} pas pu être {faite.lieu === 'drive' ? 'envoyée' : 'récupérée'}{faite.manquantes > 1 ? 's' : ''} (hors ligne ?). Réessaie connectée avant de retirer des photos.</p>}
+        <p>Veux-tu libérer de la place en retirant des photos de l'appli ?</p>
+      </>}
 
-      {termine && (
-        <div class="carte-reglage">
-          <h2>Archiver définitivement</h2>
-          <p class="petit-texte">Le costume est terminé. L'archiver sauvegarde tout {lieuEffectif === 'drive' ? 'sur ton Drive' : 'dans un ZIP'}, puis retire son détail et ses photos de l'appli. Il reste visible dans les Archives, avec un résumé, et peut être réimporté.</p>
-          <button class="bouton danger" disabled={!!etat} onClick={() => setConfirmerArchive(true)}><Icone nom="archive" />Archiver définitivement</button>
-        </div>
-      )}
-
-      {historique.length > 0 && (
-        <div class="carte-reglage">
-          <h2>Sauvegardes</h2>
+      {!archive && historique.length > 0 && (
+        <div class="historique-sauvegardes">
+          <h3 class="champ-label">Sauvegardes précédentes</h3>
           <ul class="liste-sauvegardes">
             {historique.map(t => (
-              <li>{jourCourt(t.date.slice(0, 10), '')} · {t.lieu === 'drive' ? 'Drive' : 'appareil (ZIP)'}{t.retirees > 0 ? ` · ${pluriel(t.retirees, 'photo')} retirée${t.retirees > 1 ? 's' : ''}` : ''}{t.archive ? ' · archivage' : ''}</li>
+              <li>{jourCourt(t.date.slice(0, 10), '')} · {t.lieu === 'drive' ? 'Drive' : 'appareil (ZIP)'}{t.retirees > 0 ? ` · ${pluriel(t.retirees, 'photo')} retirée${t.retirees > 1 ? 's' : ''}` : ''}</li>
             ))}
           </ul>
         </div>
@@ -170,7 +163,7 @@ export function OngletSauvegarde({ costume }: { costume: Ligne }) {
 
       {choix && faite && (
         <ChoixPhotosARetirer costume={costume} faite={faite} onFermer={() => setChoix(false)}
-          onFini={n => { setChoix(false); setFaite(null); faire([noterRetrait(donnees.value.Costumes[costume.id], n)]); montrerToast(`${pluriel(n, 'photo')} retirée${n > 1 ? 's' : ''} de l'appli`); }} />
+          onFini={n => { setChoix(false); faire([noterRetrait(donnees.value.Costumes[costume.id], n)]); montrerToast(`${pluriel(n, 'photo')} retirée${n > 1 ? 's' : ''} de l'appli`); onFermer(); }} />
       )}
 
       {confirmerArchive && (
@@ -188,7 +181,7 @@ export function OngletSauvegarde({ costume }: { costume: Ligne }) {
             <p>En confirmant, les photos de ce costume sont <strong>supprimées {google ? 'de ton Drive' : 'de cet appareil'}</strong> et son détail retiré de l'appli.</p>
           </>} />
       )}
-    </section>
+    </Feuille>
   );
 }
 

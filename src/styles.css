@@ -590,13 +590,12 @@ dialog.feuille::backdrop { background: rgb(20 12 28 / 45%); }
 .bienvenue-points { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; font-size: .95rem; }
 .bienvenue .petit-texte { margin: -4px 0 0; }
 
-/* Onglet Sauvegarde d'un costume */
-.onglet-sauvegarde { display: flex; flex-direction: column; gap: 16px; }
+/* Sauvegarde d'un costume */
+.historique-sauvegardes { margin-top: 12px; }
+.historique-sauvegardes h3 { margin: 0 0 4px; }
 .choix-lieu { border: 0; padding: 0; margin: 4px 0; display: flex; flex-direction: column; gap: 6px; }
 .choix-lieu legend { margin-bottom: 4px; }
 .liste-sauvegardes { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
-.onglet-sauvegarde .bandeau-info > div { display: flex; flex-direction: column; gap: 6px; }
-.onglet-sauvegarde .bandeau-info p { margin: 0; }
 .groupe-retrait { border: 1px solid var(--bord); border-radius: var(--rayon); padding: 8px 12px 12px; margin: 0 0 12px; }
 .groupe-retrait legend { padding: 0 4px; }
 .grille-retrait { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); }

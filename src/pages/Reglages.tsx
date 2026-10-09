@@ -115,13 +115,13 @@ function Photos() {
       </label>
       {actif && (
         <>
-          <p class="petit-texte">Dossier : <strong>{dossier ?? 'Cosplay Manager › Photos'}</strong>{!dossier && ' (créé au premier envoi)'}</p>
+          <p class="petit-texte">Dossier : <strong>{dossier ?? 'Cosplay Manager'}</strong>{!dossier && ' (créé au premier envoi)'}</p>
           <div class="ligne-actions">
             <button class="bouton" disabled={mode.value !== 'google'} onClick={() => { setErreur(''); setRenommer(true); }}>
               <Icone nom="nuage" />Nommer le dossier…
             </button>
           </div>
-          <p class="petit-texte">Les photos y sont rangées par costume, puis en Références et WIP, puis par pièce. Tu peux déplacer ce dossier où tu veux dans ton Drive : l’appli le retrouve.</p>
+          <p class="petit-texte">Un dossier par costume, avec ses photos en Références et WIP (par pièce) et ses Sauvegardes. Tu peux déplacer ce dossier où tu veux dans ton Drive : l’appli le retrouve.</p>
           <p class="petit-texte">Tes autres appareils retrouvent alors les photos. Les photos déjà envoyées restent sur le Drive si tu décoches.</p>
         </>
       )}
@@ -147,10 +147,10 @@ function NommerDossier({ nom, onFermer, onErreur }: { nom: string; onFermer: () 
     onFermer();
   };
   return (
-    <Feuille titre="Dossier des photos" onFermer={onFermer} pied={
+    <Feuille titre="Dossier sur le Drive" onFermer={onFermer} pied={
       <button class="bouton principal" disabled={attente} onClick={() => void valider()}>{attente ? 'Un instant…' : 'Valider'}</button>
     }>
-      <Champ label="Nom du dossier sur ton Drive" aide={nom ? 'Le dossier est renommé, ses photos restent dedans.' : 'Le dossier est créé à la racine de ton Drive.'}>
+      <Champ label="Nom du dossier sur ton Drive" aide={nom ? 'Le dossier est renommé, tout son contenu reste dedans.' : 'Le dossier est créé à la racine de ton Drive.'}>
         <input value={v} autoFocus onInput={e => setV((e.target as HTMLInputElement).value)} />
       </Champ>
     </Feuille>

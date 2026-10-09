@@ -7,7 +7,7 @@ import { activationsDuJour } from '../logique/activation';
 import { aujourdhui } from '../logique/dates';
 import { MODELES_PAR_DEFAUT } from '../modele/modelesParDefaut';
 import { type Pendants, clePendant, fusionner, lireFichier, versFichier } from '../sync/fusion';
-import { trouverDonnees, lireDonnees, versionDonnees, ecrireDonnees, envoyerPhoto, nomDossierPhotos, nommerDossierPhotos, dossierRange, dossierDe, deplacer, dossierDeSauvegarde, deposerFichier, supprimerFichier, type Emplacement, type PlaceDossier } from '../sync/drive';
+import { trouverDonnees, lireDonnees, versionDonnees, ecrireDonnees, envoyerPhoto, nomDossierAppli, nommerDossierAppli, dossierRange, dossierDe, deplacer, dossierDeSauvegarde, deposerFichier, supprimerFichier, type Emplacement, type PlaceDossier } from '../sync/drive';
 import { ErreurConnexion, ErreurReseau, ErreurIntrouvable, jetonValide, emailConnu } from '../sync/google';
 import { donneesDemo } from '../demo/donneesDemo';
 
@@ -15,7 +15,7 @@ export type Mode = 'demo' | 'google';
 const CLE_MODE = 'cosplay-planner.mode';
 
 // Les photos vivent sur l'appareil ; `photosDrive` (coché par l'utilisatrice) en envoie une copie dans
-// le dossier des photos du Drive, dont `nomDossierPhotos` garde le dernier nom connu, pour l'affichage.
+// le dossier de l'appli sur le Drive, dont `nomDossierPhotos` garde le dernier nom connu, pour l'affichage.
 interface Meta { pendants: Pendants; emplacement?: Emplacement; derniere?: string; photosDrive?: boolean; nomDossierPhotos?: string }
 
 export const mode = signal<Mode | null>(lireMode());
@@ -233,7 +233,7 @@ export async function reglerPhotosDrive(v: boolean): Promise<void> {
 export async function lireNomDossierPhotos(): Promise<void> {
   if (mode.value !== 'google' || !base) return;
   meta.emplacement ??= {};
-  const nom = await nomDossierPhotos(meta.emplacement);
+  const nom = await nomDossierAppli(meta.emplacement);
   if (nom === (meta.nomDossierPhotos ?? null)) return;
   meta.nomDossierPhotos = nom ?? undefined;
   dossierPhotos.value = nom;
@@ -244,7 +244,7 @@ export async function lireNomDossierPhotos(): Promise<void> {
 export async function renommerDossierPhotos(nom: string): Promise<void> {
   if (mode.value !== 'google' || !base) return;
   meta.emplacement ??= {};
-  await nommerDossierPhotos(meta.emplacement, nom);
+  await nommerDossierAppli(meta.emplacement, nom);
   meta.nomDossierPhotos = nom;
   dossierPhotos.value = nom;
   await enregistrer();
@@ -336,7 +336,7 @@ async function envoyerPhotosEnAttente(costumeId?: string): Promise<void> {
       if (x instanceof ErreurConnexion || x instanceof ErreurReseau) throw x;
       // Un dossier supprimé à la main dans le Drive : on oublie les mémos, les dossiers seront
       // retrouvés ou recréés à la prochaine synchro.
-      if (x instanceof ErreurIntrouvable) { e.dossiers = {}; e.photosId = undefined; delete e.places[id]; }
+      if (x instanceof ErreurIntrouvable) { e.dossiers = {}; e.dossierId = undefined; delete e.places[id]; }
       console.warn('Rangement des photos :', x);
     }
   }
@@ -385,7 +385,7 @@ export function deposerSauvegarde(costumeId: string, nomDossier: string, fichier
       parent = await dossierRange(e, chemin);
     } catch (x) {
       if (!(x instanceof ErreurIntrouvable)) throw x;
-      e.dossiers = {}; e.photosId = undefined; // un dossier supprimé à la main : on le retrouve ou le recrée
+      e.dossiers = {}; e.dossierId = undefined; // un dossier supprimé à la main : on le retrouve ou le recrée
       parent = await dossierRange(e, chemin);
     }
     const dossier = await dossierDeSauvegarde(nomDossier, parent);

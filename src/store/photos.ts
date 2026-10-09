@@ -83,3 +83,12 @@ export async function dimensions(b: Blob): Promise<{ w: number; h: number }> {
   img.close();
   return r;
 }
+
+/** Une photo prête pour la fiche PDF : réduite (900 px), en JPEG, avec ses dimensions ; null si introuvable. */
+export async function imagePourPdf(id: string): Promise<{ url: string; w: number; h: number } | null> {
+  const b = await blobPhoto(id).catch(() => null);
+  if (!b) return null;
+  const r = await reduire(b, 900, 0.8);
+  const { w, h } = await dimensions(r);
+  return { url: await blobVersDataUrl(r), w, h };
+}

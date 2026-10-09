@@ -18,7 +18,7 @@ import { OngletPhotos } from './costume/Photos';
 import { OngletBudget } from './costume/Budget';
 import { OngletPlanning } from './costume/Planning';
 import { OngletWip } from './costume/Wip';
-import { OngletSauvegarde } from './costume/Sauvegarde';
+import { FeuilleSauvegarde } from './costume/Sauvegarde';
 
 const purgerNouveau = (id: string) => [purger('Costumes', donnees.value.Costumes[id])];
 
@@ -30,6 +30,7 @@ export function PageCostume({ id, onglet = 'pieces' }: { id: string; onglet?: st
   const [fiche, setFiche] = useState(false);
   const [menuImage, setMenuImage] = useState(false);
   const [recadrer, setRecadrer] = useState(false);
+  const [sauvegarde, setSauvegarde] = useState<'sauvegarde' | 'archive' | null>(null);
   if (!c) return <div class="page"><Vide icone="boite" titre="Costume introuvable"><a href="#/">Retour aux costumes</a></Vide></div>;
   if (c.statut === 'archivé') aller('/archives');
 
@@ -46,7 +47,6 @@ export function PageCostume({ id, onglet = 'pieces' }: { id: string; onglet?: st
     ...(suivi ? [['budget', 'Budget'] as [string, string]] : []),
     ...(planifie ? [['planning', 'Planning'] as [string, string]] : []),
     ['wip', 'Dossier WIP'],
-    ['sauvegarde', 'Sauvegarde'],
   ];
 
   // Onglet demandé mais masqué (planning non suivi, par exemple) : on retombe sur les pièces.
@@ -82,6 +82,8 @@ export function PageCostume({ id, onglet = 'pieces' }: { id: string; onglet?: st
             <Menu actions={[
               { texte: 'Modifier la fiche', icone: 'crayon', faire: () => setFiche(true) },
               sc !== 'terminé' && { texte: 'Marquer terminé', icone: 'afaire', faire: () => maj('Costumes', id, { statut: 'terminé' }) },
+              { texte: 'Réaliser une sauvegarde', icone: 'telecharger', faire: () => setSauvegarde('sauvegarde') },
+              sc === 'terminé' && { texte: 'Archiver définitivement', icone: 'archive', faire: () => setSauvegarde('archive') },
               { texte: 'Supprimer le costume', icone: 'poubelle', danger: true, faire: () => { faire(supprimer(donnees.value, 'Costumes', id), `« ${c.nom} » supprimé`); aller('/'); } },
             ]} />
           </div>
@@ -109,9 +111,9 @@ export function PageCostume({ id, onglet = 'pieces' }: { id: string; onglet?: st
       {vu === 'budget' && <OngletBudget costume={c} />}
       {vu === 'planning' && <OngletPlanning costume={c} />}
       {vu === 'wip' && <OngletWip costume={c} />}
-      {vu === 'sauvegarde' && <OngletSauvegarde costume={c} />}
 
       {fiche && <FicheCostume id={id} onFermer={() => setFiche(false)} />}
+      {sauvegarde && <FeuilleSauvegarde costume={c} archive={sauvegarde === 'archive'} onFermer={() => setSauvegarde(null)} />}
       {menuImage && (
         <Feuille titre="Image de référence" onFermer={() => setMenuImage(false)}>
           <div class="menu-liste">

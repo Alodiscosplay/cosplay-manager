@@ -2,8 +2,8 @@
 //  - Les DONNÉES : un seul fichier JSON dans l'espace caché réservé à l'appli (`appDataFolder`, portée
 //    `drive.appdata`). Invisible dans le Drive, inaccessible aux autres applis, et sans corbeille.
 //  - Ce qu'elle doit voir : un dossier « Cosplay Manager » (portée `drive.file`), créé seulement s'il sert
-//    — copie des photos, export vers Google Slides — avec un sous-dossier « Photos », rangé par costume :
-//    Photos / <costume> / Références | WIP / <pièce>.
+//    — copie des photos, sauvegardes, export vers Google Slides — rangé par costume :
+//    Cosplay Manager / <costume> / Références | WIP / <pièce>, et <costume> / Sauvegardes.
 import { gjson, gfetch, ErreurIntrouvable } from './google';
 
 const DRIVE = 'https://www.googleapis.com/drive/v3/files';
@@ -13,7 +13,8 @@ const CLE = 'cosplayPlanner';
 const NOM_DONNEES = 'donnees.json';
 
 /**
- * Où vivent les fichiers de l'appli. Le dossier visible et ses Photos n'existent que s'ils ont servi.
+ * Où vivent les fichiers de l'appli. Le dossier visible n'existe que s'il a servi. `photosId` : l'ancien
+ * niveau « Photos » (avant le 2026-10-09), vidé et retiré par `migrerSansPhotos`.
  * `dossiers` et `places` sont des mémos propres à l'appareil (dossiers rangés déjà trouvés, dossier
  * où se trouve chaque photo) : ils évitent de redemander au Drive ce qu'on sait déjà.
  */
@@ -21,6 +22,7 @@ export interface Emplacement {
   donneesId?: string; dossierId?: string; photosId?: string;
   dossiers?: Record<string, { id: string; nom: string }>;
   places?: Record<string, string>;
+  sansPhotos?: boolean;
 }
 
 /** Un dossier du rangement des photos : son rôle, l'id de ce qu'il représente, et son nom. */
@@ -96,40 +98,55 @@ export async function dossierVisible(e: Emplacement): Promise<string> {
 }
 
 /**
- * Le dossier des copies de photos : un seul par compte, retrouvé par son marqueur et non par son nom ou
- * sa place. On peut donc le renommer depuis l'appli et le déplacer dans le Drive. Créé au premier envoi,
- * en sous-dossier « Photos » du dossier de l'appli.
+ * Le dossier de l'appli est retrouvé par son marqueur et non par son nom ou sa place : on peut le renommer
+ * depuis l'appli et le déplacer dans le Drive. Nom actuel ; null s'il n'existe pas encore.
  */
-export async function dossierPhotosParDefaut(e: Emplacement): Promise<string> {
-  e.photosId ??= (await chercher('photos')) ?? (await creerDossier('Photos', 'photos', await dossierVisible(e)));
-  return e.photosId;
-}
-
-/** Nom actuel du dossier des photos ; null s'il n'existe pas encore. */
-export async function nomDossierPhotos(e: Emplacement): Promise<string | null> {
-  e.photosId ??= await chercher('photos');
-  if (!e.photosId) return null;
+export async function nomDossierAppli(e: Emplacement): Promise<string | null> {
+  e.dossierId ??= await chercher('dossier');
+  if (!e.dossierId) return null;
   try {
-    return (await gjson<{ name: string }>(`${DRIVE}/${e.photosId}?fields=name`)).name;
+    return (await gjson<{ name: string }>(`${DRIVE}/${e.dossierId}?fields=name`)).name;
   } catch (x) {
     if (!(x instanceof ErreurIntrouvable)) throw x;
-    e.photosId = undefined; // supprimé pour de bon : il sera recréé au prochain envoi
+    e.dossierId = undefined; // supprimé pour de bon : il sera recréé quand il servira
     return null;
   }
 }
 
-/** Renomme le dossier des photos ; s'il n'existe pas encore, le crée à la racine du Drive sous ce nom. */
-export async function nommerDossierPhotos(e: Emplacement, nom: string): Promise<void> {
-  e.photosId ??= await chercher('photos');
-  if (e.photosId) {
+/** Renomme le dossier de l'appli ; s'il n'existe pas encore, le crée à la racine du Drive sous ce nom. */
+export async function nommerDossierAppli(e: Emplacement, nom: string): Promise<void> {
+  e.dossierId ??= await chercher('dossier');
+  if (e.dossierId) {
     try {
-      await gjson(`${DRIVE}/${e.photosId}?fields=id`, { method: 'PATCH', body: JSON.stringify({ name: nom }) });
+      await gjson(`${DRIVE}/${e.dossierId}?fields=id`, { method: 'PATCH', body: JSON.stringify({ name: nom }) });
       return;
     } catch (x) {
       if (!(x instanceof ErreurIntrouvable)) throw x;
     }
   }
-  e.photosId = await creerDossier(nom, 'photos');
+  e.dossierId = await creerDossier(nom, 'dossier');
+}
+
+/**
+ * Avant le 2026-10-09, les costumes étaient rangés dans un niveau « Photos » du dossier de l'appli. On
+ * remonte son contenu d'un cran, puis on met le dossier vide à la corbeille. Une seule fois par appareil.
+ */
+async function migrerSansPhotos(e: Emplacement): Promise<void> {
+  if (e.sansPhotos) return;
+  const ancien = e.photosId ?? (await chercher('photos'));
+  if (ancien) {
+    const racine = await dossierVisible(e);
+    const q = encodeURIComponent(`'${ancien}' in parents and trashed=false`);
+    let page = '';
+    do {
+      const r = await gjson<{ files: { id: string }[]; nextPageToken?: string }>(`${DRIVE}?q=${q}&fields=nextPageToken,files(id)&pageSize=200${page ? `&pageToken=${page}` : ''}`);
+      for (const f of r.files) await deplacer(f.id, racine, ancien);
+      page = r.nextPageToken ?? '';
+    } while (page);
+    await gjson(`${DRIVE}/${ancien}?fields=id`, { method: 'PATCH', body: JSON.stringify({ trashed: true }) }).catch(() => undefined);
+  }
+  e.photosId = undefined;
+  e.sansPhotos = true;
 }
 
 /**
@@ -138,7 +155,8 @@ export async function nommerDossierPhotos(e: Emplacement, nom: string): Promise<
  * costume renommé renomme son dossier, et on peut déplacer les dossiers dans le Drive.
  */
 export async function dossierRange(e: Emplacement, chemin: PlaceDossier[]): Promise<string> {
-  let parent = await dossierPhotosParDefaut(e);
+  await migrerSansPhotos(e);
+  let parent = await dossierVisible(e);
   e.dossiers ??= {};
   for (const p of chemin) {
     const cle = `${p.role}:${p.ref}`;
