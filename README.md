@@ -10,7 +10,7 @@ Planifier et suivre la création de ses cosplays, pièce par pièce, étape par 
 - **Dates facultatives partout.** Une date de début fait passer la pièce (ou le costume) *en cours* tout seul le jour venu. « Répartir » planifie les sous-étapes jusqu'à une deadline, au prorata des durées. Agenda mois/semaine, vue Planning pièces × semaines, alertes de retard.
 - **Coller une liste** (`## Pièce`, `### Étape`, une sous-étape par ligne, `(long)` en fin de ligne) et **modèles d'étapes** (Impression 3D, Perruque…) : pas besoin d'IA pour tout saisir vite.
 - **Achats** : liste de courses commune à tous les costumes, groupée par fournisseur ; une commande peut regrouper les fournitures de plusieurs costumes. Budget facultatif par costume.
-- **Photos d'avancement** → **dossier WIP** en PowerPoint (ou Google Slides), généré dans le navigateur.
+- **Dossier WIP** de concours, composé à la demande (page d'identité ou du personnage, comparaisons référence / résultat, intercalaires, sommaire, recherche documentée) puis pièce par pièce, rangées en parties (costume, wig, hand props, make-up, divers) avec leur origine, leurs matériaux principaux et leurs techniques ; créé en Google Slides modifiable (ou téléchargé en PowerPoint), généré dans le navigateur.
 - **Sauvegarder** un costume à tout moment (menu « … » de sa fiche), sur l'appareil (ZIP : données réimportables, fiche PDF, photos, dossier WIP s'il y en a un) ou sur le Drive (dossier « Sauvegardes » du costume, photos laissées à côté) ; puis, au choix, **libérer de la place** en retirant des photos de l'appli. Un costume terminé s'**archive** par le même chemin. Réimportable depuis un ZIP ou depuis le Drive.
 - **Mode démo** sans compte, pour essayer.
 

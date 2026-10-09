@@ -7,7 +7,7 @@ import { DUREES, NOMS_DUREES, type Duree } from '../modele/schema';
 import { nouvelId, supprimer, changementsImport } from '../store/operations';
 import { connecter, deconnecter, emailConnu, googleConfigure } from '../sync/google';
 import { placePhotos, tailleDonnees } from '../sync/drive';
-import { Feuille, Champ, Confirmer, telechargerBlob } from '../composants/base';
+import { Feuille, Champ, Texte, Confirmer, telechargerBlob } from '../composants/base';
 import { Icone } from '../composants/Icone';
 import { IndicateurSync } from '../app';
 import { jourCourt } from '../logique/dates';
@@ -17,6 +17,7 @@ export function PageReglages() {
     <div class="page">
       <header class="page-tete"><h1>Réglages</h1><IndicateurSync /></header>
       <Compte />
+      <Identite />
       <Photos />
       <Modeles />
       <Sauvegarde />
@@ -26,6 +27,24 @@ export function PageReglages() {
         <p class="petit-texte"><a href={`${import.meta.env.BASE_URL}confidentialite.html`} target="_blank" rel="noopener">Politique de confidentialité</a></p>
       </section>
     </div>
+  );
+}
+
+/** L'identité de cosplayeur, reprise sur la page d'identité des dossiers WIP. Synchronisée, jamais publiée. */
+function Identite() {
+  const moi = donnees.value.Profil.moi;
+  const m = (champs: Record<string, string>) => faire([{ table: 'Profil', id: 'moi', champs, nouveau: !moi }]);
+  return (
+    <section class="carte-reglage">
+      <h2>Mon identité de cosplayeur</h2>
+      <p class="petit-texte">Reprise sur la page d'identité des dossiers WIP, quand tu la demandes. Elle reste dans tes données, sur ton Drive.</p>
+      <div class="deux-colonnes">
+        <Champ label="Pseudo"><Texte valeur={moi?.pseudo ?? ''} onValider={v => m({ pseudo: v })} /></Champ>
+        <Champ label="Pays"><Texte valeur={moi?.pays ?? ''} placeholder="France" onValider={v => m({ pays: v })} /></Champ>
+        <Champ label="Prénom"><Texte valeur={moi?.prenom ?? ''} onValider={v => m({ prenom: v })} /></Champ>
+        <Champ label="Nom"><Texte valeur={moi?.nom ?? ''} onValider={v => m({ nom: v })} /></Champ>
+      </div>
+    </section>
   );
 }
 

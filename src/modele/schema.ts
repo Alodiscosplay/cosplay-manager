@@ -6,9 +6,10 @@ export const VERSION_SCHEMA = 1;
 
 export const TABLES = {
   Costumes: ['nom', 'personnage', 'oeuvre', 'statut', 'attend_costume_id', 'debut', 'deadline', 'evenement_id',
-    'suivi_budget', 'suivi_planning', 'budget_prevu', 'couleur', 'image_ref', 'cadrage', 'notes', 'fin_prevue', 'ordre', 'priorite', 'sauvegardes', 'archive_le', 'resume_archive', 'vignette'],
+    'suivi_budget', 'suivi_planning', 'budget_prevu', 'couleur', 'image_ref', 'cadrage', 'notes', 'fin_prevue', 'ordre', 'priorite', 'sauvegardes', 'archive_le', 'resume_archive', 'vignette', 'wip', 'recherche'],
   Evenements: ['nom', 'date_debut', 'date_fin', 'lieu', 'notes'],
-  Pieces: ['costume_id', 'nom', 'statut', 'debut', 'deadline', 'attend', 'patron', 'notes', 'ordre', 'ordre_planning'],
+  Pieces: ['costume_id', 'nom', 'statut', 'debut', 'deadline', 'attend', 'patron', 'notes', 'ordre', 'ordre_planning',
+    'partie_wip', 'origine', 'origine_detail', 'materiaux', 'techniques'],
   Pistes: ['piece_id', 'nom', 'pause', 'libre', 'debut', 'deadline', 'attend', 'ordre'],
   Etapes: ['piste_id', 'piece_id', 'titre', 'detail', 'duree', 'poids', 'attend', 'fait', 'fait_le',
     'date_prevue', 'deadline', 'ordre', 'urgent'],
@@ -19,6 +20,8 @@ export const TABLES = {
   Commandes: ['fournisseur_id', 'statut', 'date', 'frais_port', 'notes'],
   Photos: ['costume_id', 'piece_id', 'piste_id', 'etape_id', 'drive_id', 'legende', 'date', 'dans_wip', 'type'],
   Modeles: ['nom', 'contenu'],
+  // Une seule ligne, « moi » : l'identité de cosplayeur reprise dans les dossiers WIP.
+  Profil: ['nom', 'prenom', 'pseudo', 'pays'],
 } as const;
 
 export type NomTable = keyof typeof TABLES;

@@ -373,6 +373,14 @@ export function envoyerPhotosDuCostume(costumeId: string): Promise<number> {
   });
 }
 
+/** Le dossier d'un costume sur le Drive (créé s'il le faut) : on y range son dossier WIP. */
+export function dossierDuCostume(costumeId: string): Promise<string> {
+  return horsSynchro(async () => {
+    if (!jetonValide()) throw new ErreurConnexion();
+    return dossierRange((meta.emplacement ??= {}), [cheminPhoto(donnees.value, costumeId, '', true)[0]]);
+  });
+}
+
 /** Dépose les fichiers d'une sauvegarde dans « Sauvegardes › nomDossier » du dossier du costume ; renvoie ce dossier. */
 export function deposerSauvegarde(costumeId: string, nomDossier: string, fichiers: { nom: string; blob: Blob; donnees?: boolean }[]): Promise<string> {
   return horsSynchro(async () => {

@@ -9,7 +9,7 @@ import { photosDe, piecesDe } from '../../logique/acces';
 import { jourCourt } from '../../logique/dates';
 import { bool, type Ligne } from '../../modele/schema';
 import { construireArchive, changementsArchivage, fichiersSauvegardeDrive, lireSauvegardes, noterSauvegarde, noterRetrait } from '../../export/archive';
-import { genererWip } from '../../export/dossierWip';
+import { genererWip, lireReglagesWip, profilDe } from '../../export/dossierWip';
 import { supprimerFichier } from '../../sync/drive';
 import { vignette } from '../../store/photos';
 import { telechargerBlob, Confirmer, Feuille, PhotoImg } from '../../composants/base';
@@ -42,8 +42,8 @@ export function FeuilleSauvegarde({ costume, archive, onFermer }: { costume: Lig
   const produire = async (): Promise<Faite> => {
     let wip: Blob | undefined;
     if (avecWip) {
-      const ids = [...piecesDe(donnees.value, costume.id).map(p => p.id), ''];
-      wip = await genererWip(donnees.value, costume.id, { pieces: ids, parDiapo: 2 }, t => setEtat(`Dossier WIP : ${t}`));
+      const dd = donnees.value;
+      wip = await genererWip(dd, costume.id, lireReglagesWip(dd, dd.Costumes[costume.id]), profilDe(dd), t => setEtat(`Dossier WIP : ${t}`));
     }
     if (lieuEffectif === 'appareil') {
       const r = await construireArchive(donnees.value, costume.id, wip, setEtat);
