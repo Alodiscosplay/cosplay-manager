@@ -37,3 +37,12 @@ describe('sauvegarde d’un costume', () => {
     expect(lireSauvegardes(c).map(t => [t.lieu, t.retirees])).toEqual([['appareil', 0], ['drive', 12]]);
   });
 });
+
+describe('réimport et statut', () => {
+  it('un costume sauvegardé en cours revient en cours ; un costume archivé revient terminé', () => {
+    const avec = (statut: string) => ({ format: FORMAT, version: 1, exporte_le: '', fichiers: {}, lignes: { Costumes: [{ id: 'c', nom: 'Ariel', statut }] } });
+    const statut = (s: string) => lireContenu(avec(s), donneesVides()).changements.find(c => c.table === 'Costumes')!.champs.statut;
+    expect(statut('en cours')).toBe('en cours');
+    expect(statut('archivé')).toBe('terminé');
+  });
+});

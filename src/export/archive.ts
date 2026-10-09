@@ -147,7 +147,7 @@ export function lireContenu(brut: unknown, d: Donnees): { changements: Changemen
       }
       if (l.attend) champs.attend = txtListe(liste(l.attend).map(x => nouveaux.get(x) ?? '').filter(Boolean));
       if (t === 'Costumes') {
-        champs.statut = 'terminé';
+        champs.statut = l.statut === 'archivé' || !l.statut ? 'terminé' : l.statut; // une sauvegarde garde son statut
         champs.archive_le = ''; champs.resume_archive = ''; champs.vignette = ''; champs.sauvegardes = '';
         champs.image_ref = idDrive(l.image_ref);
         if (l.image_ref && contenu.fichiers[l.image_ref]) photos.push({ chemin: contenu.fichiers[l.image_ref], ligneId: nid(l.id), champ: 'image_ref', table: 'Costumes' });
