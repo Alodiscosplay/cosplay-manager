@@ -53,7 +53,7 @@ export function Accueil() {
         );
       })}
 
-      {nbArchives > 0 && <a class="lien-discret" href="#/archives"><Icone nom="archive" taille={16} />{nbArchives} costume{nbArchives > 1 ? 's' : ''} archivé{nbArchives > 1 ? 's' : ''}</a>}
+      <a class="lien-discret" href="#/archives"><Icone nom="archive" taille={16} />{nbArchives > 0 ? `${nbArchives} costume${nbArchives > 1 ? 's' : ''} archivé${nbArchives > 1 ? 's' : ''} · réimporter une sauvegarde` : 'Archives · réimporter une sauvegarde'}</a>
 
       {creation && <NouveauCostume onFermer={() => setCreation(false)} />}
     </div>

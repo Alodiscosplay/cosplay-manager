@@ -1,8 +1,9 @@
 // Fiche lisible d'un costume, en PDF (A4) : ce qu'on relit hors de l'appli, sur un téléphone comme sur un
-// ordinateur. Les images sont fournies par `image` (données JPEG en data URL), pour rester testable.
+// ordinateur. Seule l'image de référence y figure : les photos sont à côté, dans la sauvegarde. Elle est
+// fournie par `image` (données JPEG en data URL), pour rester testable.
 import type { jsPDF as JsPdf } from 'jspdf';
 import { type Donnees, bool } from '../modele/schema';
-import { ligne, piecesDe, pistesDe, etapesDePiste, fournituresDe, photosDe } from '../logique/acces';
+import { ligne, piecesDe, pistesDe, etapesDePiste, fournituresDe } from '../logique/acces';
 import { avancementCostume, avancementPiece, formatPct } from '../logique/avancement';
 import { budgetCostume, montant, euros } from '../logique/budget';
 import { jourCourt } from '../logique/dates';
@@ -44,22 +45,6 @@ export async function fichePdf(d: Donnees, costumeId: string, image: ChargeurIma
     doc.setDrawColor(...ACCENT).setLineWidth(0.4).line(MARGE, y + 1, MARGE + LARGEUR, y + 1);
     y += 4;
   };
-  /** Une rangée de vignettes, sur toute la largeur. */
-  const vignettes = async (ids: string[]) => {
-    const parLigne = 4, ecart = 3, cote = (LARGEUR - ecart * (parLigne - 1)) / parLigne;
-    for (let i = 0; i < ids.length; i += parLigne) {
-      const lot = (await Promise.all(ids.slice(i, i + parLigne).map(image))).filter(Boolean) as { url: string; w: number; h: number }[];
-      if (!lot.length) continue;
-      const h = Math.max(...lot.map(im => Math.min(cote * 1.4, (cote * im.h) / im.w)));
-      place(h + ecart);
-      lot.forEach((im, k) => {
-        const w = Math.min(cote, (h * im.w) / im.h), hh = (w * im.h) / im.w;
-        doc.addImage(im.url, 'JPEG', MARGE + k * (cote + ecart) + (cote - w) / 2, y + (h - hh) / 2, w, hh);
-      });
-      y += h + ecart;
-    }
-  };
-
   // ---------- En-tête : image de référence et identité du costume ----------
   const ref = c.image_ref ? await image(c.image_ref) : null;
   const colTexte = ref ? MARGE + 62 : MARGE;
@@ -82,7 +67,6 @@ export async function fichePdf(d: Donnees, costumeId: string, image: ChargeurIma
   if (ref) y = Math.max(y, haut + 82);
 
   // ---------- Pièces, étapes, sous-étapes et photos ----------
-  const photos = photosDe(d, costumeId).filter(p => p.drive_id && p.drive_id !== c.image_ref);
   titre('Pièces, étapes et sous-étapes');
   for (const p of pieces) {
     place(12); y += 2;
@@ -98,11 +82,7 @@ export async function fichePdf(d: Donnees, costumeId: string, image: ChargeurIma
       }
     }
     if (p.notes) texte(p.notes, 9, DOUX);
-    const ph = photos.filter(x => x.piece_id === p.id).map(x => x.drive_id);
-    if (ph.length) { y += 2; await vignettes(ph); }
   }
-  const sansPiece = photos.filter(x => !pieces.some(p => p.id === x.piece_id)).map(x => x.drive_id);
-  if (sansPiece.length) { titre('Autres photos'); await vignettes(sansPiece); }
 
   // ---------- Fournitures et budget ----------
   const fournitures = fournituresDe(d, costumeId);

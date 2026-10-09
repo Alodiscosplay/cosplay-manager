@@ -9,7 +9,7 @@ import { STATUTS_COSTUME, bool, txtBool, type NomTable } from '../modele/schema'
 import { supprimer, nouvelId, purger } from '../store/operations';
 import { ajouterImage } from '../store/photos';
 import { aller, lienCostume } from '../routeur';
-import { Barre, Pct, Puce, Feuille, Champ, Texte, ChoixDate, Selection, Menu, Vide } from '../composants/base';
+import { Barre, Pct, Puce, Feuille, Champ, Texte, ChoixDate, Selection, Menu, Vide, Confirmer } from '../composants/base';
 import { ImageCadree, EditeurCadrage } from '../composants/Cadrage';
 import { Icone } from '../composants/Icone';
 import { OngletPieces } from './costume/Pieces';
@@ -31,6 +31,7 @@ export function PageCostume({ id, onglet = 'pieces' }: { id: string; onglet?: st
   const [menuImage, setMenuImage] = useState(false);
   const [recadrer, setRecadrer] = useState(false);
   const [sauvegarde, setSauvegarde] = useState<'sauvegarde' | 'archive' | null>(null);
+  const [suppression, setSuppression] = useState(false);
   if (!c) return <div class="page"><Vide icone="boite" titre="Costume introuvable"><a href="#/">Retour aux costumes</a></Vide></div>;
   if (c.statut === 'archivé') aller('/archives');
 
@@ -84,7 +85,7 @@ export function PageCostume({ id, onglet = 'pieces' }: { id: string; onglet?: st
               sc !== 'terminé' && { texte: 'Marquer terminé', icone: 'afaire', faire: () => maj('Costumes', id, { statut: 'terminé' }) },
               { texte: 'Réaliser une sauvegarde', icone: 'telecharger', faire: () => setSauvegarde('sauvegarde') },
               sc === 'terminé' && { texte: 'Archiver définitivement', icone: 'archive', faire: () => setSauvegarde('archive') },
-              { texte: 'Supprimer le costume', icone: 'poubelle', danger: true, faire: () => { faire(supprimer(donnees.value, 'Costumes', id), `« ${c.nom} » supprimé`); aller('/'); } },
+              { texte: 'Supprimer le costume', icone: 'poubelle', danger: true, faire: () => setSuppression(true) },
             ]} />
           </div>
           {(c.personnage || c.oeuvre) && <p class="sous-titre">{[c.personnage, c.oeuvre].filter(Boolean).join(' · ')}</p>}
@@ -113,6 +114,14 @@ export function PageCostume({ id, onglet = 'pieces' }: { id: string; onglet?: st
       {vu === 'wip' && <OngletWip costume={c} />}
 
       {fiche && <FicheCostume id={id} onFermer={() => setFiche(false)} />}
+      {suppression && (
+        <Confirmer titre={`Supprimer « ${c.nom} » ?`} bouton="Supprimer" danger onNon={() => setSuppression(false)}
+          onOui={() => { setSuppression(false); faire(supprimer(donnees.value, 'Costumes', id), `« ${c.nom} » supprimé`); aller('/'); }}
+          texte={<>
+            <p>Le costume est supprimé avec ses pièces, ses étapes, ses fournitures et ses photos. C'est définitif : seul le bouton « Annuler », juste après, permet de revenir en arrière.</p>
+            <p>Pour le garder, fais d'abord une sauvegarde (menu « … » › Réaliser une sauvegarde).</p>
+          </>} />
+      )}
       {sauvegarde && <FeuilleSauvegarde costume={c} archive={sauvegarde === 'archive'} onFermer={() => setSauvegarde(null)} />}
       {menuImage && (
         <Feuille titre="Image de référence" onFermer={() => setMenuImage(false)}>
