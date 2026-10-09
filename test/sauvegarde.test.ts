@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { lireContenu, noterSauvegarde, noterRetrait, lireSauvegardes, FORMAT } from '../src/export/archive';
+import { lireContenu, lireSauvegarde, noterSauvegarde, noterRetrait, lireSauvegardes, FORMAT } from '../src/export/archive';
 import { donneesVides, type Ligne } from '../src/modele/schema';
 
 const contenu = (lieu?: 'drive') => ({
@@ -44,5 +44,43 @@ describe('réimport et statut', () => {
     const statut = (s: string) => lireContenu(avec(s), donneesVides()).changements.find(c => c.table === 'Costumes')!.champs.statut;
     expect(statut('en cours')).toBe('en cours');
     expect(statut('archivé')).toBe('terminé');
+  });
+});
+
+describe('réimport d’une sauvegarde sur l’appareil : ZIP, dossier décompressé ou costume.json seul', () => {
+  const contenuZip = {
+    format: FORMAT, version: 1, exporte_le: '', fichiers: { 'local:a': 'photos/robe/1.jpg' },
+    lignes: { Costumes: [{ id: 'c', nom: 'Ariel', statut: 'en cours' }], Photos: [{ id: 'p', costume_id: 'c', drive_id: 'local:a' }] },
+  };
+  const json = () => new File([JSON.stringify(contenuZip)], 'costume.json');
+  const dansDossier = (f: File, chemin: string) => Object.defineProperty(f, 'webkitRelativePath', { value: chemin });
+
+  it('ZIP tel quel, même si tout est rangé dans un sous-dossier', async () => {
+    const { default: Zip } = await import('jszip');
+    const zip = new Zip();
+    zip.file('Ariel/costume.json', JSON.stringify(contenuZip));
+    zip.file('Ariel/photos/robe/1.jpg', 'jpg');
+    const f = new File([await zip.generateAsync({ type: 'uint8array' })], 'ariel.zip');
+    const r = await lireSauvegarde([f], donneesVides());
+    expect(r.photos.map(p => !!p.blob)).toEqual([true]);
+  });
+
+  it('dossier décompressé : les photos sont retrouvées par leur chemin', async () => {
+    const r = await lireSauvegarde([
+      dansDossier(json(), 'ariel-sauvegarde/costume.json'),
+      dansDossier(new File(['jpg'], '1.jpg'), 'ariel-sauvegarde/photos/robe/1.jpg'),
+    ], donneesVides());
+    expect(r.photos.map(p => !!p.blob)).toEqual([true]);
+    expect(r.changements.find(c => c.table === 'Costumes')!.champs.nom).toBe('Ariel');
+  });
+
+  it('costume.json seul : les données reviennent, les photos manquent', async () => {
+    const r = await lireSauvegarde([json()], donneesVides());
+    expect(r.changements.some(c => c.table === 'Photos')).toBe(true);
+    expect(r.photos.map(p => p.blob)).toEqual([null]);
+  });
+
+  it('refuse ce qui ne contient pas de costume.json', async () => {
+    await expect(lireSauvegarde([new File(['x'], 'photo.jpg')], donneesVides())).rejects.toThrow();
   });
 });

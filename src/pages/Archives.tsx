@@ -3,7 +3,7 @@ import { donnees, faire, mode, montrerToast } from '../store/store';
 import { costumes } from '../logique/acces';
 import { jourCourt } from '../logique/dates';
 import { euros } from '../logique/budget';
-import { lireArchive, lireContenu } from '../export/archive';
+import { lireSauvegarde, lireContenu } from '../export/archive';
 import { listerSauvegardes, telecharger, type SauvegardeDrive } from '../sync/drive';
 import { ajouterImage } from '../store/photos';
 import { supprimer } from '../store/operations';
@@ -20,22 +20,28 @@ export function PageArchives() {
   const [erreur, setErreur] = useState('');
   const [depuisDrive, setDepuisDrive] = useState(false);
 
-  const reimporter = async (f?: File) => {
-    if (!f) return;
-    setErreur(''); setEtat('Lecture de l\'archive');
+  const [manquantes, setManquantes] = useState(0);
+  // Choisir un dossier n'existe que sur ordinateur (les navigateurs de téléphone ne le proposent pas).
+  const dossierPossible = 'webkitdirectory' in document.createElement('input') && matchMedia('(pointer: fine)').matches;
+
+  const reimporter = async (liste: FileList | null) => {
+    const fichiers = liste ? [...liste] : [];
+    if (!fichiers.length) return;
+    setErreur(''); setManquantes(0); setEtat('Lecture de la sauvegarde');
     try {
-      const { changements, photos, zip } = await lireArchive(f, donnees.value);
+      const { changements, photos } = await lireSauvegarde(fichiers, donnees.value);
       faire(changements);
+      let perdues = 0;
       for (const [i, p] of photos.entries()) {
         setEtat(`Photo ${i + 1} / ${photos.length}`);
-        const blob = await zip.file(p.chemin)?.async('blob');
-        if (!blob) continue;
-        const id = await ajouterImage(blob);
+        if (!p.blob) { perdues++; continue; }
+        const id = await ajouterImage(p.blob);
         faire([{ table: p.table, id: p.ligneId, champs: { [p.champ]: id } }]);
       }
       const costume = changements.find(c => c.table === 'Costumes');
-      montrerToast(`« ${costume?.champs.nom} » réimporté`);
-      if (costume) aller(`/costume/${costume.id}`);
+      montrerToast(`« ${costume?.champs.nom} » réimporté${perdues ? `, sans ${perdues} photo${perdues > 1 ? 's' : ''}` : ''}`);
+      if (perdues) setManquantes(perdues);
+      else if (costume) aller(`/costume/${costume.id}`);
     } catch (e) {
       setErreur((e as Error).message);
     } finally { setEtat(''); }
@@ -47,14 +53,22 @@ export function PageArchives() {
       <header class="page-tete">
         <h1>Archives</h1>
         <label class="bouton">
-          <Icone nom="archive" />Réimporter une archive
-          <input type="file" accept=".zip,application/zip" class="cache" onChange={e => reimporter((e.target as HTMLInputElement).files?.[0])} />
+          <Icone nom="archive" />Réimporter une sauvegarde
+          <input type="file" accept=".zip,application/zip,.json,application/json" class="cache" onChange={e => { const i = e.target as HTMLInputElement; void reimporter(i.files).then(() => { i.value = ''; }); }} />
         </label>
       </header>
+      <p class="petit-texte">Choisis le fichier ZIP de la sauvegarde tel quel{dossierPossible ? ', ou son dossier décompressé' : ''}. Le fichier costume.json seul fonctionne aussi, mais sans les photos.</p>
+      {dossierPossible && (
+        <label class="bouton">
+          <Icone nom="archive" />Réimporter un dossier décompressé
+          <input type="file" class="cache" {...{ webkitdirectory: '' }} onChange={e => { const i = e.target as HTMLInputElement; void reimporter(i.files).then(() => { i.value = ''; }); }} />
+        </label>
+      )}
+      {manquantes > 0 && <p class="erreur" role="alert">{manquantes} photo{manquantes > 1 ? 's n’ont' : ' n’a'} pas pu être reprise{manquantes > 1 ? 's' : ''} : elle{manquantes > 1 ? 's' : ''} n'étai{manquantes > 1 ? 'ent' : 't'} pas dans ce que tu as choisi. Recompresse le dossier de la sauvegarde en ZIP (clic droit › Compresser), puis réimporte-le pour les récupérer.</p>}
       {mode.value === 'google' && <button class="bouton" onClick={() => setDepuisDrive(true)}><Icone nom="nuage" />Réimporter depuis le Drive</button>}
       {etat && <p class="petit-texte" role="status">{etat}…</p>}
       {erreur && <p class="erreur" role="alert">{erreur}</p>}
-      {!archives.length && <Vide icone="archive" titre="Aucun costume archivé"><p>Un costume terminé s'archive depuis son onglet Sauvegarde : tout est gardé dans un ZIP ou sur ton Drive, et son détail quitte l'appli.</p></Vide>}
+      {!archives.length && <Vide icone="archive" titre="Aucun costume archivé"><p>Un costume terminé s'archive depuis le menu « … » de sa fiche : tout est gardé dans un ZIP ou sur ton Drive, et son détail quitte l'appli.</p></Vide>}
       <div class="grille-cartes">
         {archives.map(c => {
           let r: Resume | null = null;

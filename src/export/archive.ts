@@ -106,13 +106,34 @@ export function changementsArchivage(d: Donnees, costumeId: string, vignetteData
 
 type PhotoARecopier = { chemin: string; ligneId: string; champ: 'drive_id' | 'image_ref'; table: NomTable };
 
-/** Relit un ZIP d'archive et recrée le costume avec de NOUVEAUX identifiants (aucune collision possible). */
-export async function lireArchive(fichier: Blob, d: Donnees): Promise<{ changements: Changement[]; photos: PhotoARecopier[]; zip: JSZip }> {
-  const { default: Zip } = await import('jszip');
-  const zip = await Zip.loadAsync(fichier);
-  const brut = await zip.file('costume.json')?.async('string');
-  if (!brut) throw new Error("Ce fichier n'est pas une archive Cosplay Manager (costume.json absent).");
-  return { ...lireContenu(JSON.parse(brut), d), zip };
+/** Une sauvegarde relue : le costume à recréer et, pour chaque photo, son contenu s'il a été retrouvé. */
+export interface Reimport { changements: Changement[]; photos: (PhotoARecopier & { blob: Blob | null })[] }
+
+/**
+ * Relit une sauvegarde faite sur l'appareil et recrée le costume avec de NOUVEAUX identifiants (aucune
+ * collision possible). Trois formes acceptées : le ZIP tel quel ; le dossier décompressé (choisi en entier,
+ * sur ordinateur) ; ou `costume.json` seul (sur téléphone) — les photos manquent alors.
+ */
+export async function lireSauvegarde(fichiers: File[], d: Donnees): Promise<Reimport> {
+  if (fichiers.length === 1 && /\.zip$/i.test(fichiers[0].name)) {
+    const { default: Zip } = await import('jszip');
+    const zip: JSZip = await Zip.loadAsync(fichiers[0]);
+    // Un ZIP refait à la main peut avoir tout rangé dans un sous-dossier : on cherche costume.json partout.
+    const json = zip.file(/(^|\/)costume\.json$/)[0];
+    if (!json) throw new Error("Ce fichier n'est pas une sauvegarde Cosplay Manager (costume.json absent).");
+    const racine = json.name.slice(0, -'costume.json'.length);
+    const r = lireContenu(JSON.parse(await json.async('string')), d);
+    const photos = await Promise.all(r.photos.map(async p => ({ ...p, blob: (await zip.file(racine + p.chemin)?.async('blob')) ?? null })));
+    return { changements: r.changements, photos };
+  }
+  // Dossier décompressé, ou costume.json seul : les chemins relatifs disent où sont les photos.
+  const chemin = (f: File) => ((f as File & { webkitRelativePath?: string }).webkitRelativePath || f.name).replace(/\\/g, '/');
+  const json = fichiers.find(f => /(^|\/)costume\.json$/i.test(chemin(f)));
+  if (!json) throw new Error("Aucun fichier costume.json : choisis le ZIP de la sauvegarde, son dossier décompressé, ou le fichier costume.json qu'il contient.");
+  const racine = chemin(json).slice(0, -'costume.json'.length);
+  const parChemin = new Map(fichiers.map(f => [chemin(f), f]));
+  const r = lireContenu(JSON.parse(await json.text()), d);
+  return { changements: r.changements, photos: r.photos.map(p => ({ ...p, blob: parChemin.get(racine + p.chemin) ?? null })) };
 }
 
 /**
