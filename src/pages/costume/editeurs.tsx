@@ -12,6 +12,7 @@ import { DUREES, NOMS_DUREES, STATUTS_PIECE, bool, liste, txtListe, type Donnees
 import { supprimer, insererModele, ajouterModeleDansPiste, deplacerEtape, cocherEtape, appliquerPlan, effacerPlanning, nouvelId } from '../../store/operations';
 import { Feuille, Champ, Texte, ChoixDate, Selection } from '../../composants/base';
 import { maj } from '../Costume';
+import { partieDe, PARTIES } from '../../export/dossierWip';
 import { Icone } from '../../composants/Icone';
 
 // ---------- Étape ----------
@@ -86,6 +87,9 @@ export function EditeurPiece({ id, onFermer }: { id: string; onFermer: () => voi
         <Champ label="Deadline (facultative)"><ChoixDate label="deadline" valeur={p.deadline ?? ''} min={p.debut || undefined} onChange={v => m({ deadline: v })} /></Champ>
       </div>
       <Champ label="Patron (facultatif)"><Texte valeur={p.patron ?? ''} onValider={v => m({ patron: v })} /></Champ>
+      <Champ label="Partie dans le dossier WIP" aide="Un accessoire tenu en main (ombrelle, sac, arme…) va dans « Hand props ».">
+        <Selection label="Partie dans le dossier WIP" valeur={partieDe(p)} options={PARTIES} onChange={v => m({ partie_wip: v })} />
+      </Champ>
       <Champ label="Notes"><Texte multiligne valeur={p.notes ?? ''} onValider={v => m({ notes: v })} /></Champ>
       <ChoixAttentes table="Pieces" l={p} candidats={autres} aide="La pièce entière attend que ces pièces soient finies." />
       <button class="bouton" onClick={() => setRattacher(true)}><Icone nom="achats" taille={16} />Fournitures de la pièce</button>

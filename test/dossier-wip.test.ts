@@ -65,7 +65,7 @@ describe('partie d’une pièce', () => {
   it('se devine d’après son nom tant qu’on ne l’a pas choisie', async () => {
     const { partieDe } = await import('../src/export/dossierWip');
     const p = (nom: string, partie_wip = '') => ({ id: 'x', maj: '', supprime: '', nom, partie_wip });
-    expect([partieDe(p('Perruque')), partieDe(p('Wig casque')), partieDe(p('Maquillage')), partieDe(p('Corset')), partieDe(p('Perruque', 'divers'))])
-      .toEqual(['wig', 'wig', 'makeup', 'costume', 'divers']);
+    expect([partieDe(p('Perruque')), partieDe(p('Wig casque')), partieDe(p('Maquillage')), partieDe(p('Corset')), partieDe(p('Perruque', 'divers')), partieDe(p('Ombrelle')), partieDe(p('Sac à main'))])
+      .toEqual(['wig', 'wig', 'makeup', 'costume', 'divers', 'props', 'props']);
   });
 });

@@ -5,7 +5,7 @@
 // Règles tirées de l'étude des dossiers de concours : Wiki, [[dossier-wip-cosplay]].
 import { type Donnees, type Ligne, bool } from '../modele/schema';
 import { ligne, piecesDe, photosDe, etapesDePiece } from '../logique/acces';
-import { jourCourt, lireJour, ecartJours } from '../logique/dates';
+import { lireJour, ecartJours } from '../logique/dates';
 import { blobPhoto, blobVersDataUrl, dimensions, reduire } from '../store/photos';
 
 export type Partie = 'costume' | 'wig' | 'props' | 'makeup' | 'divers';
@@ -45,8 +45,9 @@ export function lireReglagesWip(d: Donnees, c: Ligne): ReglagesWip {
 export function partieDe(p: Ligne | undefined): Partie {
   if (!p) return 'divers';
   if (PARTIES.some(([k]) => k === p.partie_wip)) return p.partie_wip as Partie;
-  if (/perruque|\bwig/i.test(p.nom)) return 'wig';
+  if (/perruque|\bwig\b/i.test(p.nom)) return 'wig';
   if (/maquillage|make-?up/i.test(p.nom)) return 'makeup';
+  if (/ombrelle|parapluie|[ée]ventail|\bsac\b|sacoche|panier|baguette|b[âa]ton|sceptre|[ée]p[ée]e|\barme\b|bouclier|\blance\b|\barc\b|\blivre\b|lanterne|\bprops?\b/i.test(p.nom)) return 'props';
   return 'costume';
 }
 
@@ -258,11 +259,11 @@ async function grillePhotos(s: { addImage: (o: object) => void; addText: (t: str
     const cx = x + (k % cols) * (cw + ecart), cy = y0 + Math.floor(k / cols) * (ch + ecart);
     const im = await image(p.drive_id);
     if (im) s.addImage(contenir(im, cx, cy, cw, ch - hLegende));
-    s.addText(`${toutes.indexOf(p) + 1}. ${legende(d, p, piece)}`, { x: cx, y: cy + ch - hLegende, w: cw, h: hLegende, fontSize: 11, color: ENCRE, valign: 'top', fit: 'shrink' });
+    s.addText(`${toutes.indexOf(p) + 1}.${legende(d, p, piece) ? ` ${legende(d, p, piece)}` : ''}`, { x: cx, y: cy + ch - hLegende, w: cw, h: hLegende, fontSize: 11, color: ENCRE, valign: 'top', fit: 'shrink' });
   }
 }
 
-/** Légende d'une photo : sa légende (ou ce qu'elle montre), puis sa date. */
+/** Légende d'une photo : sa légende, sinon ce qu'elle montre (l'étape). Pas de date : le jury n'en a pas besoin. */
 function legende(d: Donnees, p: Ligne, piece: Ligne | undefined): string {
   const date = lireJour(p.date);
   let quoi = p.legende ?? '';
@@ -274,5 +275,5 @@ function legende(d: Donnees, p: Ligne, piece: Ligne | undefined): string {
       if (proche) quoi = proche.titre;
     }
   }
-  return [quoi, date ? jourCourt(date, '') : ''].filter(Boolean).join(' — ');
+  return quoi;
 }
