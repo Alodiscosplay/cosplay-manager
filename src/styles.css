@@ -620,3 +620,4 @@ dialog.feuille::backdrop { background: rgb(20 12 28 / 45%); }
 .textes-piece-wip { padding: 6px 4px 8px 30px; display: flex; flex-direction: column; gap: 8px; }
 .puces-fournitures { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .liste-ajout-pages { list-style: none; padding: 0; margin: 0 0 8px; display: flex; flex-direction: column; gap: 4px; }
+.bouton-textes { font-size: 1.3rem; font-weight: 700; line-height: 1; }

@@ -25,6 +25,7 @@ export interface ReglagesWip {
   identite: boolean; comparaisons: boolean; intercalaires: boolean; sommaire: boolean; recherche: boolean;
   ordre: string[];          // ids des pièces dans l'ordre voulu ('' = photos sans pièce)
   exclues: string[];
+  forcees: string[];        // pièces gardées bien qu'elles n'aient pas de photo (elles sont décochées d'office)
   parPage: 2 | 4 | 6;
   pagesMax: number;         // 0 = pas de limite
   paires: Record<string, { ref?: string; res?: string }>; // clé de VUES → ids de photos (drive_id)
@@ -38,8 +39,14 @@ export function lireReglagesWip(d: Donnees, c: Ligne): ReglagesWip {
   return {
     identite: r.identite ?? true, comparaisons: r.comparaisons ?? true, intercalaires: r.intercalaires ?? true,
     sommaire: r.sommaire ?? true, recherche: r.recherche ?? false,
-    ordre, exclues: r.exclues ?? [], parPage: r.parPage ?? 4, pagesMax: r.pagesMax ?? 0, paires: r.paires ?? {},
+    ordre, exclues: r.exclues ?? [], forcees: r.forcees ?? [], parPage: r.parPage ?? 4, pagesMax: r.pagesMax ?? 0, paires: r.paires ?? {},
   };
+}
+
+/** Une pièce est dans le dossier sauf si on l'a décochée ; sans photo, elle est décochée d'office. */
+export function pieceIncluse(d: Donnees, c: Ligne, r: ReglagesWip, id: string): boolean {
+  if (r.exclues.includes(id)) return false;
+  return photosWip(d, c.id, id).length > 0 || r.forcees.includes(id);
 }
 
 /** La partie d'une pièce : celle choisie, sinon devinée d'après son nom (perruque, maquillage), sinon « costume ». */
@@ -133,7 +140,7 @@ export function planWip(d: Donnees, c: Ligne, r: ReglagesWip, o: OptionsPlan = {
     section('Images et photos globales');
     for (const v of paires) diapos.push({ t: 'comparaison', cle: v.cle });
   }
-  const retenues = seul ? r.ordre.filter(id => seul.includes(id)) : r.ordre.filter(id => !r.exclues.includes(id));
+  const retenues = seul ? r.ordre.filter(id => seul.includes(id)) : r.ordre.filter(id => pieceIncluse(d, c, r, id));
   for (const [partie, nom] of PARTIES) {
     const pieces = retenues.filter(id => partieDe(id ? ligne(d, 'Pieces', id) : undefined) === partie);
     const pages: Diapo[] = [];
@@ -172,7 +179,7 @@ export function ajusterWip(d: Donnees, c: Ligne, r: ReglagesWip): Ajustement {
     if (n <= max) return { reglages: rr, limites: {}, retirees: 0, pages: n, impossible: false };
   }
   const rr = { ...r, parPage: Math.max(r.parPage, 6) as 2 | 4 | 6 };
-  const ids = rr.ordre.filter(id => !rr.exclues.includes(id));
+  const ids = rr.ordre.filter(id => pieceIncluse(d, c, rr, id));
   const total = Object.fromEntries(ids.map(id => [id, photosWip(d, c.id, id).length]));
   const lim: Record<string, number> = { ...total };
   const prem = premierePage(rr.parPage);

@@ -100,3 +100,14 @@ describe('dossier WIP : limite de pages et pages à ajouter', () => {
     expect(p.diapos.map(x => x.t)).toEqual(['piece']);
   });
 });
+
+describe('pièce sans photo', () => {
+  it('décochée d’office, mais on peut la garder en la recochant', () => {
+    const { d, c, ids } = donnees();
+    d.Pieces[ids['Chaussures']].techniques = 'Peinture Angelus';
+    const r = { ...lireReglagesWip(d, c), intercalaires: false, sommaire: false };
+    const pieces = (rr: typeof r) => planWip(d, c, rr).diapos.filter(x => x.t === 'piece').map(x => (x as { pieceId: string }).pieceId);
+    expect(pieces(r)).not.toContain(ids['Chaussures']);
+    expect(pieces({ ...r, forcees: [ids['Chaussures']] })).toContain(ids['Chaussures']);
+  });
+});

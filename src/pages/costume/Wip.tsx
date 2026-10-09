@@ -6,7 +6,7 @@ import Sortable from 'sortablejs';
 import { donnees, mode, dossierDuCostume, montrerToast } from '../../store/store';
 import { piecesDe, photosDe, fournituresDe } from '../../logique/acces';
 import { liste, type Ligne } from '../../modele/schema';
-import { genererWip, lireReglagesWip, photosWip, partieDe, planWip, ajusterWip, profilDe, PARTIES, ORIGINES, VUES, type ReglagesWip } from '../../export/dossierWip';
+import { genererWip, lireReglagesWip, photosWip, partieDe, planWip, ajusterWip, pieceIncluse, profilDe, PARTIES, ORIGINES, VUES, type ReglagesWip } from '../../export/dossierWip';
 import { versGoogleSlides } from '../../sync/drive';
 import { telechargerBlob, nomFichier, Feuille, Champ, Texte, Selection, PhotoImg } from '../../composants/base';
 import { jourCourt } from '../../logique/dates';
@@ -41,7 +41,7 @@ export function OngletWip({ costume }: { costume: Ligne }) {
         window.open(url, '_blank', 'noopener');
         // L'appli retient le dossier et les pièces qu'il contient, pour proposer ensuite d'en ajouter.
         const cr = lireReglagesWip(dd, dd.Costumes[costume.id]);
-        const dedans = seulement ?? cr.ordre.filter(id => !cr.exclues.includes(id));
+        const dedans = seulement ?? cr.ordre.filter(id => pieceIncluse(dd, dd.Costumes[costume.id], cr, id));
         const l = seulement && lien ? { ...lien, pieces: [...new Set([...lien.pieces, ...dedans])] } : { url, cree: new Date().toISOString(), pieces: dedans };
         maj('Costumes', costume.id, { wip_slides: JSON.stringify(l) });
         montrerToast(seulement ? 'Pages créées : importe-les dans ton dossier (Fichier › Importer des diapositives)' : 'Dossier WIP créé dans Google Slides, dans le dossier du costume');
@@ -206,18 +206,22 @@ function ListePieces({ costume, r, regler, pieces }: { costume: Ligne; r: Reglag
         const p = pieces.find(x => x.id === id);
         const n = photosWip(d, costume.id, id).length;
         if (!p && !n) return <li hidden />; // photos sans pièce : seulement s'il y en a
-        const exclue = r.exclues.includes(id);
+        const exclue = !pieceIncluse(d, costume, r, id);
+        // Cocher une pièce sans photo la « force » dans le dossier ; décocher une pièce l'exclut.
+        const cocher = (v: boolean) => n === 0
+          ? regler({ forcees: v ? [...r.forcees, id] : r.forcees.filter(x => x !== id), exclues: r.exclues.filter(x => x !== id) })
+          : regler({ exclues: v ? r.exclues.filter(x => x !== id) : [...r.exclues, id] });
         const majP = (champs: Record<string, string>) => p && maj('Pieces', p.id, champs);
         return (
           <li class={exclue ? 'exclue' : ''}>
             <div class="tete-piece-wip">
               <span class="poignee" aria-label="Déplacer" title="Glisser pour réordonner"><Icone nom="poignee" taille={18} /></span>
               <label class="case-ligne">
-                <input type="checkbox" checked={!exclue} onChange={e => regler({ exclues: (e.target as HTMLInputElement).checked ? r.exclues.filter(x => x !== id) : [...r.exclues, id] })} />
+                <input type="checkbox" checked={!exclue} onChange={e => cocher((e.target as HTMLInputElement).checked)} />
                 <span><strong>{p?.nom ?? 'Photos sans pièce'}</strong> <span class="petit-texte">{n} photo{n > 1 ? 's' : ''}</span></span>
               </label>
               {p && <Selection label={`Partie de ${p.nom}`} valeur={partieDe(p)} options={PARTIES} onChange={v => majP({ partie_wip: v })} />}
-              {p && <button class="bouton petit" onClick={() => setOuverte(ouverte === id ? null : id)}>{ouverte === id ? 'Fermer' : 'Textes'}</button>}
+              {p && <button class="bouton-icone petit bouton-textes" aria-expanded={ouverte === id} aria-label={`Textes de ${p.nom}`} title="Origine, matériaux, techniques" onClick={() => setOuverte(ouverte === id ? null : id)}>{ouverte === id ? '−' : '+'}</button>}
             </div>
             {p && ouverte === id && <TextesPiece costume={costume} piece={p} />}
           </li>
