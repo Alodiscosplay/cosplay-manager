@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { fusionner, lireFichier, versFichier, clePendant } from '../src/sync/fusion';
+import { fusionner, lireFichier, versFichier, clePendant, tablesInconnues } from '../src/sync/fusion';
 import { donneesVides, type Ligne } from '../src/modele/schema';
 
 const tache = (id: string, titre: string, maj: string, supprime = ''): Ligne => ({ id, maj, supprime, titre });
@@ -84,5 +84,18 @@ describe('deux appareils, même costume, pièces différentes', () => {
     expect(r.donnees.Etapes.jupe1.fait).toBe('oui');
     expect(r.donnees.Etapes.corset1.fait).toBe('oui');
     expect(r.aEnvoyer).toBe(true);
+  });
+});
+
+describe('tables venues d’une version plus récente', () => {
+  it('un appareil pas à jour réécrit telles quelles les tables qu’il ne connaît pas', () => {
+    const distant = { Taches: { a: tache('a', 'x', '1') }, Nouveaute: { n1: { id: 'n1', maj: '1', supprime: '', valeur: 'à garder' } } } as never;
+    const local = donneesVides();
+    local.Taches.b = tache('b', 'locale', '2');
+    const r = fusionner(local, distant, { [clePendant('Taches', 'b')]: '2' });
+    const ecrit = versFichier(r.donnees, 1, '3', tablesInconnues(distant)) as unknown as { donnees: Record<string, Record<string, { valeur?: string }>> };
+    expect(ecrit.donnees.Nouveaute.n1.valeur).toBe('à garder');
+    expect(Object.keys(ecrit.donnees.Taches).sort()).toEqual(['a', 'b']);
+    expect(tablesInconnues(lireFichier(ecrit))).toEqual({ Nouveaute: { n1: { id: 'n1', maj: '1', supprime: '', valeur: 'à garder' } } });
   });
 });

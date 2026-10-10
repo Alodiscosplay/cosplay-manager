@@ -6,7 +6,9 @@
 //    le fichier, sauf si la ligne locale attend d'être envoyée ;
 //  - une ligne présente d'un seul côté est GARDÉE. Rien ne disparaît par la synchro : une suppression est
 //    une ligne vidée et marquée « purge », qui se propage comme une modification. Une ligne qui n'existe
-//    que sur l'appareil repart donc vers le fichier — c'est ce qui protège d'un fichier perdu ou écrasé.
+//    que sur l'appareil repart donc vers le fichier — c'est ce qui protège d'un fichier perdu ou écrasé ;
+//  - une table que cette version ne connaît pas (ajoutée par une version plus récente, sur un autre
+//    appareil) est réécrite telle quelle : un appareil pas encore à jour ne l'efface plus.
 import { type Donnees, type Ligne, type NomTable, NOMS_TABLES, donneesVides } from '../modele/schema';
 
 /** Lignes en attente d'envoi : clé `Table/id` → `maj` au moment de la modification. */
@@ -51,9 +53,15 @@ export function fusionner(local: Donnees, distant: Fichier['donnees'], pendants:
   return { donnees: res, pendants: restants, aEnvoyer: Object.keys(restants).length > 0 };
 }
 
-/** Le fichier à écrire pour des données. */
-export function versFichier(d: Donnees, schema: number, maj: string): Fichier {
-  return { format: 'cosplay-planner-donnees', schema, maj, donnees: d };
+/** Les tables du fichier que cette version de l'appli ne connaît pas. */
+export function tablesInconnues(distant: Fichier['donnees']): Record<string, unknown> {
+  const connues = new Set<string>(NOMS_TABLES);
+  return Object.fromEntries(Object.entries(distant).filter(([t]) => !connues.has(t)));
+}
+
+/** Le fichier à écrire pour des données, en y gardant les tables inconnues lues dans le fichier. */
+export function versFichier(d: Donnees, schema: number, maj: string, inconnues: Record<string, unknown> = {}): Fichier {
+  return { format: 'cosplay-planner-donnees', schema, maj, donnees: { ...inconnues, ...d } as Fichier['donnees'] };
 }
 
 /** Lit un fichier téléchargé ; un contenu illisible ou d'un autre format compte comme vide. */

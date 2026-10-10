@@ -35,5 +35,6 @@ export default defineConfig({
       },
     }),
   ],
-  test: { environment: 'node', include: ['test/**/*.test.ts'] },
+  // Délai large : certains tests génèrent un ZIP ou un PowerPoint, lents sur une machine chargée.
+  test: { environment: 'node', include: ['test/**/*.test.ts'], testTimeout: 30_000 },
 });

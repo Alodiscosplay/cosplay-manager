@@ -6,7 +6,7 @@ import { ouvrirBase, lireKv, ecrireKv, type Base, lirePhoto, ecrirePhoto, efface
 import { activationsDuJour } from '../logique/activation';
 import { aujourdhui } from '../logique/dates';
 import { MODELES_PAR_DEFAUT } from '../modele/modelesParDefaut';
-import { type Pendants, clePendant, fusionner, lireFichier, versFichier } from '../sync/fusion';
+import { type Pendants, clePendant, fusionner, lireFichier, versFichier, tablesInconnues } from '../sync/fusion';
 import { trouverDonnees, lireDonnees, versionDonnees, ecrireDonnees, envoyerPhoto, nomDossierAppli, nommerDossierAppli, dossierRange, dossierDe, deplacer, dossierDeSauvegarde, deposerFichier, supprimerFichier, type Emplacement, type PlaceDossier } from '../sync/drive';
 import { ErreurConnexion, ErreurReseau, ErreurIntrouvable, jetonValide, emailConnu } from '../sync/google';
 import { donneesDemo } from '../demo/donneesDemo';
@@ -175,10 +175,11 @@ export async function synchroniser(): Promise<void> {
       p0 = { ...meta.pendants };
       const lu = e.donneesId ? await lireDonnees(e.donneesId) : null;
       if (!lu) e.donneesId = undefined; // pas encore créé, ou supprimé : il sera recréé depuis l'appareil
-      const fusion = fusionner(donnees.value, lireFichier(lu?.contenu), p0);
+      const fichier = lireFichier(lu?.contenu);
+      const fusion = fusionner(donnees.value, fichier, p0);
       if (fusion.aEnvoyer || !e.donneesId) {
         if (e.donneesId && lu && (await versionDonnees(e.donneesId)) !== lu.version) continue;
-        e.donneesId = await ecrireDonnees(e.donneesId, versFichier(fusion.donnees, VERSION_SCHEMA, new Date().toISOString()));
+        e.donneesId = await ecrireDonnees(e.donneesId, versFichier(fusion.donnees, VERSION_SCHEMA, new Date().toISOString(), tablesInconnues(fichier)));
       }
       f = fusion;
     }
