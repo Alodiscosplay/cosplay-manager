@@ -8,7 +8,7 @@ import { aujourdhui } from '../logique/dates';
 import { MODELES_PAR_DEFAUT } from '../modele/modelesParDefaut';
 import { type Pendants, clePendant, fusionner, lireFichier, versFichier, tablesInconnues } from '../sync/fusion';
 import { trouverDonnees, lireDonnees, versionDonnees, ecrireDonnees, envoyerPhoto, nomDossierAppli, nommerDossierAppli, dossierRange, dossierDe, deplacer, dossierDeSauvegarde, deposerFichier, supprimerFichier, type Emplacement, type PlaceDossier } from '../sync/drive';
-import { ErreurConnexion, ErreurReseau, ErreurIntrouvable, jetonValide, emailConnu } from '../sync/google';
+import { ErreurConnexion, ErreurReseau, ErreurIntrouvable, jetonValide, emailConnu, renouvelerAuGeste, prechargerGoogle } from '../sync/google';
 import { donneesDemo } from '../demo/donneesDemo';
 
 export type Mode = 'demo' | 'google';
@@ -435,6 +435,12 @@ export function retirerPhotos(photoIds: string[], lieu: 'appareil' | 'drive', do
 // ---------- Événements du navigateur ----------
 
 export function brancherEvenements(): void {
+  // Le jeton Google ne dure qu'une heure : le premier clic après (ou peu avant) son expiration le renouvelle.
+  if (mode.value === 'google') prechargerGoogle();
+  document.addEventListener('click', () => {
+    if (mode.value !== 'google') return;
+    void renouvelerAuGeste().then(ok => { if (ok) planifierSync(200); });
+  }, true);
   window.addEventListener('online', () => planifierSync(200));
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState !== 'visible' || !pret.value) return;
