@@ -7,7 +7,9 @@ export const VERSION_SCHEMA = 1;
 export const TABLES = {
   Costumes: ['nom', 'personnage', 'oeuvre', 'statut', 'attend_costume_id', 'debut', 'deadline', 'evenement_id',
     'suivi_budget', 'suivi_planning', 'budget_prevu', 'couleur', 'image_ref', 'cadrage', 'notes', 'fin_prevue', 'ordre', 'priorite', 'sauvegardes', 'archive_le', 'resume_archive', 'vignette', 'wip', 'recherche', 'wip_slides'],
-  Evenements: ['nom', 'date_debut', 'date_fin', 'lieu', 'notes'],
+  // Un événement : une convention, ou une activité (concours, show…) seule ou dans une convention.
+  // Costumes.evenement_id peut lister plusieurs événements (un costume porté à plusieurs).
+  Evenements: ['nom', 'date_debut', 'date_fin', 'lieu', 'notes', 'activite', 'convention_id', 'lien'],
   Pieces: ['costume_id', 'nom', 'statut', 'debut', 'deadline', 'attend', 'patron', 'notes', 'ordre', 'ordre_planning',
     'partie_wip', 'origine', 'origine_detail', 'materiaux', 'techniques'],
   Pistes: ['piece_id', 'nom', 'pause', 'libre', 'debut', 'deadline', 'attend', 'ordre'],
@@ -20,6 +22,8 @@ export const TABLES = {
   Commandes: ['fournisseur_id', 'statut', 'date', 'frais_port', 'notes'],
   Photos: ['costume_id', 'piece_id', 'piste_id', 'etape_id', 'drive_id', 'legende', 'date', 'dans_wip', 'type'],
   Modeles: ['nom', 'contenu'],
+  // Les dates à suivre d'un événement. Nature : « periode » (debut → fin), « limite » ou « fixe » (fin seule).
+  DatesCles: ['evenement_id', 'titre', 'nature', 'debut', 'fin', 'fait', 'fait_le', 'lien', 'notes', 'ordre', 'urgent'],
   // Une seule ligne, « moi » : l'identité de cosplayeur reprise dans les dossiers WIP.
   Profil: ['nom', 'prenom', 'pseudo', 'pays'],
 } as const;

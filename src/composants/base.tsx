@@ -145,11 +145,12 @@ export function ChoixDate({ valeur, onChange, label, min }: { valeur: string; on
           onInput={e => setTexte((e.target as HTMLInputElement).value)}
           onBlur={e => valider((e.target as HTMLInputElement).value)}
           onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); valider((e.target as HTMLInputElement).value); } }} />
-        <button type="button" class="bouton-icone petit" aria-label={`Choisir ${label} dans le calendrier`} onClick={ouvrirCalendrier}><Icone nom="agenda" taille={16} /></button>
+        {/* Hors de l'ordre de tabulation : Tab passe d'une date à la suivante (« Du » → « Au »). */}
+        <button type="button" class="bouton-icone petit" tabIndex={-1} aria-label={`Choisir ${label} dans le calendrier`} onClick={ouvrirCalendrier}><Icone nom="agenda" taille={16} /></button>
         <input ref={calendrier} type="date" class="calendrier-cache" tabIndex={-1} aria-hidden="true" min={min || undefined}
           onChange={e => { const v = (e.target as HTMLInputElement).value; if (v) valider(v); }} />
       </div>
-      {valeur && <button type="button" class="bouton-icone petit" aria-label={`Effacer ${label}`} onClick={() => { setTexte(''); setErreur(''); onChange(''); }}><Icone nom="croix" taille={16} /></button>}
+      {valeur && <button type="button" class="bouton-icone petit" tabIndex={-1} aria-label={`Effacer ${label}`} onClick={() => { setTexte(''); setErreur(''); onChange(''); }}><Icone nom="croix" taille={16} /></button>}
       {erreur && <span class="erreur-date" role="alert">{erreur}</span>}
     </div>
   );

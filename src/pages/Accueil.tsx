@@ -5,6 +5,7 @@ import { costumes, piecesDe, ligne, reordonnerParmi } from '../logique/acces';
 import { avancementCostume } from '../logique/avancement';
 import { statutCostume, pieceTerminee } from '../logique/disponibilite';
 import { deadlineCostume } from '../logique/planning';
+import { dateEvenementCostume } from '../logique/evenements';
 import { relatif, jourCourt } from '../logique/dates';
 import { creerCostume, reordonner } from '../store/operations';
 import { annulerDeplacementDom } from '../composants/glisser';
@@ -87,7 +88,8 @@ function CarteCostume({ c, deplacable }: { c: Ligne; deplacable?: boolean }) {
   const a = avancementCostume(d, c.id);
   const dl = deadlineCostume(d, c);
   const attend = c.statut === 'en attente' ? ligne(d, 'Costumes', c.attend_costume_id) : undefined;
-  const ev = ligne(d, 'Evenements', c.evenement_id);
+  // Sans deadline propre, c'est le premier événement où il est porté qui la donne : on le nomme.
+  const ev = c.deadline ? undefined : dateEvenementCostume(d, c)?.evenement;
   const pieces = piecesDe(d, c.id);
   const nbTerminees = pieces.filter(p => pieceTerminee(d, p.id)).length;
   return (

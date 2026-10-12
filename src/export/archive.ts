@@ -2,9 +2,10 @@
 //  - un ZIP téléchargé sur l'appareil (données réimportables, fiche lisible hors appli, photos pleine taille) ;
 //  - le Drive : données et fiche dans « Sauvegardes » du dossier du costume, les photos restant à côté
 //    (les données gardent leurs identifiants Drive, ce qui permet le réimport sans les recopier).
-import { type Donnees, type Ligne, type NomTable, bool, liste, txtListe } from '../modele/schema';
+import { type Donnees, type Ligne, type NomTable, bool, liste, txtListe, vivant } from '../modele/schema';
 import { ligne, piecesDe, pistesDe, etapesDePiste, fournituresDe, photosDe, tous } from '../logique/acces';
 import { avancementCostume } from '../logique/avancement';
+import { evenementsDe, datesClesDe } from '../logique/evenements';
 import { budgetCostume } from '../logique/budget';
 import { lireJour } from '../logique/dates';
 import { blobPhoto, imagePourPdf } from '../store/photos';
@@ -37,12 +38,15 @@ export function lignesDuCostume(d: Donnees, costumeId: string): Partial<Record<N
   const pieces = piecesDe(d, costumeId);
   const pistes = pieces.flatMap(p => pistesDe(d, p.id));
   const etapes = pistes.flatMap(p => etapesDePiste(d, p.id));
-  const ev = ligne(d, 'Evenements', c.evenement_id);
+  // Les événements où il est porté, leur convention, et leurs dates clés.
+  const evs = evenementsDe(d, c);
+  for (const e of [...evs]) { const conv = ligne(d, 'Evenements', e.convention_id); if (conv && !evs.includes(conv)) evs.push(conv); }
   return {
     Costumes: [c], Pieces: pieces, Pistes: pistes, Etapes: etapes,
     Fournitures: fournituresDe(d, costumeId), Photos: photosDe(d, costumeId),
     Taches: tous(d, 'Taches').filter(t => t.costume_id === costumeId),
-    Evenements: ev ? [ev] : [],
+    Evenements: evs,
+    DatesCles: evs.flatMap(e => datesClesDe(d, e.id)),
   };
 }
 
@@ -151,10 +155,17 @@ export function lireContenu(brut: unknown, d: Donnees): { changements: Changemen
   const changements: Changement[] = [];
   const photos: PhotoARecopier[] = [];
 
-  // Un événement qui existe encore est réutilisé tel quel.
-  for (const ev of contenu.lignes.Evenements ?? []) {
-    if (d.Evenements[ev.id]) nouveaux.set(ev.id, ev.id);
-    else changements.push({ table: 'Evenements', id: nid(ev.id), champs: sansTechnique(ev) });
+  // Un événement (ou une date clé) qui existe encore est réutilisé tel quel.
+  const evenementsSauves = contenu.lignes.Evenements ?? [];
+  for (const ev of evenementsSauves) if (vivant(d.Evenements[ev.id])) nouveaux.set(ev.id, ev.id);
+  for (const ev of evenementsSauves) {
+    if (vivant(d.Evenements[ev.id])) continue;
+    const conv = ev.convention_id;
+    changements.push({ table: 'Evenements', id: nid(ev.id), champs: { ...sansTechnique(ev), convention_id: conv && (nouveaux.has(conv) || evenementsSauves.some(e => e.id === conv)) ? nid(conv) : '' } });
+  }
+  for (const dc of contenu.lignes.DatesCles ?? []) {
+    if (vivant(d.DatesCles[dc.id]) || !nouveaux.has(dc.evenement_id)) continue;
+    changements.push({ table: 'DatesCles', id: d.DatesCles[dc.id] ? nouvelId() : dc.id, champs: { ...sansTechnique(dc), evenement_id: nouveaux.get(dc.evenement_id)! } });
   }
   const refs: Record<string, string[]> = { Costumes: ['attend_costume_id', 'evenement_id'], Pieces: ['costume_id'], Pistes: ['piece_id'], Etapes: ['piste_id', 'piece_id'], Fournitures: ['costume_id', 'piece_id'], Photos: ['costume_id', 'piece_id', 'piste_id', 'etape_id'], Taches: ['costume_id'] };
   // Premier passage : réserver tous les identifiants (les références peuvent pointer « en avant »).

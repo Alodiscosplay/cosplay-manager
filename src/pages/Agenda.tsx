@@ -1,16 +1,20 @@
 import { useState } from 'preact/hooks';
 import { donnees, jour, faire } from '../store/store';
-import { agenda, fenetresPieces, traveesSemaine, type ElementAgenda, type FenetrePiece, type TypeAgenda } from '../logique/planning';
-import { costumes, couleurCostume, teinteCouleur, TEINTES, GRIS, tous } from '../logique/acces';
-import { bool } from '../modele/schema';
+import { agenda, fenetresPieces, fenetresEvenements, traveesSemaine, type ElementAgenda, type FenetrePiece, type FenetreEvenement, type TypeAgenda } from '../logique/planning';
+import { evenements, activiteDe, activitesDe, datesClesDe, nomEvenement, libelleEvenement } from '../logique/evenements';
+import { costumes, couleurCostume, teinteCouleur, TEINTES, GRIS } from '../logique/acces';
+import { bool, type Ligne } from '../modele/schema';
 import { lundi, ajouterJours, versDate, MOIS, JOURS_COURTS, jourCourt, lireJour } from '../logique/dates';
 import { Feuille, Selection } from '../composants/base';
 import { Icone } from '../composants/Icone';
 import { IndicateurSync } from '../app';
 import { lienCostume } from '../routeur';
-import { EditeurEvenement } from './Costume';
+import { EditeurEvenement } from './Evenement';
 
-const LIBELLES: Record<TypeAgenda, string> = { evenement: 'Événement', deadline: 'Deadline', tache: 'Tâche' };
+const LIBELLES: Record<TypeAgenda, string> = { evenement: 'Événement', datecle: 'Date clé', deadline: 'Deadline', tache: 'Tâche' };
+
+type Fenetre = FenetrePiece | FenetreEvenement;
+const estEvenement = (f: Fenetre): f is FenetreEvenement => 'evenement' in f;
 const CLE_VUE = 'cosplay-planner.vue-agenda';
 
 export function PageAgenda() {
@@ -42,9 +46,17 @@ export function PageAgenda() {
   };
   const duJour = (x: string) => items.filter(i => i.jour === x);
   // Les pièces s'étirent sur leur durée ; leurs deadlines ne sont donc plus des puces à part.
-  const fenetres = fenetresPieces(d, jours[0], jours[jours.length - 1], filtre || undefined);
+  // Les événements puis les pièces, en barres : les événements prennent les lignes du haut.
+  const fenetres: Fenetre[] = [
+    ...fenetresEvenements(d, jours[0], jours[jours.length - 1], filtre || undefined),
+    ...fenetresPieces(d, jours[0], jours[jours.length - 1], filtre || undefined),
+  ];
   const pucesDuJour = (x: string) => duJour(x).filter(i => i.ref.table !== 'Pieces');
   const piecesDuJour = (x: string) => fenetres.filter(f => f.debut <= x && f.fin >= x);
+  // Une date clé ouvre la fiche de son événement.
+  const ouvrir = (i: ElementAgenda | string) => setEvenement(typeof i === 'string' ? i : i.ref.table === 'DatesCles' ? d.DatesCles[i.ref.id]?.evenement_id ?? null : i.ref.id);
+  const racines = evenements(d).filter(e => !e.convention_id || !d.Evenements[e.convention_id] || !!d.Evenements[e.convention_id].supprime);
+  const fini = (e: Ligne) => !!e.date_debut && (e.date_fin || e.date_debut) < j;
   const semainesGrille = Array.from({ length: nbJours / 7 }, (_, i) => jours[i * 7]);
 
   const naviguer = (sens: -1 | 1) => {
@@ -84,21 +96,21 @@ export function PageAgenda() {
             <div class="cal-entetes">{JOURS_COURTS.map(x => <div class="cal-entete">{x}</div>)}</div>
             {semainesGrille.map(l => (
               <SemaineAgenda lundiS={l} jourJ={j} choisi={choisi} moisCourant={debutMois.slice(0, 7)} fenetres={fenetres}
-                puces={pucesDuJour} style={style} couleurs={couleurs} onChoisir={setChoisi} />
+                puces={pucesDuJour} style={style} couleurs={couleurs} onChoisir={setChoisi} ouvrirEvenement={ouvrir} />
             ))}
           </div>
           <JourDetaille jourX={choisi} items={pucesDuJour(choisi)} pieces={piecesDuJour(choisi)} couleurs={couleurs}
-            ouvrirEvenement={setEvenement} couleur={i => style(i)} />
+            ouvrirEvenement={ouvrir} couleur={i => style(i)} />
         </>
       ) : (
         <div class="semaine">
           <div class="calendrier-mois grand">
             <div class="cal-entetes">{JOURS_COURTS.map(x => <div class="cal-entete">{x}</div>)}</div>
             <SemaineAgenda lundiS={jours[0]} jourJ={j} choisi={choisi} fenetres={fenetres}
-              puces={pucesDuJour} style={style} couleurs={couleurs} onChoisir={setChoisi} />
+              puces={pucesDuJour} style={style} couleurs={couleurs} onChoisir={setChoisi} ouvrirEvenement={ouvrir} />
           </div>
           {jours.map(x => <JourDetaille jourX={x} items={pucesDuJour(x)} pieces={piecesDuJour(x)} couleurs={couleurs}
-            ouvrirEvenement={setEvenement} compact couleur={i => style(i)} />)}
+            ouvrirEvenement={ouvrir} compact couleur={i => style(i)} />)}
         </div>
       )}
 
@@ -113,11 +125,16 @@ export function PageAgenda() {
 
       <section class="groupe">
         <h2 class="groupe-titre">Événements</h2>
-        <ul class="liste-simple">
-          {tous(d, 'Evenements').sort((a, b) => (a.date_debut || '').localeCompare(b.date_debut || '')).map(e => (
-            <li><button class="lien-bouton" onClick={() => setEvenement(e.id)}>{e.nom}</button> <span class="petit-texte">{e.date_debut ? jourCourt(lireJour(e.date_debut), j) : 'sans date'}{e.lieu ? ` · ${e.lieu}` : ''}</span></li>
-          ))}
+        {!racines.length && <p class="petit-texte">Aucun événement. « + Événement » ajoute une convention, un concours, un shooting…</p>}
+        <ul class="liste-simple liste-evenements">
+          {racines.filter(e => !fini(e)).map(e => <LigneEvenement e={e} ouvrir={ouvrir} />)}
         </ul>
+        {racines.some(fini) && (
+          <details class="repli">
+            <summary>Passés ({racines.filter(fini).length})</summary>
+            <ul class="liste-simple liste-evenements">{racines.filter(fini).reverse().map(e => <LigneEvenement e={e} ouvrir={ouvrir} />)}</ul>
+          </details>
+        )}
       </section>
 
       {evenement && <EditeurEvenement id={evenement === 'nouveau' ? undefined : evenement} onFermer={() => setEvenement(null)} />}
@@ -126,9 +143,31 @@ export function PageAgenda() {
   );
 }
 
+/** Un événement de la liste, avec ses activités s'il s'agit d'une convention, et ses dates clés ouvertes. */
+function LigneEvenement({ e, ouvrir }: { e: Ligne; ouvrir: (id: string) => void }) {
+  const d = donnees.value;
+  const j = jour.value;
+  const infos = (x: Ligne) => {
+    const n = datesClesDe(d, x.id).filter(dc => !bool(dc.fait)).length;
+    return [x.nom && x.nom !== activiteDe(x) && (x.activite || !x.convention_id) ? activiteDe(x) : '', x.date_debut ? jourCourt(lireJour(x.date_debut), j) : 'sans date', x.lieu,
+      n ? `${n} date${n > 1 ? 's' : ''} clé${n > 1 ? 's' : ''} à suivre` : ''].filter(Boolean).join(' · ');
+  };
+  const activites = activitesDe(d, e.id);
+  return (
+    <li>
+      <div><button class="lien-bouton" onClick={() => ouvrir(e.id)}>{libelleEvenement(e)}</button> <span class="petit-texte">{infos(e)}</span></div>
+      {activites.length > 0 && (
+        <ul class="liste-simple sous-liste">
+          {activites.map(a => <li><button class="lien-bouton" onClick={() => ouvrir(a.id)}>{libelleEvenement(a)}</button> <span class="petit-texte">{infos(a)}</span></li>)}
+        </ul>
+      )}
+    </li>
+  );
+}
+
 function JourDetaille({ jourX, items, pieces = [], couleurs, ouvrirEvenement, compact, couleur }: {
-  jourX: string; items: ElementAgenda[]; pieces?: FenetrePiece[]; couleurs?: Map<string, string>;
-  ouvrirEvenement: (id: string) => void; compact?: boolean;
+  jourX: string; items: ElementAgenda[]; pieces?: Fenetre[]; couleurs?: Map<string, string>;
+  ouvrirEvenement: (i: ElementAgenda | string) => void; compact?: boolean;
   couleur?: (i: ElementAgenda) => Record<string, string> | undefined;
 }) {
   const j = jour.value;
@@ -138,7 +177,14 @@ function JourDetaille({ jourX, items, pieces = [], couleurs, ouvrirEvenement, co
       <h3>{nomJour} {jourCourt(jourX, j)}</h3>
       {!items.length && !pieces.length ? <p class="petit-texte">{compact ? '—' : 'Rien ce jour-là.'}</p> : (
         <ul>
-          {pieces.map(f => (
+          {pieces.filter(estEvenement).map(f => (
+            <li class="item-agenda evenement">
+              <span class="point evenement" />
+              <button class="lien-bouton" onClick={() => ouvrirEvenement(f.evenement.id)}>{nomEvenement(donnees.value, f.evenement)}</button>
+              <span class="petit-texte"> · {activiteDe(f.evenement)}{f.evenement.lieu ? ` · ${f.evenement.lieu}` : ''}</span>
+            </li>
+          ))}
+          {pieces.filter((f): f is FenetrePiece => !estEvenement(f)).map(f => (
             <li class={`item-agenda piece${f.faite ? ' fait' : ''}`}>
               <span class="point" style={{ background: couleurs?.get(f.costume.id) }} />
               <a href={lienCostume(f.costume.id, bool(f.costume.suivi_planning) ? 'planning' : 'pieces')}>{f.costume.nom} — {f.piece.nom}</a>
@@ -148,8 +194,8 @@ function JourDetaille({ jourX, items, pieces = [], couleurs, ouvrirEvenement, co
           {items.map(i => (
             <li class={`item-agenda ${i.type}${i.fait ? ' fait' : ''}`}>
               <span class={`point ${i.type}`} style={couleur?.(i)} />
-              {i.type === 'evenement'
-                ? <button class="lien-bouton" onClick={() => ouvrirEvenement(i.ref.id)}>{i.titre}</button>
+              {i.type === 'evenement' || i.type === 'datecle'
+                ? <button class="lien-bouton" onClick={() => ouvrirEvenement(i)}>{i.titre}</button>
                 : i.costumeId ? <a href={lienCostume(i.costumeId)}>{i.titre}</a> : <a href="#/afaire">{i.titre}</a>}
               <span class="petit-texte"> · {LIBELLES[i.type]}{i.detail ? ` · ${i.detail}` : ''}{i.fait ? ' · fait' : ''}</span>
             </li>
@@ -186,10 +232,10 @@ function ChoixCouleur({ id, rang, onFermer }: { id: string; rang: number; onFerm
  * Une semaine de l'agenda : sept jours cliquables, et par-dessus les pièces en cours, chacune en barre
  * de son début à sa deadline, à la couleur de son projet.
  */
-function SemaineAgenda({ lundiS, jourJ, choisi, moisCourant, fenetres, puces, style, couleurs, onChoisir }: {
-  lundiS: string; jourJ: string; choisi: string; moisCourant?: string; fenetres: FenetrePiece[];
+function SemaineAgenda({ lundiS, jourJ, choisi, moisCourant, fenetres, puces, style, couleurs, onChoisir, ouvrirEvenement }: {
+  lundiS: string; jourJ: string; choisi: string; moisCourant?: string; fenetres: Fenetre[];
   puces: (x: string) => ElementAgenda[]; style: (i: ElementAgenda, fond?: boolean) => Record<string, string> | undefined;
-  couleurs: Map<string, string>; onChoisir: (x: string) => void;
+  couleurs: Map<string, string>; onChoisir: (x: string) => void; ouvrirEvenement: (id: string) => void;
 }) {
   const jours = Array.from({ length: 7 }, (_, i) => ajouterJours(lundiS, i));
   const travees = traveesSemaine(fenetres, lundiS);
@@ -211,8 +257,18 @@ function SemaineAgenda({ lundiS, jourJ, choisi, moisCourant, fenetres, puces, st
         );
       })}
       {travees.map(t => {
-        const c = couleurs.get(t.fenetre.costume.id) ?? 'var(--accent)';
+        if (estEvenement(t.fenetre)) {
+          const ev = t.fenetre.evenement;
+          return (
+            <button class={`cal-barre evenement${t.ouvre ? ' ouvre' : ''}${t.ferme ? ' ferme' : ''}`}
+              style={{ gridColumn: `${t.de + 1} / ${t.a + 2}`, gridRow: `${t.ligne + 2}` }}
+              title={`${nomEvenement(donnees.value, ev)} · ${activiteDe(ev)}`} onClick={() => ouvrirEvenement(ev.id)}>
+              <span class="cal-barre-texte">{libelleEvenement(ev)}</span>
+            </button>
+          );
+        }
         const f = t.fenetre;
+        const c = couleurs.get(f.costume.id) ?? 'var(--accent)';
         return (
           <a class={`cal-barre${t.ouvre ? ' ouvre' : ''}${t.ferme ? ' ferme' : ''}${f.faite ? ' faite' : ''}`}
             href={lienCostume(f.costume.id, bool(f.costume.suivi_planning) ? 'planning' : 'pieces')}

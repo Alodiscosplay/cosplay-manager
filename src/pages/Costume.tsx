@@ -1,12 +1,14 @@
 import { useState } from 'preact/hooks';
 import { donnees, jour, faire } from '../store/store';
-import { ligne, costumes, tous, piecesDe } from '../logique/acces';
+import { ligne, costumes, piecesDe } from '../logique/acces';
 import { avancementCostume } from '../logique/avancement';
 import { statutCostume, pieceTerminee } from '../logique/disponibilite';
 import { deadlineCostume } from '../logique/planning';
-import { relatif, jourCourt, ajouterJours } from '../logique/dates';
+import { dateEvenementCostume, evenementsDe, evenements, nomEvenement } from '../logique/evenements';
+import { EditeurEvenement, lierCostume } from './Evenement';
+import { relatif, jourCourt } from '../logique/dates';
 import { STATUTS_COSTUME, bool, txtBool, type NomTable } from '../modele/schema';
-import { supprimer, nouvelId, purger } from '../store/operations';
+import { supprimer, purger } from '../store/operations';
 import { ajouterImage } from '../store/photos';
 import { aller, lienCostume } from '../routeur';
 import { Barre, Pct, Puce, Feuille, Champ, Texte, ChoixDate, Selection, Menu, Vide, Confirmer } from '../composants/base';
@@ -40,7 +42,8 @@ export function PageCostume({ id, onglet = 'pieces' }: { id: string; onglet?: st
   const nbTerminees = piecesCostume.filter(p => pieceTerminee(d, p.id)).length;
   const sc = statutCostume(c, jour.value);
   const dl = deadlineCostume(d, c);
-  const ev = ligne(d, 'Evenements', c.evenement_id);
+  // Sans deadline propre, c'est le premier événement où il est porté qui la donne : on le nomme.
+  const ev = c.deadline ? undefined : dateEvenementCostume(d, c)?.evenement;
   const suivi = bool(c.suivi_budget);
   const planifie = bool(c.suivi_planning);
   const onglets: [string, string][] = [
@@ -93,7 +96,7 @@ export function PageCostume({ id, onglet = 'pieces' }: { id: string; onglet?: st
           <div class="puces">
             <button class="puce-bouton" onClick={() => setFiche(true)}><Puce ton={sc === 'en cours' ? 'accent' : 'gris'}>{sc}</Puce></button>
             {c.statut === 'en attente' && c.attend_costume_id && <Puce ton="gris">attend {ligne(d, 'Costumes', c.attend_costume_id)?.nom ?? '?'}</Puce>}
-            {dl && <Puce ton={dl < jour.value ? 'rouge' : 'accent'}><Icone nom="drapeau" taille={12} />{ev ? `${ev.nom} · ` : ''}{jourCourt(dl)} ({relatif(dl, jour.value)})</Puce>}
+            {dl && <Puce ton={dl < jour.value ? 'rouge' : 'accent'}><Icone nom="drapeau" taille={12} />{ev ? `${nomEvenement(d, ev)} · ` : ''}{jourCourt(dl)} ({relatif(dl, jour.value)})</Puce>}
             {c.debut && c.statut === 'projet' && <Puce ton="gris">début {jourCourt(c.debut)}</Puce>}
             <Puce ton="gris">{nbTerminees}/{piecesCostume.length} pièce{piecesCostume.length > 1 ? 's' : ''} terminée{piecesCostume.length > 1 ? 's' : ''}</Puce>
           </div>
@@ -148,8 +151,10 @@ export function FicheCostume({ id, onFermer, nouveau }: { id: string; onFermer: 
   const c = d.Costumes[id];
   const m = (champs: Record<string, string>) => maj('Costumes', id, champs);
   const autres = costumes(d).filter(x => x.id !== id && x.statut !== 'archivé');
-  const evenements = tous(d, 'Evenements');
+  const portes = evenementsDe(d, c);
+  const autresEvenements = evenements(d).filter(e => !portes.includes(e));
   const [nouvelEv, setNouvelEv] = useState(false);
+  const [ficheEv, setFicheEv] = useState<string | null>(null);
   const fermer = () => {
     // Valide le champ en cours de saisie (les champs n'enregistrent qu'à la sortie).
     (document.activeElement as HTMLElement | null)?.blur();
@@ -185,12 +190,21 @@ export function FicheCostume({ id, onFermer, nouveau }: { id: string; onFermer: 
           <ChoixDate label="deadline" valeur={c.deadline ?? ''} min={c.debut || undefined} onChange={v => m({ deadline: v })} />
         </Champ>
       </div>
-      <Champ label="Convention / événement (facultatif)" aide="Sans deadline, la date de l'événement sert de deadline.">
+      <div class="champ">
+        <span class="champ-label">Événements prévus (facultatif)</span>
+        <ul class="liste-simple">
+          {portes.map(e => (
+            <li><button class="lien-bouton" onClick={() => setFicheEv(e.id)}>{nomEvenement(d, e)}</button>
+              <span class="petit-texte">{e.date_debut ? jourCourt(e.date_debut) : 'sans date'}</span>
+              <button class="bouton-icone petit" aria-label={`Retirer ${e.nom}`} title="Retirer" onClick={() => lierCostume(c, e.id, false)}><Icone nom="croix" taille={16} /></button></li>
+          ))}
+        </ul>
         <div class="ligne-actions">
-          <Selection label="Événement" valeur={c.evenement_id ?? ''} options={[['', '—'], ...evenements.map(e => [e.id, `${e.nom}${e.date_debut ? ` (${jourCourt(e.date_debut)})` : ''}`] as [string, string])]} onChange={v => m({ evenement_id: v })} />
+          {autresEvenements.length > 0 && <Selection label="Ajouter un événement" valeur="" options={[['', '+ Ajouter un événement…'], ...autresEvenements.map(e => [e.id, `${nomEvenement(d, e)}${e.date_debut ? ` (${jourCourt(e.date_debut)})` : ''}`] as [string, string])]} onChange={v => v && lierCostume(c, v, true)} />}
           <button class="bouton petit" onClick={() => setNouvelEv(true)}><Icone nom="plus" taille={16} />Nouveau</button>
         </div>
-      </Champ>
+        <span class="champ-aide">Prévu pour une activité, il l'est aussi pour sa convention. Sans deadline, la date du premier événement sert de deadline ; elle ne passe pas toute seule au suivant.</span>
+      </div>
       <label class="interrupteur">
         <input type="checkbox" checked={bool(c.suivi_budget)} onChange={e => m({ suivi_budget: txtBool((e.target as HTMLInputElement).checked) })} />
         <span>Suivre le budget de ce costume</span>
@@ -201,33 +215,8 @@ export function FicheCostume({ id, onFermer, nouveau }: { id: string; onFermer: 
       </label>
       {bool(c.suivi_budget) && <Champ label="Budget prévu (€, facultatif)"><Texte type="number" valeur={c.budget_prevu ?? ''} onValider={v => m({ budget_prevu: v })} /></Champ>}
       <Champ label="Notes"><Texte multiligne valeur={c.notes ?? ''} onValider={v => m({ notes: v })} /></Champ>
-      {nouvelEv && <EditeurEvenement onFermer={id2 => { setNouvelEv(false); if (id2) m({ evenement_id: id2 }); }} />}
-    </Feuille>
-  );
-}
-
-export function EditeurEvenement({ id, onFermer }: { id?: string; onFermer: (id?: string) => void }) {
-  const existant = id ? donnees.value.Evenements[id] : undefined;
-  const [v, setV] = useState({ nom: existant?.nom ?? '', date_debut: existant?.date_debut ?? '', date_fin: existant?.date_fin ?? '', lieu: existant?.lieu ?? '', notes: existant?.notes ?? '' });
-  const valider = () => {
-    if (!v.nom.trim()) return;
-    const eid = id ?? nouvelId();
-    faire([{ table: 'Evenements', id: eid, champs: { ...v, nom: v.nom.trim() } }]);
-    onFermer(eid);
-  };
-  return (
-    <Feuille titre={id ? "Modifier l'événement" : 'Nouvel événement'} onFermer={() => onFermer()} pied={<>
-      {id && <button class="bouton danger" onClick={() => { faire(supprimer(donnees.value, 'Evenements', id), 'Événement supprimé'); onFermer(); }}>Supprimer</button>}
-      <button class="bouton principal" disabled={!v.nom.trim()} onClick={valider}>Enregistrer</button>
-    </>}>
-      <Champ label="Nom"><input value={v.nom} autoFocus onInput={e => setV({ ...v, nom: (e.target as HTMLInputElement).value })} /></Champ>
-      <div class="deux-colonnes">
-        <Champ label="Du"><ChoixDate label="date de début" valeur={v.date_debut}
-          onChange={x => setV({ ...v, date_debut: x, date_fin: x && (!v.date_fin || v.date_fin < x) ? ajouterJours(x, 1) : v.date_fin })} /></Champ>
-        <Champ label="Au"><ChoixDate label="date de fin" valeur={v.date_fin} min={v.date_debut || undefined} onChange={x => setV({ ...v, date_fin: x })} /></Champ>
-      </div>
-      <Champ label="Lieu"><input value={v.lieu} onInput={e => setV({ ...v, lieu: (e.target as HTMLInputElement).value })} /></Champ>
-      <Champ label="Notes"><textarea rows={2} value={v.notes} onInput={e => setV({ ...v, notes: (e.target as HTMLTextAreaElement).value })} /></Champ>
+      {nouvelEv && <EditeurEvenement costume={id} onFermer={() => setNouvelEv(false)} />}
+      {ficheEv && <EditeurEvenement id={ficheEv} onFermer={() => setFicheEv(null)} />}
     </Feuille>
   );
 }

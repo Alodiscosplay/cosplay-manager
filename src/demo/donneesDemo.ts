@@ -15,11 +15,19 @@ export function donneesDemo(jour: Jour): Donnees {
   MODELES_PAR_DEFAUT.forEach((m, i) => faire([{ table: 'Modeles', id: nouvelId(), champs: { nom: m.nom, contenu: m.contenu, ordre: String(i + 1) } }]));
 
   const conv = nouvelId();
-  faire([{ table: 'Evenements', id: conv, champs: { nom: 'Convention (exemple)', date_debut: ajouterJours(jour, 60), date_fin: ajouterJours(jour, 61), lieu: 'Parc des expositions' } }]);
+  faire([{ table: 'Evenements', id: conv, champs: { nom: 'Convention (exemple)', activite: 'Convention', date_debut: ajouterJours(jour, 60), date_fin: ajouterJours(jour, 61), lieu: 'Parc des expositions' } }]);
+  // Un concours dans la convention, avec ses dates clés.
+  const concours = nouvelId();
+  faire([{ table: 'Evenements', id: concours, champs: { nom: 'Concours cosplay', activite: 'Concours cosplay', convention_id: conv, date_debut: ajouterJours(jour, 60), date_fin: ajouterJours(jour, 60) } }]);
+  faire([
+    { table: 'DatesCles', id: nouvelId(), champs: { evenement_id: concours, titre: 'Inscriptions', nature: 'periode', debut: ajouterJours(jour, -2), fin: ajouterJours(jour, 10), ordre: '1' } },
+    { table: 'DatesCles', id: nouvelId(), champs: { evenement_id: concours, titre: 'Envoi des références', nature: 'limite', fin: ajouterJours(jour, 30), ordre: '2' } },
+    { table: 'DatesCles', id: nouvelId(), champs: { evenement_id: conv, titre: 'Billet par mail', nature: 'fixe', fin: ajouterJours(jour, 45), ordre: '3' } },
+  ]);
 
   // Costume 1 : en cours, avec pistes parallèles
   const c1 = faire(creerCostume(d, 'Fée des bois (exemple)'))[0].id;
-  maj1('Costumes', c1, { statut: 'en cours', personnage: 'Fée des bois', oeuvre: 'Exemple', evenement_id: conv, suivi_budget: 'oui', budget_prevu: '120' });
+  maj1('Costumes', c1, { statut: 'en cours', personnage: 'Fée des bois', oeuvre: 'Exemple', evenement_id: concours, suivi_budget: 'oui', budget_prevu: '120' });
   faire(appliquerListe(d, analyserListe(`## Chapeau
 ### Tissu
 Patronner le chapeau (long)

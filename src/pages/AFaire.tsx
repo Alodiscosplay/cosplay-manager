@@ -3,6 +3,8 @@ import Sortable from 'sortablejs';
 import { donnees, jour, faire } from '../store/store';
 import { aFaire, tailleRepli, texteAttente, type ElementAFaire } from '../logique/disponibilite';
 import { alertes } from '../logique/planning';
+import { datesClesAFaire, natureDe, nomEvenement, type DateCleAFaire } from '../logique/evenements';
+import { EditeurEvenement } from './Evenement';
 import { costumes, costumesParPriorite, ligne, tous, ordreSuivant, reordonnerParmi } from '../logique/acces';
 import { jourCourt, lireJour, relatif } from '../logique/dates';
 import { bool, txtBool, type Ligne } from '../modele/schema';
@@ -19,6 +21,11 @@ export function PageAFaire() {
   const r = aFaire(d, j);
   const al = alertes(d, j);
   const [tache, setTache] = useState<string | null>(null);
+  const [evenement, setEvenement] = useState<string | null>(null);
+  // Les dates clés des événements (inscriptions, envois, réponses, répétitions) : un bloc à elles.
+  const dc = datesClesAFaire(d, j);
+  const datesUrgentes = dc.aFaire.filter(x => bool(x.dateCle.urgent));
+  const dates = dc.aFaire.filter(x => !bool(x.dateCle.urgent));
   const [nouvelle, setNouvelle] = useState('');
 
   // Ce qu'elle a marqué urgent remonte en tête, et n'apparaît plus plus bas.
@@ -41,7 +48,7 @@ export function PageAFaire() {
     setNouvelle('');
   };
 
-  const n = tailleRepli(r.repli);
+  const n = tailleRepli(r.repli) + dc.plusTard.length;
 
   // Les costumes se glissent par ordre de priorité, propre à cette page (la page Costumes a le sien) ;
   // ceux qui ne sont pas affichés ici gardent leur place.
@@ -73,7 +80,7 @@ export function PageAFaire() {
       </header>
       <p class="petit-texte intro">La sous-étape suivante de chaque étape, dans les pièces en cours des costumes en cours.</p>
 
-      {!r.elements.length && !r.taches.length && (
+      {!r.elements.length && !r.taches.length && !dc.aFaire.length && (
         <Vide icone="afaire" titre="Rien à faire pour l'instant">
           <p>Mets un costume « en cours », puis une de ses pièces « en cours » : sa prochaine sous-étape apparaîtra ici.</p>
         </Vide>
@@ -92,12 +99,13 @@ export function PageAFaire() {
         <a class="alerte orange" href={lienCostume(c.id)}><Icone nom="lecture" taille={16} />{c.nom} est en cours, mais aucune de ses pièces : choisis sur quoi tu travailles</a>
       ))}
 
-      {(urgents.length > 0 || tachesUrgentes.length > 0) && (
+      {(urgents.length > 0 || tachesUrgentes.length > 0 || datesUrgentes.length > 0) && (
         <section class="groupe-afaire urgent">
           <h2><Icone nom="alerte" taille={18} />Urgent</h2>
           <ul class="etapes">
             {urgents.map(e => <ElementLigne e={e} contexte />)}
             {tachesUrgentes.map(t => <TacheLigne t={t} onOuvrir={setTache} />)}
+            {datesUrgentes.map(x => <DateCleLigne x={x} onOuvrir={setEvenement} />)}
           </ul>
         </section>
       )}
@@ -132,6 +140,15 @@ export function PageAFaire() {
         ))}
       </div>
 
+      {dates.length > 0 && (
+        <section class="groupe-afaire">
+          <h2><a href="#/agenda">Événements</a></h2>
+          <ul class="etapes">
+            {dates.map(x => <DateCleLigne x={x} onOuvrir={setEvenement} />)}
+          </ul>
+        </section>
+      )}
+
       {n > 0 && (
         <details class="repli">
           <summary>Pas dans la liste ({n})</summary>
@@ -143,11 +160,13 @@ export function PageAFaire() {
             {r.repli.costumesEnAttente.map(c => <li><a href={lienCostume(c.id)}>{c.nom}</a> · en attente{ligne(d, 'Costumes', c.attend_costume_id) ? ` de ${ligne(d, 'Costumes', c.attend_costume_id)!.nom}` : ''}</li>)}
             {r.repli.costumesProjet.map(c => <li><a href={lienCostume(c.id)}>{c.nom}</a> · en projet{c.debut ? `, commence le ${jourCourt(c.debut)}` : ''}</li>)}
             {r.repli.costumesEnPause.map(c => <li><a href={lienCostume(c.id)}>{c.nom}</a> · en pause</li>)}
+            {dc.plusTard.map(x => <li><button class="lien-bouton" onClick={() => setEvenement(x.evenement.id)}>{x.dateCle.titre}</button> ({nomEvenement(d, x.evenement)}) · apparaîtra le {jourCourt(x.apparait)}</li>)}
           </ul>
         </details>
       )}
 
       {tache && <EditeurTache id={tache} onFermer={() => setTache(null)} />}
+      {evenement && <EditeurEvenement id={evenement} onFermer={() => setEvenement(null)} />}
     </div>
   );
 }
@@ -179,6 +198,28 @@ function TacheLigne({ t, onOuvrir }: { t: Ligne; onOuvrir: (id: string) => void 
         </span>
       </button>
       <BoutonUrgent urgent={urgent} titre={t.titre} onChange={v => faire([{ table: 'Taches', id: t.id, champs: { urgent: txtBool(v) } }])} />
+    </li>
+  );
+}
+
+/** Une date clé d'événement : on la coche ici comme sur la fiche de l'événement. */
+function DateCleLigne({ x, onOuvrir }: { x: DateCleAFaire; onOuvrir: (evenementId: string) => void }) {
+  const d = donnees.value;
+  const j = jour.value;
+  const dc = x.dateCle;
+  const urgent = bool(dc.urgent);
+  return (
+    <li class="etape">
+      <Case coche={false} label={dc.titre} onChange={() => faire([{ table: 'DatesCles', id: dc.id, champs: { fait: txtBool(true), fait_le: j, urgent: '' } }], `« ${dc.titre} » cochée`)} />
+      <button class="etape-texte" onClick={() => onOuvrir(x.evenement.id)}>
+        <span class="etape-titre">{dc.titre}</span>
+        <span class="etape-meta">
+          <span class="costume-nom">{nomEvenement(d, x.evenement)}</span>
+          <span class={x.niveau === 'rouge' ? 'en-retard' : x.niveau === 'orange' ? 'bientot' : ''}><Icone nom={natureDe(dc) === 'fixe' ? 'horloge' : 'drapeau'} taille={12} />{x.texte}</span>
+        </span>
+      </button>
+      {/^https?:\/\//.test(dc.lien ?? '') && <a class="bouton-icone petit" href={dc.lien} target="_blank" rel="noopener" aria-label={`Ouvrir le lien de « ${dc.titre} »`} title="Ouvrir le lien"><Icone nom="lien" taille={16} /></a>}
+      <BoutonUrgent urgent={urgent} titre={dc.titre} onChange={v => faire([{ table: 'DatesCles', id: dc.id, champs: { urgent: txtBool(v) } }])} />
     </li>
   );
 }

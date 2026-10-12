@@ -499,6 +499,13 @@ dialog.feuille::backdrop { background: rgb(20 12 28 / 45%); }
 .cal-barre.ouvre { border-left-width: 3px; border-top-left-radius: 6px; border-bottom-left-radius: 6px; }
 .cal-barre.ferme { border-top-right-radius: 6px; border-bottom-right-radius: 6px; border-right-width: 1px; }
 .cal-barre.faite { opacity: .45; }
+.cal-barre.evenement { background: var(--accent); color: var(--accent-encre); border-color: var(--accent); font-family: inherit; cursor: pointer; text-align: left; }
+.point.datecle { background: transparent; border: 2px solid var(--accent); }
+.cal-texte.datecle { background: color-mix(in srgb, var(--accent) 14%, var(--surface)); color: var(--encre); }
+.sous-groupe { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; margin: 16px 0 8px; }
+.sous-groupe > ul { align-self: stretch; }
+.liste-evenements > li { flex-direction: column; align-items: flex-start; }
+.sous-liste { padding-left: 16px; margin-top: 4px; border-left: 2px solid var(--bord); }
 .cal-barre-texte { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: none; }
 .cal-barre-fin { flex: none; display: none; }
 @media (min-width: 700px) {
@@ -621,3 +628,10 @@ dialog.feuille::backdrop { background: rgb(20 12 28 / 45%); }
 .puces-fournitures { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .liste-ajout-pages { list-style: none; padding: 0; margin: 0 0 8px; display: flex; flex-direction: column; gap: 4px; }
 .bouton-textes { font-size: 1.3rem; font-weight: 700; line-height: 1; }
+.etape-meta .bientot { color: var(--orange); }
+.bloc-activite { align-self: stretch; border: 1px solid var(--bord); border-radius: var(--rayon); background: var(--surface); }
+.bloc-activite.ouverte { border-color: var(--accent); }
+.bloc-activite-tete { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; width: 100%; min-height: 44px; padding: 8px 12px;
+  background: none; border: 0; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.bloc-activite-nom { font-weight: 600; }
+.bloc-activite-corps { display: flex; flex-direction: column; gap: 12px; padding: 0 12px 12px; }

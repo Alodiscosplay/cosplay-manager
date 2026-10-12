@@ -4,14 +4,14 @@ import { costumes, piecesDe, pistesDe, etapesDePiste, etapesDePiece, ligne, idsA
 import { poids, avancement } from './avancement';
 import { lireJour, ajouterJours, ecartJours, jourCourt, type Jour } from './dates';
 import { statutCostume, pieceTerminee } from './disponibilite';
+import { dateEvenementCostume, evenementsDe, natureDe, nomEvenement } from './evenements';
 
 // ---------- Deadlines effectives ----------
 
 export function deadlineCostume(d: Donnees, c: Ligne): Jour | '' {
   const propre = lireJour(c.deadline);
   if (propre) return propre;
-  const ev = ligne(d, 'Evenements', c.evenement_id);
-  return ev ? lireJour(ev.date_debut) : '';
+  return dateEvenementCostume(d, c)?.jour ?? '';
 }
 
 export function deadlinePiece(d: Donnees, p: Ligne): Jour | '' {
@@ -271,17 +271,45 @@ export function fenetresPieces(d: Donnees, depuis: Jour, jusqua: Jour, costumeFi
   return res.sort((a, b) => a.debut.localeCompare(b.debut) || b.fin.localeCompare(a.fin));
 }
 
+/** Un événement sur l'agenda, en barre de son premier à son dernier jour. */
+export interface FenetreEvenement { evenement: Ligne; debut: Jour; fin: Jour }
+
+/** Les événements visibles par le filtre : ceux où le costume est porté, et leur convention. */
+export function evenementsDuFiltre(d: Donnees, costumeFiltre?: string): Set<string> | undefined {
+  if (!costumeFiltre) return undefined;
+  const c = ligne(d, 'Costumes', costumeFiltre);
+  const ids = new Set<string>();
+  for (const e of c ? evenementsDe(d, c) : []) { ids.add(e.id); if (e.convention_id) ids.add(e.convention_id); }
+  return ids;
+}
+
+export function fenetresEvenements(d: Donnees, depuis: Jour, jusqua: Jour, costumeFiltre?: string): FenetreEvenement[] {
+  const garder = evenementsDuFiltre(d, costumeFiltre);
+  const res: FenetreEvenement[] = [];
+  for (const ev of Object.values(d.Evenements)) {
+    if (!vivant(ev) || (garder && !garder.has(ev.id))) continue;
+    const debut = lireJour(ev.date_debut);
+    if (!debut) continue;
+    const f = lireJour(ev.date_fin);
+    const fin = f && f >= debut ? f : debut;
+    if (fin < depuis || debut > jusqua) continue;
+    res.push({ evenement: ev, debut, fin });
+  }
+  // Les conventions avant leurs activités : elles prennent la ligne du haut.
+  return res.sort((a, b) => a.debut.localeCompare(b.debut) || b.fin.localeCompare(a.fin) || (a.evenement.convention_id ? 1 : 0) - (b.evenement.convention_id ? 1 : 0));
+}
+
 /** Un morceau de barre sur une semaine, rangé dans la première ligne libre. */
-export interface Travee { fenetre: FenetrePiece; de: number; a: number; ligne: number; ouvre: boolean; ferme: boolean }
+export interface Travee<T = FenetrePiece> { fenetre: T; de: number; a: number; ligne: number; ouvre: boolean; ferme: boolean }
 
 /**
  * Découpe les fenêtres sur la semaine qui commence le `lundi` (colonnes 0 à 6) et les range en lignes
  * sans chevauchement : la première barre qui commence prend la première ligne libre.
  */
-export function traveesSemaine(fenetres: FenetrePiece[], lundi: Jour): Travee[] {
+export function traveesSemaine<T extends { debut: Jour; fin: Jour }>(fenetres: T[], lundi: Jour): Travee<T>[] {
   const dimanche = ajouterJours(lundi, 6);
   const lignes: number[] = []; // dernière colonne occupée par ligne
-  const res: Travee[] = [];
+  const res: Travee<T>[] = [];
   for (const f of fenetres) {
     if (f.fin < lundi || f.debut > dimanche) continue;
     const de = f.debut < lundi ? 0 : ecartJours(lundi, f.debut);
@@ -295,7 +323,7 @@ export function traveesSemaine(fenetres: FenetrePiece[], lundi: Jour): Travee[] 
 
 // ---------- Agenda ----------
 
-export type TypeAgenda = 'deadline' | 'evenement' | 'tache';
+export type TypeAgenda = 'deadline' | 'evenement' | 'datecle' | 'tache';
 
 export interface ElementAgenda {
   jour: Jour; type: TypeAgenda; titre: string; detail: string;
@@ -307,10 +335,23 @@ export function agenda(d: Donnees, depuis: Jour, jusqua: Jour, costumeFiltre?: s
   const dans = (j: Jour) => j && j >= depuis && j <= jusqua;
   const garder = (costumeId?: string) => !costumeFiltre || costumeFiltre === costumeId;
 
-  for (const ev of Object.values(d.Evenements)) {
-    if (!vivant(ev)) continue;
-    const j = lireJour(ev.date_debut);
-    if (!costumeFiltre && dans(j)) res.push({ jour: j, type: 'evenement', titre: ev.nom, detail: ev.lieu || '', fait: false, ref: { table: 'Evenements', id: ev.id } });
+  // Les événements eux-mêmes sont des barres (fenetresEvenements) ; ici, leurs dates clés.
+  const evs = evenementsDuFiltre(d, costumeFiltre);
+  for (const dc of Object.values(d.DatesCles)) {
+    const ev = vivant(dc) ? ligne(d, 'Evenements', dc.evenement_id) : undefined;
+    if (!ev || (evs && !evs.has(ev.id))) continue;
+    const pousser = (j: Jour, detail: string) => {
+      if (dans(j)) res.push({ jour: j, type: 'datecle', titre: `${nomEvenement(d, ev)} — ${dc.titre}`, detail, fait: bool(dc.fait), ref: { table: 'DatesCles', id: dc.id } });
+    };
+    const debut = lireJour(dc.debut), fin = lireJour(dc.fin);
+    switch (natureDe(dc)) {
+      case 'periode':
+        if (debut) pousser(debut, fin === debut ? 'ouverture et clôture' : 'ouverture');
+        if (fin && fin !== debut) pousser(fin, 'clôture');
+        break;
+      case 'limite': if (fin) pousser(fin, 'date limite'); break;
+      case 'fixe': if (fin) pousser(fin, 'date fixe'); break;
+    }
   }
   // Titre toujours préfixé par le costume : « Mary Poppins — Robe » ne se confond pas avec la robe d'un autre projet.
   for (const c of costumes(d)) {
@@ -330,6 +371,6 @@ export function agenda(d: Donnees, depuis: Jour, jusqua: Jour, costumeFiltre?: s
     const c = ligne(d, 'Costumes', t.costume_id);
     if (dans(j)) res.push({ jour: j, type: 'tache', titre: c ? `${c.nom} — ${t.titre}` : t.titre, detail: 'tâche', costumeId: t.costume_id || undefined, fait: bool(t.fait), ref: { table: 'Taches', id: t.id } });
   }
-  const rang: Record<TypeAgenda, number> = { evenement: 0, deadline: 1, tache: 2 };
+  const rang: Record<TypeAgenda, number> = { evenement: 0, datecle: 1, deadline: 2, tache: 3 };
   return res.sort((a, b) => a.jour.localeCompare(b.jour) || rang[a.type] - rang[b.type]);
 }

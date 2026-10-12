@@ -246,6 +246,17 @@ export function supprimer(d: Donnees, table: NomTable, id: string): Changement[]
       vider('Etapes', racine);
       for (const ph of Object.values(d.Photos)) if (ph.etape_id === id) retoucher('Photos', ph, { etape_id: '' });
       break;
+    case 'Evenements': {
+      // Une convention emporte ses activités ; chaque événement, ses dates clés. Les costumes restent.
+      const partis = new Set([id, ...Object.values(d.Evenements).filter(e => e.convention_id === id).map(e => e.id)]);
+      for (const eid of partis) vider('Evenements', d.Evenements[eid]);
+      for (const dc of Object.values(d.DatesCles)) if (partis.has(dc.evenement_id)) vider('DatesCles', dc);
+      for (const c of Object.values(d.Costumes)) {
+        const evs = liste(c.evenement_id);
+        if (evs.some(x => partis.has(x))) retoucher('Costumes', c, { evenement_id: txtListe(evs.filter(x => !partis.has(x))) });
+      }
+      break;
+    }
     default:
       vider(table, racine);
   }
