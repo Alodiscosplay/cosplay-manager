@@ -6,7 +6,7 @@ import { aFaire, etapeDisponible, creeraitBoucle, texteAttente, champsStatutPiec
 import { activationsDuJour } from '../src/logique/activation';
 import { planifierCostume, debutEtape, retardPiece, finPlanifiable, alertes, fenetresPieces, traveesSemaine } from '../src/logique/planning';
 import { effacerPlanning } from '../src/store/operations';
-import { quantiteNombre, regrouperAchats, budgetCostume, totalCommande, regrouperParNom, texteQuantites } from '../src/logique/budget';
+import { quantiteNombre, regrouperAchats, budgetCostume, totalCommande, regrouperParNom, texteQuantites, releveBudget } from '../src/logique/budget';
 import { analyserListe, versTexte, modeleVersTexte, texteVersModele } from '../src/logique/collerListe';
 import { changementsImport, enchainerPistes, supprimer, viderAnciensSupprimes, cocherEtape, creerCommandes, changerStatutCommande, appliquerListe, insererModele, deplacerEtape, creerCostume } from '../src/store/operations';
 import { etapesDePiste, pistesDe, piecesDe, etapesDePiece, piecesDeFourniture, reordonnerParmi, costumesParPriorite } from '../src/logique/acces';
@@ -356,6 +356,28 @@ describe('achats et budget', () => {
     d = appliquer(d, changerStatutCommande(d, cmd, 'reçue', '2026-10-05'));
     expect([d.Fournitures.x.statut, d.Fournitures.y.statut]).toEqual(['reçu', 'reçu']);
     expect(budgetCostume(d, 'A')).toMatchObject({ total: 5.45, prevu: 0, commande: 0, recu: 5.45 });
+  });
+
+  it('le relevé détaille le budget actuel dépensé par commande, frais de port compris', () => {
+    let d = vide();
+    d.Costumes.A = { id: 'A', maj: '', supprime: '', nom: 'Bridget', statut: 'en cours', suivi_budget: 'oui' };
+    d.Costumes.B = { id: 'B', maj: '', supprime: '', nom: 'Furina', statut: 'en cours' };
+    d.Fournisseurs.F = { id: 'F', maj: '', supprime: '', nom: 'Mercerie' };
+    const four = (id: string, costume_id: string, libelle: string, prix: string, statut = 'à acheter') =>
+      ({ id, maj: '', supprime: '', costume_id, libelle, quantite: '1', prix_unitaire: prix, fournisseur_id: 'F', statut });
+    d.Fournitures.x = four('x', 'A', 'Zip', '3');
+    d.Fournitures.y = four('y', 'B', 'Biais', '1');
+    d.Fournitures.z = four('z', 'A', 'Boutons', '2', 'reçu');       // reçu sans commande (ancienne saisie)
+    d.Fournitures.w = four('w', 'A', 'Dentelle', '', 'à acheter');  // sans prix, encore à acheter
+    d.Fournitures.v = four('v', 'A', 'Fil', '9', 'déjà là');        // ne compte pas
+    const ch = creerCommandes(d, ['x', 'y'], '2026-10-01', { F: '4' });
+    d = appliquer(d, ch);
+    const r = releveBudget(d, 'A', ['commandé', 'reçu']);
+    expect(r.map(g => [g.commande ? g.date : 'hors commande', g.fournisseur?.nom ?? '', g.lignes.map(l => l.fourniture.libelle), g.articles, g.port, g.total]))
+      .toEqual([['2026-10-01', 'Mercerie', ['Zip'], 3, 2, 5], ['hors commande', '', ['Boutons'], 2, 0, 2]]);
+    const b = budgetCostume(d, 'A');
+    expect(r.reduce((t, g) => t + g.total, 0)).toBe(b.recu + b.commande);
+    expect(releveBudget(d, 'A', ['à acheter'])[0].lignes.map(l => [l.fourniture.libelle, l.montant])).toEqual([['Dentelle', null]]);
   });
 
   it('les frais de port d’une commande se partagent à parts égales entre ses fournitures, et comptent dans le budget de leur costume', () => {

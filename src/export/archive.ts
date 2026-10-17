@@ -6,7 +6,7 @@ import { type Donnees, type Ligne, type NomTable, bool, liste, txtListe, vivant 
 import { ligne, piecesDe, pistesDe, etapesDePiste, fournituresDe, photosDe, tous } from '../logique/acces';
 import { avancementCostume } from '../logique/avancement';
 import { evenementsDe, datesClesDe } from '../logique/evenements';
-import { budgetCostume } from '../logique/budget';
+import { budgetCostume, lireRepartition } from '../logique/budget';
 import { lireJour } from '../logique/dates';
 import { blobPhoto, imagePourPdf } from '../store/photos';
 import { fichePdf } from './fichePdf';
@@ -188,7 +188,15 @@ export function lireContenu(brut: unknown, d: Donnees): { changements: Changemen
         champs.drive_id = idDrive(l.drive_id);
         if (contenu.fichiers[l.drive_id]) photos.push({ chemin: contenu.fichiers[l.drive_id], ligneId: nid(l.id), champ: 'drive_id', table: 'Photos' });
       }
-      if (t === 'Fournitures') champs.commande_id = '';
+      if (t === 'Fournitures') {
+        champs.commande_id = '';
+        // La quantité prise par chaque pièce suit le nouvel id de la pièce.
+        const piece = (x: string) => nouveaux.get(x) ?? '';
+        champs.piece_id = txtListe(liste(l.piece_id).map(piece).filter(Boolean));
+        const rep = lireRepartition(l);
+        const suivie = Object.fromEntries(Object.entries(rep).map(([x, q]) => [piece(x), q]).filter(([x]) => x));
+        champs.repartition = Object.keys(suivie).length ? JSON.stringify(suivie) : '';
+      }
       changements.push({ table: t, id: nid(l.id), champs, nouveau: true });
     }
   }

@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import Sortable from 'sortablejs';
 import { donnees, faire, jour } from '../../store/store';
 import { piecesDe, pistesDe, etapesDePiste, tous, idsAttendus, nomAttendu, ordreSuivant, fournituresDe, piecesDeFourniture } from '../../logique/acces';
-import { cleNom } from '../../logique/budget';
+import { cleNom, disponiblePour, disponibleTexte, lireRepartition, uniteRepartition, texteReste } from '../../logique/budget';
 import { creeraitBoucle, statutStockePiece, champsStatutPiece, pieceTerminee } from '../../logique/disponibilite';
 import { analyserListe, versTexte } from '../../logique/collerListe';
 import { planifierCostume, ordrePlanning, deadlineCostume, deadlinePiece, etapeFinie, finPlanifiable } from '../../logique/planning';
@@ -14,6 +14,7 @@ import { Feuille, Champ, Texte, ChoixDate, Selection } from '../../composants/ba
 import { maj } from '../Costume';
 import { partieDe, PARTIES } from '../../export/dossierWip';
 import { Icone } from '../../composants/Icone';
+import { EditeurFourniture } from '../../composants/Fournitures';
 
 // ---------- Étape ----------
 
@@ -186,34 +187,62 @@ export function texteAttendus(d: typeof donnees.value, l: Ligne): string {
 // ---------- Rattacher des fournitures à une pièce ----------
 
 /**
- * Fournitures du costume rattachées à aucune pièce (achetées ou saisies avant de créer la pièce),
- * plus celles déjà rattachées à cette pièce. Cocher = rattacher, décocher = remettre « hors pièces ».
+ * Fournitures du costume qu'on peut encore prendre pour cette pièce : rattachées à aucune pièce, déjà à
+ * celle-ci, ou dont il reste une partie (un ruban de 10 m dont 4 m sont libres). Cocher = rattacher, avec
+ * la quantité prise si on la connaît ; décocher = la retirer de la pièce.
  */
 export function RattacherFournitures({ pieceId, onFermer, apresCreation }: { pieceId: string; onFermer: () => void; apresCreation?: boolean }) {
   const d = donnees.value;
   const piece = d.Pieces[pieceId];
+  const [nouvelle, setNouvelle] = useState(false);
   if (!piece) return null;
-  const candidates = fournituresDe(d, piece.costume_id).filter(f => {
-    const ids = piecesDeFourniture(d, f).map(p => p.id);
-    return ids.length === 0 || ids.includes(pieceId);
-  }).sort((a, b) => cleNom(a.libelle).localeCompare(cleNom(b.libelle), 'fr'));
+  const candidates = fournituresDe(d, piece.costume_id).filter(f => disponiblePour(d, f, pieceId))
+    .sort((a, b) => cleNom(a.libelle).localeCompare(cleNom(b.libelle), 'fr'));
   const basculer = (f: Ligne, coche: boolean) => {
     const autres = liste(f.piece_id).filter(x => x !== pieceId);
-    maj('Fournitures', f.id, { piece_id: txtListe(coche ? [...autres, pieceId] : autres) });
+    const rep = lireRepartition(f);
+    // cochée : elle prend d'office tout ce qui reste (modifiable) ; décochée : sa quantité part avec elle
+    if (coche) { const libre = disponibleTexte(d, f); if (libre) rep[pieceId] = libre; } else delete rep[pieceId];
+    maj('Fournitures', f.id, { piece_id: txtListe(coche ? [...autres, pieceId] : autres), repartition: Object.keys(rep).length ? JSON.stringify(rep) : '' });
+  };
+  const quantite = (f: Ligne, q: string) => {
+    const rep = lireRepartition(f);
+    if (q.trim()) rep[pieceId] = q.trim(); else delete rep[pieceId];
+    maj('Fournitures', f.id, { repartition: Object.keys(rep).length ? JSON.stringify(rep) : '' });
   };
   return (
-    <Feuille titre={`Fournitures de « ${piece.nom} »`} onFermer={onFermer} pied={
-      <button class="bouton principal" onClick={onFermer}>{apresCreation ? 'Terminé' : 'Fermer'}</button>}>
+    <Feuille titre={`Fournitures de « ${piece.nom} »`} onFermer={onFermer} pied={<>
+      {/* Une fourniture qui n'existe pas encore : le formulaire habituel, déjà rattaché à la pièce. */}
+      <button class="bouton" onClick={() => setNouvelle(true)}><Icone nom="plus" taille={16} />Fourniture</button>
+      <button class="bouton principal" onClick={onFermer}>{apresCreation ? 'Terminé' : 'Fermer'}</button>
+    </>}>
       {apresCreation && <p class="petit-texte">Des fournitures de ce costume ne sont rattachées à aucune pièce. Coche celles qui concernent « {piece.nom} », ou ferme pour le faire plus tard.</p>}
-      {!candidates.length && <p class="petit-texte">Aucune fourniture hors pièces dans ce costume.</p>}
+      {candidates.length > 0 && <p class="petit-texte">Une fourniture partagée (un ruban sur plusieurs pièces) : indique la quantité prise par celle-ci pour savoir ce qui reste.</p>}
+      {!candidates.length && <p class="petit-texte">Aucune fourniture disponible dans ce costume : « + Fourniture » en crée une pour cette pièce.</p>}
       <div class="attentes">
-        {candidates.map(f => (
-          <label class="case-ligne">
-            <input type="checkbox" checked={liste(f.piece_id).includes(pieceId)} onChange={e => basculer(f, (e.target as HTMLInputElement).checked)} />
-            <span>{f.libelle}<span class="petit-texte">{[f.quantite, f.unite].filter(Boolean).length ? ` · ${[f.quantite, f.unite].filter(Boolean).join(' ')}` : ''} · {f.statut || 'à acheter'}</span></span>
-          </label>
-        ))}
+        {candidates.map(f => {
+          const coche = liste(f.piece_id).includes(pieceId);
+          const autres = piecesDeFourniture(d, f).filter(p => p.id !== pieceId).map(p => p.nom);
+          const reste = texteReste(d, f);
+          const unite = uniteRepartition(f);
+          return (
+            <div class="ligne-fourniture-piece">
+              <label class="case-ligne">
+                <input type="checkbox" checked={coche} onChange={e => basculer(f, (e.target as HTMLInputElement).checked)} />
+                <span>{f.libelle}<span class="petit-texte">{[f.quantite, f.unite].filter(Boolean).length ? ` · ${[f.quantite, f.unite].filter(Boolean).join(' ')}` : ''} · {f.statut || 'à acheter'}{autres.length ? ` · aussi : ${autres.join(', ')}` : ''}{reste ? ` · ${reste}` : ''}</span></span>
+              </label>
+              {coche && (
+                <span class="quantite-piece">
+                  <input value={lireRepartition(f)[pieceId] ?? ''} inputMode="decimal" placeholder="tout" aria-label={`Quantité de ${f.libelle} pour ${piece.nom}`}
+                    onChange={e => quantite(f, (e.target as HTMLInputElement).value)} />
+                  {unite && <span class="petit-texte">{unite}</span>}
+                </span>
+              )}
+            </div>
+          );
+        })}
       </div>
+      {nouvelle && <EditeurFourniture costumeId={piece.costume_id} pieceId={pieceId} onFermer={() => setNouvelle(false)} />}
     </Feuille>
   );
 }

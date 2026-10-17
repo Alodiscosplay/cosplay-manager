@@ -3,8 +3,8 @@
 import { useState } from 'preact/hooks';
 import { donnees, faire } from '../store/store';
 import { costumes, piecesDe, piecesDeFourniture, tous, ligne } from '../logique/acces';
-import { montant, euros, texteQuantites, cleNom, type GroupeNom } from '../logique/budget';
-import { STATUTS_FOURNITURE, liste, type Ligne } from '../modele/schema';
+import { montant, euros, texteQuantites, cleNom, lireRepartition, uniteRepartition, texteReste, disponibleTexte, type GroupeNom } from '../logique/budget';
+import { STATUTS_FOURNITURE, liste, txtListe, type Ligne } from '../modele/schema';
 import { nouvelId, supprimer, retirerDeCommande } from '../store/operations';
 import { Feuille, Champ, Selection } from './base';
 import { Icone } from './Icone';
@@ -48,7 +48,14 @@ export function LigneFourniture({ f, afficherCostume, afficherFournisseur, selec
   const m = montant(f);
   const c = ligne(d, 'Costumes', f.costume_id);
   const four = afficherFournisseur ? ligne(d, 'Fournisseurs', f.fournisseur_id) : undefined;
-  const pieces = piecesDeFourniture(d, f).map(p => p.nom).join(', ');
+  // « Chapeau 3 m, Robe 2 m »
+  const rep = lireRepartition(f);
+  const unite = uniteRepartition(f);
+  const pieces = piecesDeFourniture(d, f).map(p => {
+    const q = (rep[p.id] ?? '').trim();
+    return `${p.nom}${q ? ` ${q}${/[a-zA-Z]/.test(q) || !unite ? '' : ` ${unite}`}` : ''}`;
+  }).join(', ');
+  const reste = texteReste(d, f);
   const statut = f.statut || 'à acheter';
   const quantite = [f.quantite, f.unite].filter(Boolean).join(' ');
   const titre = detail ? [afficherCostume && c?.nom, pieces || 'Général'].filter(Boolean).join(' · ') : f.libelle;
@@ -64,6 +71,7 @@ export function LigneFourniture({ f, afficherCostume, afficherFournisseur, selec
           {quantite && <span>{quantite}</span>}
           {!detail && afficherCostume && c && <span class="costume-nom">{c.nom}</span>}
           {!detail && pieces && <span>{pieces}</span>}
+          {reste && <span class={reste.startsWith('il manque') ? 'en-retard' : ''}>{reste}</span>}
           {four && <span class="fournisseur-nom">{four.nom}</span>}
           {enCommande(d, f) && <span><Icone nom="boite" taille={12} />en commande</span>}
         </span>
@@ -140,7 +148,6 @@ export function EditeurFourniture({ id, costumeId, pieceId, onFermer }: { id?: s
   const noms = [...new Map(toutes.map(f => [cleNom(f.libelle), (f.libelle ?? '').trim()])).values()].filter(Boolean).sort((a, b) => a.localeCompare(b, 'fr'));
   const unites = [...new Set(toutes.map(f => (f.unite ?? '').trim()).filter(Boolean))].sort();
   const memeNom = toutes.filter(f => f.id !== id && v.libelle.trim() && cleNom(f.libelle) === cleNom(v.libelle));
-  const plusieursPieces = liste(existant?.piece_id).length > 1; // ancienne saisie à plusieurs pièces
 
   // Un nom déjà connu : on reprend son unité, son prix, son fournisseur et son lien (modifiables).
   const choisirNom = (libelle: string) => {
@@ -180,12 +187,7 @@ export function EditeurFourniture({ id, costumeId, pieceId, onFermer }: { id?: s
         </Champ>
         <div class="deux-colonnes">
           <Champ label="Pour le costume">
-            <Selection label="Costume" valeur={v.costume_id} options={listeCostumes.map(c => [c.id, c.nom] as [string, string])} onChange={x => setV({ ...v, costume_id: x, piece_id: '' })} />
-          </Champ>
-          <Champ label="Pièce (facultatif)" aide={plusieursPieces ? `Saisie pour plusieurs pièces (${piecesDeFourniture(d, existant!).map(p => p.nom).join(', ')}) : choisir une pièce la rattache à elle seule.` : undefined}>
-            <Selection label="Pièce" valeur={plusieursPieces && liste(v.piece_id).length > 1 ? '__plusieurs' : v.piece_id}
-              options={[['', '— Général'], ...(plusieursPieces ? [['__plusieurs', 'Plusieurs pièces'] as [string, string]] : []), ...piecesDe(d, v.costume_id).map(p => [p.id, p.nom] as [string, string])]}
-              onChange={x => { if (x !== '__plusieurs') setV({ ...v, piece_id: x }); }} />
+            <Selection label="Costume" valeur={v.costume_id} options={listeCostumes.map(c => [c.id, c.nom] as [string, string])} onChange={x => setV({ ...v, costume_id: x, piece_id: '', repartition: '' })} />
           </Champ>
         </div>
         <div class="trois-colonnes">
@@ -196,6 +198,7 @@ export function EditeurFourniture({ id, costumeId, pieceId, onFermer }: { id?: s
           </Champ>
           <Champ label="Prix unitaire €"><input value={v.prix_unitaire} inputMode="decimal" placeholder="facultatif" onInput={change('prix_unitaire')} /></Champ>
         </div>
+        <ChoixPieces v={v} setV={setV} />
         <Champ label="Fournisseur">
           <Selection label="Fournisseur" valeur={v.fournisseur_id} onChange={x => setV({ ...v, fournisseur_id: x })}
             options={[['', '—'], ...tous(d, 'Fournisseurs').map(f => [f.id, f.nom] as [string, string]), ['__nouveau', '+ Nouveau fournisseur…']]} />
@@ -208,5 +211,47 @@ export function EditeurFourniture({ id, costumeId, pieceId, onFermer }: { id?: s
         )}
       </form>
     </Feuille>
+  );
+}
+
+/**
+ * Les pièces du costume qui utilisent la fourniture, avec la quantité prise par chacune. Une pièce
+ * ajoutée reçoit d'office tout ce qui reste ; une quantité vidée veut dire « en entier ».
+ */
+function ChoixPieces({ v, setV }: { v: Record<string, string>; setV: (x: Record<string, string>) => void }) {
+  const d = donnees.value;
+  const ids = liste(v.piece_id);
+  const rep = lireRepartition(v as unknown as Ligne);
+  const unite = uniteRepartition(v as unknown as Ligne);
+  const poser = (nouveauxIds: string[], nouvelleRep: Record<string, string>) => {
+    const garde = Object.fromEntries(nouveauxIds.filter(id => (nouvelleRep[id] ?? '').trim()).map(id => [id, nouvelleRep[id].trim()]));
+    setV({ ...v, piece_id: txtListe(nouveauxIds), repartition: Object.keys(garde).length ? JSON.stringify(garde) : '' });
+  };
+  const pieces = piecesDe(d, v.costume_id);
+  const nom = (id: string) => pieces.find(p => p.id === id)?.nom ?? '(pièce supprimée)';
+  const libres = pieces.filter(p => !ids.includes(p.id));
+  const actuelle = v as unknown as Ligne;
+  const reste = ids.length ? texteReste(d, actuelle) : '';
+  const ajouter = (id: string) => poser([...ids, id], { ...rep, [id]: disponibleTexte(d, actuelle) });
+  return (
+    <div class="champ">
+      <span class="champ-label">Pièces (facultatif)</span>
+      {ids.map(id => (
+        <div class="ligne-repartition">
+          <span class="repartition-piece">{nom(id)}</span>
+          <span class="repartition-saisie">
+            <input class="repartition-quantite" value={rep[id] ?? ''} inputMode="decimal" placeholder="tout" aria-label={`Quantité pour ${nom(id)}`}
+              onInput={e => poser(ids, { ...rep, [id]: (e.target as HTMLInputElement).value })} />
+            {unite && <span class="petit-texte">{unite}</span>}
+          </span>
+          <button type="button" class="bouton-icone petit" aria-label={`Retirer ${nom(id)}`} onClick={() => poser(ids.filter(x => x !== id), rep)}><Icone nom="croix" taille={16} /></button>
+        </div>
+      ))}
+      {libres.length > 0 && (
+        <Selection label="Ajouter une pièce" valeur="" options={[['', ids.length ? '+ Une autre pièce…' : '— Général (aucune pièce) · + Ajouter une pièce…'], ...libres.map(p => [p.id, p.nom] as [string, string])]}
+          onChange={x => x && ajouter(x)} />
+      )}
+      {reste && <span class={`champ-aide${reste.startsWith('il manque') ? ' en-retard' : ''}`}>{reste}</span>}
+    </div>
   );
 }

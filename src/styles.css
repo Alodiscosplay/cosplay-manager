@@ -635,3 +635,23 @@ dialog.feuille::backdrop { background: rgb(20 12 28 / 45%); }
   background: none; border: 0; color: inherit; font: inherit; text-align: left; cursor: pointer; }
 .bloc-activite-nom { font-weight: 600; }
 .bloc-activite-corps { display: flex; flex-direction: column; gap: 12px; padding: 0 12px 12px; }
+.chiffre-detail { border: 0; background: none; padding: 0; color: inherit; font: inherit; text-align: left; cursor: pointer;
+  text-decoration: underline dotted; text-underline-offset: 4px; text-decoration-color: var(--doux); }
+.chiffre-detail:hover, .chiffre-detail:focus-visible { color: var(--accent); text-decoration-color: var(--accent); }
+.tuile-chiffre .chiffre-detail { font-size: 1.35rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.releve-groupe { display: flex; flex-direction: column; gap: 4px; }
+.releve { list-style: none; margin: 0; padding: 0 0 0 12px; border-left: 2px solid var(--bord); display: flex; flex-direction: column; gap: 4px; }
+.releve-ligne { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin: 0; }
+.releve-ligne .montant { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.releve-ligne .sans-prix { color: var(--doux); font-style: italic; }
+.releve-tete { font-size: .95rem; }
+.releve-ligne.port { color: var(--doux); }
+.releve-total { border-top: 1px solid var(--bord); padding-top: 8px; font-weight: 700; }
+.ligne-repartition { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.ligne-repartition .repartition-piece { flex: 1 1 8em; min-width: 8em; overflow-wrap: anywhere; }
+.repartition-saisie { display: inline-flex; align-items: center; gap: 6px; flex: none; }
+.ligne-repartition input.repartition-quantite, .quantite-piece input { width: 6.5em; min-width: 0; flex: none; }
+.ligne-fourniture-piece { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
+.ligne-fourniture-piece .case-ligne { flex: 1 1 260px; }
+.quantite-piece { display: inline-flex; align-items: center; gap: 6px; margin-left: 32px; }
+

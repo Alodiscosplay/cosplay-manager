@@ -1,6 +1,6 @@
 // Budget et liste d'achats. Les prix sont facultatifs partout.
-import { type Donnees, type Ligne, num, vivant } from '../modele/schema';
-import { costumes, fournituresDe, tous, ligne } from './acces';
+import { type Donnees, type Ligne, num, vivant, liste } from '../modele/schema';
+import { costumes, fournituresDe, tous, ligne, piecesDeFourniture } from './acces';
 
 /** Lit une quantité telle qu'on l'écrit vraiment : « 1,5 », « 1m20 » (= 1,20), « 4 paires ». Vide = 1. */
 export function quantiteNombre(q: string | undefined): number {
@@ -44,6 +44,40 @@ export function budgetCostume(d: Donnees, costumeId: string): Budget {
     if (f.statut === 'reçu') b.recu += m;
   }
   return b;
+}
+
+// ---------- Relevé : le détail d'un chiffre du budget ----------
+
+export interface LigneReleve { fourniture: Ligne; montant: number | null; port: number }
+export interface GroupeReleve { commande: Ligne | null; fournisseur: Ligne | null; date: string; lignes: LigneReleve[]; articles: number; port: number; total: number }
+
+/**
+ * Le détail d'un chiffre du budget, comme un relevé de compte : les fournitures du costume aux statuts
+ * donnés, regroupées par commande (date, fournisseur, part des frais de port), dans l'ordre des dates ;
+ * celles qui ne sont dans aucune commande viennent à la fin. Mêmes règles que budgetCostume : les
+ * « déjà là » ne comptent pas. La somme des totaux est le chiffre de la tuile.
+ */
+export function releveBudget(d: Donnees, costumeId: string, statuts: string[]): GroupeReleve[] {
+  const groupes = new Map<string, GroupeReleve>();
+  for (const f of fournituresDe(d, costumeId)) {
+    const statut = f.statut || 'à acheter';
+    if (statut === 'déjà là' || !statuts.includes(statut)) continue;
+    const cmd = ligne(d, 'Commandes', f.commande_id) ?? null;
+    const cle = cmd?.id ?? '';
+    if (!groupes.has(cle)) {
+      const fournisseur = ligne(d, 'Fournisseurs', cmd ? cmd.fournisseur_id : '') ?? null;
+      groupes.set(cle, { commande: cmd, fournisseur, date: cmd?.date ?? '', lignes: [], articles: 0, port: 0, total: 0 });
+    }
+    const g = groupes.get(cle)!;
+    const m = montant(f);
+    const port = partFraisPort(d, f);
+    g.lignes.push({ fourniture: f, montant: m, port });
+    g.articles += m ?? 0;
+    g.port += port;
+    g.total += (m ?? 0) + port;
+  }
+  for (const g of groupes.values()) g.lignes.sort((a, b) => cleNom(a.fourniture.libelle).localeCompare(cleNom(b.fourniture.libelle), 'fr'));
+  return [...groupes.values()].sort((a, b) => (a.commande ? 0 : 1) - (b.commande ? 0 : 1) || a.date.localeCompare(b.date));
 }
 
 /**
@@ -200,4 +234,93 @@ export function texteQuantites(q: Quantite[]): string {
     if (x.famille === 'volume') return x.total >= 1000 ? `${nombre(x.total / 1000, 2)} l` : `${nombre(x.total, 0)} ml`;
     return nombre(x.total, 2) + (x.unite ? ` ${x.unite}` : '');
   }).join(' + ');
+}
+
+// ---------- Une fourniture répartie entre plusieurs pièces ----------
+// Une fourniture est ce qu'on achète (un lot de 10 m de ruban, 2 lots de 20 boutons) ; elle peut se
+// répartir entre plusieurs pièces de son costume, avec la quantité prise par chacune (colonne
+// `repartition` : { idPièce: « 3 » }). Les pièces font foi : `piece_id` en donne la liste, une quantité
+// pour une pièce qui n'y est plus est ignorée. Entre costumes, rien ne se partage ici : c'est la
+// commande et le regroupement par nom des Achats qui réunissent les besoins.
+
+/** Le contenu acheté : 10 × m → 10 m ; 2 × « lot de 20 » → 40 ; 2 × « lot de 20 boutons » → 40 boutons. */
+export function contenu(f: Ligne): Quantite {
+  const m = mesure(f);
+  if (m.famille) return m;
+  const lot = /(\d+(?:[.,]\d+)?)\s*([a-zA-Zéèêàâîôû]*)/.exec(f.unite ?? '');
+  if (lot) return { unite: lot[2], total: quantiteNombre(f.quantite) * num(lot[1]) };
+  return m;
+}
+
+/** L'unité dans laquelle on saisit la quantité d'une pièce : celle de l'achat (m, g…), ou ce que contient le lot. */
+export function uniteRepartition(f: Ligne): string {
+  const c = contenu(f);
+  if (c.famille) {
+    const u = (f.unite ?? '').trim();
+    return uniteConnue(u) ? u : c.famille === 'longueur' ? 'm' : c.famille === 'masse' ? 'g' : 'ml';
+  }
+  return c.unite;
+}
+
+export function lireRepartition(f: Ligne): Record<string, string> {
+  try {
+    const v = JSON.parse(f.repartition || '{}');
+    return v && typeof v === 'object' && !Array.isArray(v) ? v : {};
+  } catch { return {}; }
+}
+
+/** Une quantité saisie pour une pièce, dans la base du contenu (« 50 cm » → 0,5 si l'achat est en mètres). */
+export function quantitePiece(f: Ligne, texte: string | undefined): number | null {
+  const s = (texte ?? '').trim();
+  if (!s) return null;
+  const c = contenu(f);
+  const n = quantiteNombre(s);
+  if (/^\d+\s*m\s*\d/.test(s.toLowerCase())) return n; // « 1m20 » : déjà en mètres
+  const u = /^\s*\d+(?:[.,]\d+)?\s*([a-zA-Zéèêàâîôû]+)/.exec(s)?.[1];
+  const connue = u ? uniteConnue(u) : undefined;
+  if (c.famille && connue && connue[0] === c.famille) return n * connue[1];
+  if (c.famille) return n * (uniteConnue(uniteRepartition(f))?.[1] ?? 1);
+  return n;
+}
+
+export interface Bilan { contenu: Quantite; utilise: number; complet: boolean; reste: number | null }
+
+/** Ce qui est pris par les pièces, et ce qui reste quand toutes les quantités sont connues. */
+export function bilan(d: Donnees, f: Ligne): Bilan {
+  const c = contenu(f);
+  const rep = lireRepartition(f);
+  let utilise = 0, complet = true;
+  for (const p of piecesDeFourniture(d, f)) {
+    const q = quantitePiece(f, rep[p.id]);
+    if (q === null) complet = false; else utilise += q;
+  }
+  return { contenu: c, utilise, complet, reste: complet ? Math.round((c.total - utilise) * 1e6) / 1e6 : null };
+}
+
+/** Ce qu'on peut encore prendre pour une nouvelle pièce : tout le contenu, ou ce qui reste ('' si inconnu ou épuisé). */
+export function disponibleTexte(d: Donnees, f: Ligne): string {
+  const b = bilan(d, f);
+  const libre = piecesDeFourniture(d, f).length ? b.reste : b.contenu.total;
+  if (libre === null || libre <= 1e-9) return '';
+  const base = b.contenu.famille ? uniteConnue(uniteRepartition(f))?.[1] ?? 1 : 1;
+  const n = Math.round((libre / base) * 1000) / 1000;
+  return String(n).replace('.', ',');
+}
+
+/** « reste 4 m », « il manque 2 m », ou rien si une quantité manque. */
+export function texteReste(d: Donnees, f: Ligne): string {
+  const b = bilan(d, f);
+  if (b.reste === null || !piecesDeFourniture(d, f).length) return '';
+  const q = (n: number) => texteQuantites([{ ...b.contenu, total: n }]);
+  return b.reste > 0 ? `reste ${q(b.reste)}` : b.reste < 0 ? `il manque ${q(-b.reste)}` : 'tout est utilisé';
+}
+
+/**
+ * Peut-on encore la prendre pour cette pièce ? Oui si elle n'est rattachée à rien, si elle l'est déjà à
+ * cette pièce, ou s'il en reste. Une fourniture prise en entier (une pièce sans quantité) n'est plus proposée.
+ */
+export function disponiblePour(d: Donnees, f: Ligne, pieceId: string): boolean {
+  if (!piecesDeFourniture(d, f).length || liste(f.piece_id).includes(pieceId)) return true;
+  const reste = bilan(d, f).reste;
+  return reste !== null && reste > 1e-9;
 }
