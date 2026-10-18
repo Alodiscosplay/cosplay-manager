@@ -11,7 +11,7 @@ export const TABLES = {
   // Costumes.evenement_id peut lister plusieurs événements (un costume porté à plusieurs).
   Evenements: ['nom', 'date_debut', 'date_fin', 'lieu', 'notes', 'activite', 'convention_id', 'lien'],
   Pieces: ['costume_id', 'nom', 'statut', 'debut', 'deadline', 'attend', 'patron', 'notes', 'ordre', 'ordre_planning',
-    'partie_wip', 'origine', 'origine_detail', 'materiaux', 'techniques'],
+    'partie_wip', 'origine', 'origine_detail', 'materiaux', 'techniques', 'ampleur', 'preparation_finie'],
   Pistes: ['piece_id', 'nom', 'pause', 'libre', 'debut', 'deadline', 'attend', 'ordre'],
   Etapes: ['piste_id', 'piece_id', 'titre', 'detail', 'duree', 'poids', 'attend', 'fait', 'fait_le',
     'date_prevue', 'deadline', 'ordre', 'urgent'],

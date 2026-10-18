@@ -4,7 +4,7 @@ import Sortable from 'sortablejs';
 import { annulerDeplacementDom } from '../../composants/glisser';
 import { donnees, jour, faire } from '../../store/store';
 import { piecesDe, pistesDe, etapesDePiste, idsAttendus } from '../../logique/acces';
-import { avancementPiece, avancementPiste, poids } from '../../logique/avancement';
+import { avancementPiece, avancementPiste, poids, poidsPiece } from '../../logique/avancement';
 import { statutPiece, statutStockePiece, champsStatutPiece, pisteEnPause, champsPausePiste, etatPiste, attentes, texteAttente } from '../../logique/disponibilite';
 import { jourCourt, relatif, lireJour } from '../../logique/dates';
 import { DUREES, NOMS_DUREES, bool, txtBool, type Duree, type Ligne } from '../../modele/schema';
@@ -93,6 +93,7 @@ function CartePiece({ piece, ouvrir }: { piece: Ligne; ouvrir: (o: Ouvert) => vo
   const [nouvellePiste, setNouvellePiste] = useState('');
   const conteneur = useRef<HTMLDivElement>(null);
   const a = avancementPiece(d, piece.id);
+  const pesee = poidsPiece(d, piece);
   const pistes = pistesDe(d, piece.id);
   const att = attentes(d, piece);
   const dl = lireJour(piece.deadline);
@@ -157,6 +158,14 @@ function CartePiece({ piece, ouvrir }: { piece: Ligne; ouvrir: (o: Ouvert) => vo
         <Barre a={a} fine />
         <div class="puces">
           {sp === 'terminée' && <Puce ton="vert">terminée</Puce>}
+          {/* Ce que pèse la pièce dans le % du costume : son ampleur estimée, ou ses sous-étapes une fois préparées. */}
+          {pesee.source === 'sous-étapes'
+            ? <Puce ton="gris" titre="Préparation des sous-étapes terminée : dans le % du costume, la pièce compte pour le poids de ses sous-étapes.">
+                poids réel : {Math.round(pesee.poids * 10) / 10}
+              </Puce>
+            : <Puce ton="gris" titre="Dans le % du costume, la pièce compte pour son ampleur estimée tant que la préparation de ses sous-étapes n'est pas terminée (fiche de la pièce).">
+                poids estimé : {pesee.ampleur} ({pesee.poids})
+              </Puce>}
           {debutFutur && <Puce ton="gris"><Icone nom="horloge" taille={12} />reprend le {jourCourt(debutFutur)}</Puce>}
           {dl && <Puce ton={dl < j && a.pct !== 100 ? 'rouge' : 'gris'}><Icone nom="drapeau" taille={12} />{jourCourt(dl)} · {relatif(dl, j)}</Puce>}
           {piece.patron

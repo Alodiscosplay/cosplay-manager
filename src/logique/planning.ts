@@ -1,7 +1,7 @@
 // Planification : répartir les étapes jusqu'à une deadline, repérer le retard, alimenter l'agenda.
 import { type Donnees, type Ligne, bool, vivant } from '../modele/schema';
 import { costumes, piecesDe, pistesDe, etapesDePiste, etapesDePiece, ligne, idsAttendus } from './acces';
-import { poids, avancement } from './avancement';
+import { poids, avancement, avancementCostume } from './avancement';
 import { lireJour, ajouterJours, ecartJours, jourCourt, type Jour } from './dates';
 import { statutCostume, pieceTerminee } from './disponibilite';
 import { dateEvenementCostume, evenementsDe, natureDe, nomEvenement } from './evenements';
@@ -215,7 +215,7 @@ export function alertes(d: Donnees, jour: Jour, joursAvant = 14, joursRouge = 3)
     const sc = statutCostume(c, jour);
     if (sc === 'terminé' || sc === 'archivé') continue;
     const dc = deadlineCostume(d, c);
-    const av = avancement(piecesDe(d, c.id).flatMap(p => etapesDePiece(d, p.id)));
+    const av = avancementCostume(d, c.id);
     if (dc && proche(dc) && av.pct !== 100) {
       res.push({ niveau: niveau(dc), costumeId: c.id,
         texte: dc < jour ? `${c.nom} : deadline dépassée (${jourCourt(dc, jour)})` : `${c.nom} : deadline le ${jourCourt(dc, jour)}` });

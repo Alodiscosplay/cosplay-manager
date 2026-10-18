@@ -1,6 +1,6 @@
 import { useState } from 'preact/hooks';
 import { donnees, jour, faire } from '../store/store';
-import { ligne, costumes, piecesDe } from '../logique/acces';
+import { ligne, costumes, piecesDe, etapesDePiece } from '../logique/acces';
 import { avancementCostume } from '../logique/avancement';
 import { statutCostume, pieceTerminee } from '../logique/disponibilite';
 import { deadlineCostume } from '../logique/planning';
@@ -40,6 +40,8 @@ export function PageCostume({ id, onglet = 'pieces' }: { id: string; onglet?: st
   const a = avancementCostume(d, id);
   const piecesCostume = piecesDe(d, id);
   const nbTerminees = piecesCostume.filter(p => pieceTerminee(d, p.id)).length;
+  // Pièces qui ont des sous-étapes mais ne comptent pas encore par elles dans le % du costume.
+  const aPreparer = piecesCostume.filter(p => !bool(p.preparation_finie) && etapesDePiece(d, p.id).length > 0);
   const sc = statutCostume(c, jour.value);
   const dl = deadlineCostume(d, c);
   // Sans deadline propre, c'est le premier événement où il est porté qui la donne : on le nomme.
@@ -86,6 +88,9 @@ export function PageCostume({ id, onglet = 'pieces' }: { id: string; onglet?: st
             <Menu actions={[
               { texte: 'Modifier la fiche', icone: 'crayon', faire: () => setFiche(true) },
               sc !== 'terminé' && { texte: 'Marquer terminé', icone: 'afaire', faire: () => maj('Costumes', id, { statut: 'terminé' }) },
+              aPreparer.length > 0 && { texte: 'Préparation terminée pour toutes les pièces', icone: 'afaire',
+                faire: () => faire(aPreparer.map(p => ({ table: 'Pieces' as const, id: p.id, champs: { preparation_finie: 'oui' } })),
+                  `Préparation terminée pour ${aPreparer.length} pièce${aPreparer.length > 1 ? 's' : ''}`) },
               { texte: 'Réaliser une sauvegarde', icone: 'telecharger', faire: () => setSauvegarde('sauvegarde') },
               sc === 'terminé' && { texte: 'Archiver définitivement', icone: 'archive', faire: () => setSauvegarde('archive') },
               { texte: 'Supprimer le costume', icone: 'poubelle', danger: true, faire: () => setSuppression(true) },

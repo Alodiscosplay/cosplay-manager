@@ -13,6 +13,7 @@ import { supprimer, insererModele, ajouterModeleDansPiste, deplacerEtape, cocher
 import { Feuille, Champ, Texte, ChoixDate, Selection } from '../../composants/base';
 import { maj } from '../Costume';
 import { partieDe, PARTIES } from '../../export/dossierWip';
+import { NOMS_AMPLEURS, poidsPiece, ampleurDe } from '../../logique/avancement';
 import { Icone } from '../../composants/Icone';
 import { EditeurFourniture } from '../../composants/Fournitures';
 
@@ -64,6 +65,31 @@ export function EditeurEtape({ id, onFermer }: { id: string; onFermer: () => voi
 
 // ---------- Pièce ----------
 
+/**
+ * Ce que pèse la pièce dans le % du costume : son ampleur estimée tant que ses sous-étapes ne sont pas
+ * toutes préparées, puis le poids de ses sous-étapes une fois la case cochée.
+ */
+function PoidsDansLeCostume({ p, m }: { p: Ligne; m: (champs: Record<string, string>) => void }) {
+  const d = donnees.value;
+  const w = poidsPiece(d, p);
+  const n = Math.round(w.poids * 10) / 10;
+  const actuel = w.source === 'sous-étapes' ? `le poids de ses sous-étapes (${n})`
+    : `son ampleur estimée, ${w.ampleur} (${n})`;
+  return (
+    <>
+      <Champ label="Ampleur estimée (pour le % du costume)"
+        aide="Tant que la préparation n'est pas terminée : petite ≈ coiffer une perruque, moyenne ≈ un chapeau, grande ≈ un corset, très grande ≈ une robe brodée.">
+        <Selection label="Ampleur estimée" valeur={ampleurDe(p)} options={NOMS_AMPLEURS.map(a => [a, a] as [string, string])} onChange={v => m({ ampleur: v })} />
+      </Champ>
+      <label class="interrupteur">
+        <input type="checkbox" checked={bool(p.preparation_finie)} onChange={e => m({ preparation_finie: (e.target as HTMLInputElement).checked ? 'oui' : '' })} />
+        <span>Préparation des sous-étapes terminée</span>
+      </label>
+      <p class="petit-texte">Cochée, la pièce pèse ses sous-étapes dans le % du costume ; sinon, son ampleur estimée. Aujourd'hui, elle compte pour {actuel}.</p>
+    </>
+  );
+}
+
 export function EditeurPiece({ id, onFermer }: { id: string; onFermer: () => void }) {
   const d = donnees.value;
   const p = d.Pieces[id];
@@ -81,6 +107,7 @@ export function EditeurPiece({ id, onFermer }: { id: string; onFermer: () => voi
       <Champ label="Statut" aide="Seules les pièces « en cours » alimentent « À faire ».">
         <Selection label="Statut" valeur={statutStockePiece(p)} options={STATUTS_PIECE} onChange={v => m(champsStatutPiece(p, v, jour.value))} />
       </Champ>
+      <PoidsDansLeCostume p={p} m={m} />
       <div class="deux-colonnes">
         <Champ label="Début (facultatif)" aide="Une pièce en pause passe en cours toute seule ce jour-là.">
           <ChoixDate label="date de début" valeur={p.debut ?? ''} onChange={v => m({ debut: v })} />
