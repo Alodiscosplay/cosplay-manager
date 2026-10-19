@@ -654,4 +654,11 @@ dialog.feuille::backdrop { background: rgb(20 12 28 / 45%); }
 .ligne-fourniture-piece { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
 .ligne-fourniture-piece .case-ligne { flex: 1 1 260px; }
 .quantite-piece { display: inline-flex; align-items: center; gap: 6px; margin-left: 32px; }
+.options-avancees { border: 1px solid var(--bord); border-radius: var(--rayon); padding: 8px 12px; display: flex; flex-direction: column; gap: 8px; }
+.options-avancees summary { cursor: pointer; color: var(--doux); font-size: .9rem; }
+.ligne-attribution { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 6px; }
+.ligne-attribution input { width: 7em; flex: none; }
+.champ-reduction { display: flex; align-items: center; gap: 6px; }
+.champ-reduction input { flex: 1; min-width: 0; }
+.segments.petits button { padding: 4px 10px; min-height: 0; }
 

@@ -35,8 +35,8 @@ export function budgetCostume(d: Donnees, costumeId: string): Budget {
     if (f.statut === 'déjà là') continue;
     const prix = montant(f);
     if (prix === null) b.sansPrix++;
-    // la part des frais de port de sa commande compte avec la fourniture
-    const m = (prix ?? 0) + partFraisPort(d, f);
+    // sa part des frais de sa commande (port, douane, moins le bon de réduction) compte avec elle
+    const m = (prix ?? 0) + fraisDeLigne(d, f);
     if (!m) continue;
     b.total += m;
     if ((f.statut || 'à acheter') === 'à acheter') b.prevu += m;
@@ -48,8 +48,8 @@ export function budgetCostume(d: Donnees, costumeId: string): Budget {
 
 // ---------- Relevé : le détail d'un chiffre du budget ----------
 
-export interface LigneReleve { fourniture: Ligne; montant: number | null; port: number }
-export interface GroupeReleve { commande: Ligne | null; fournisseur: Ligne | null; date: string; lignes: LigneReleve[]; articles: number; port: number; total: number }
+export interface LigneReleve { fourniture: Ligne; montant: number | null; port: number; douane: number; reduction: number }
+export interface GroupeReleve { commande: Ligne | null; fournisseur: Ligne | null; date: string; lignes: LigneReleve[]; articles: number; port: number; douane: number; reduction: number; total: number }
 
 /**
  * Le détail d'un chiffre du budget, comme un relevé de compte : les fournitures du costume aux statuts
@@ -66,15 +66,17 @@ export function releveBudget(d: Donnees, costumeId: string, statuts: string[]): 
     const cle = cmd?.id ?? '';
     if (!groupes.has(cle)) {
       const fournisseur = ligne(d, 'Fournisseurs', cmd ? cmd.fournisseur_id : '') ?? null;
-      groupes.set(cle, { commande: cmd, fournisseur, date: cmd?.date ?? '', lignes: [], articles: 0, port: 0, total: 0 });
+      groupes.set(cle, { commande: cmd, fournisseur, date: cmd?.date ?? '', lignes: [], articles: 0, port: 0, douane: 0, reduction: 0, total: 0 });
     }
     const g = groupes.get(cle)!;
     const m = montant(f);
-    const port = partFraisPort(d, f);
-    g.lignes.push({ fourniture: f, montant: m, port });
+    const port = partFraisPort(d, f), douane = partDouane(d, f), reduction = partReduction(d, f);
+    g.lignes.push({ fourniture: f, montant: m, port, douane, reduction });
     g.articles += m ?? 0;
     g.port += port;
-    g.total += (m ?? 0) + port;
+    g.douane += douane;
+    g.reduction += reduction;
+    g.total += (m ?? 0) + port + douane - reduction;
   }
   for (const g of groupes.values()) g.lignes.sort((a, b) => cleNom(a.fourniture.libelle).localeCompare(cleNom(b.fourniture.libelle), 'fr'));
   return [...groupes.values()].sort((a, b) => (a.commande ? 0 : 1) - (b.commande ? 0 : 1) || a.date.localeCompare(b.date));
@@ -92,18 +94,98 @@ export function partFraisPort(d: Donnees, f: Ligne): number {
   return port / Math.max(1, lignesCommande(d, cmd.id).length);
 }
 
+/**
+ * Les frais d'importation / de douane d'une commande : ce qu'on a attribué à un article lui revient ;
+ * le reste se partage à parts égales entre les articles sans attribution (tous, si rien n'est attribué).
+ */
+export function partDouane(d: Donnees, f: Ligne): number {
+  const cmd = ligne(d, 'Commandes', f.commande_id);
+  if (!cmd || !num(cmd.frais_douane)) return 0;
+  const ids = lignesCommande(d, cmd.id).map(l => l.id);
+  return repartirDouane(num(cmd.frais_douane), ids, lireJson(cmd.douane_repartition))[f.id] ?? 0;
+}
+
+/** La taxe / douane article par article : ce qui est attribué, et le reste à parts égales entre les autres. */
+export function repartirDouane(total: number, ids: string[], rep: Record<string, string>): Record<string, number> {
+  const attribue = (id: string) => (rep[id] ?? '').trim() !== '';
+  const libres = ids.filter(id => !attribue(id));
+  const deja = ids.filter(attribue).reduce((s, id) => s + num(rep[id]), 0);
+  const part = libres.length ? Math.max(0, total - deja) / libres.length : 0;
+  return Object.fromEntries(ids.map(id => [id, attribue(id) ? num(rep[id]) : part]));
+}
+
+/** Ce qui reste des frais de douane à attribuer, une fois les montants saisis article par article. */
+export function douaneNonAttribuee(d: Donnees, commandeId: string): number {
+  const cmd = ligne(d, 'Commandes', commandeId);
+  if (!cmd) return 0;
+  const rep = lireJson(cmd.douane_repartition);
+  const ids = new Set(lignesCommande(d, commandeId).map(l => l.id));
+  const deja = Object.entries(rep).filter(([id, v]) => ids.has(id) && (v ?? '').trim()).reduce((s, [, v]) => s + num(v), 0);
+  return Math.round((num(cmd.frais_douane) - deja) * 100) / 100;
+}
+
+/** Un bon de réduction : « 5 » (€) ou « 10 % ». */
+export function lireReduction(v: string | undefined): { montant: number } | { pct: number } | null {
+  const s = (v ?? '').trim();
+  if (!s) return null;
+  if (s.endsWith('%')) { const p = num(s.slice(0, -1)); return p ? { pct: p } : null; }
+  const m = num(s);
+  return m ? { montant: m } : null;
+}
+
+/** Les articles concernés par le bon : ceux qu'on a choisis, ou tous. */
+export function articlesReduction(lignes: Ligne[], choisis: string[]): Ligne[] {
+  const retenus = lignes.filter(l => choisis.includes(l.id));
+  return retenus.length ? retenus : lignes;
+}
+
+/**
+ * Le bon article par article : en pourcentage, sur le prix de chacun ; en euros, au prorata du prix des
+ * articles concernés (à parts égales s'ils n'ont pas de prix). Un article hors du bon : 0.
+ */
+export function repartirReduction(reduction: string | undefined, lignes: Ligne[], choisis: string[]): Record<string, number> {
+  const r = lireReduction(reduction);
+  const res: Record<string, number> = Object.fromEntries(lignes.map(l => [l.id, 0]));
+  if (!r) return res;
+  const concernes = articlesReduction(lignes, choisis);
+  const base = concernes.reduce((s, l) => s + (montant(l) ?? 0), 0);
+  for (const l of concernes) {
+    res[l.id] = 'pct' in r ? ((montant(l) ?? 0) * r.pct) / 100
+      : base > 0 ? (r.montant * (montant(l) ?? 0)) / base : r.montant / concernes.length;
+  }
+  return res;
+}
+
+export function partReduction(d: Donnees, f: Ligne): number {
+  const cmd = ligne(d, 'Commandes', f.commande_id);
+  if (!cmd || !lireReduction(cmd.reduction)) return 0;
+  return repartirReduction(cmd.reduction, lignesCommande(d, cmd.id), liste(cmd.reduction_articles))[f.id] ?? 0;
+}
+
+/** Tout ce que la commande ajoute (ou retire) au prix d'un article : port + douane − réduction. */
+export function fraisDeLigne(d: Donnees, f: Ligne): number {
+  return partFraisPort(d, f) + partDouane(d, f) - partReduction(d, f);
+}
+
+export function lireJson(v: string | undefined): Record<string, string> {
+  try { const x = JSON.parse(v || '{}'); return x && typeof x === 'object' && !Array.isArray(x) ? x : {}; } catch { return {}; }
+}
+
 export function lignesCommande(d: Donnees, commandeId: string): Ligne[] {
   return tous(d, 'Fournitures').filter(f => f.commande_id === commandeId);
 }
 
-export function totalCommande(d: Donnees, commandeId: string): { articles: number; port: number; total: number; sansPrix: number } {
-  let articles = 0, sansPrix = 0;
+export function totalCommande(d: Donnees, commandeId: string): { articles: number; port: number; douane: number; reduction: number; total: number; sansPrix: number } {
+  let articles = 0, sansPrix = 0, reduction = 0;
   for (const f of lignesCommande(d, commandeId)) {
     const m = montant(f);
     if (m === null) sansPrix++; else articles += m;
+    reduction += partReduction(d, f);
   }
   const port = num(d.Commandes[commandeId]?.frais_port);
-  return { articles, port, total: articles + port, sansPrix };
+  const douane = num(d.Commandes[commandeId]?.frais_douane);
+  reduction = Math.round(reduction * 100) / 100;
+  return { articles, port, douane, reduction, total: articles + port + douane - reduction, sansPrix };
 }
 
 // ---------- Fournitures hors costume : stock et divers ----------

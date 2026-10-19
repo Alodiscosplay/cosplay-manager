@@ -294,7 +294,6 @@ function LigneEtape({ etape, suivante, ouvrir }: { etape: Ligne; suivante: boole
 
   return (
     <li class={`etape${fait ? ' faite' : ''}${suivante ? ' suivante' : ''}`} data-id={etape.id}>
-      <span class="poignee" aria-label="Déplacer la sous-étape" title="Glisser pour réordonner ou changer d'étape"><Icone nom="poignee" taille={16} /></span>
       <Case coche={fait} label={etape.titre} onChange={v => faire(cocherEtape(d, etape.id, v, j))} />
       <button class="etape-texte" onClick={ouvrir}>
         <span class="etape-titre">{etape.titre}</span>
@@ -304,6 +303,8 @@ function LigneEtape({ etape, suivante, ouvrir }: { etape: Ligne; suivante: boole
           {etape.detail && <span class="a-detail" title={etape.detail}>note</span>}
         </span>
       </button>
+      {/* Entre le nom et le poids : la poignée pour changer l'ordre. */}
+      <span class="poignee" aria-label="Déplacer la sous-étape" title="Glisser pour réordonner ou changer d'étape"><Icone nom="poignee" taille={16} /></span>
       <ChoixDuree etape={etape} />
     </li>
   );

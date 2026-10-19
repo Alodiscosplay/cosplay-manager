@@ -52,7 +52,7 @@ function FeuilleReleve({ costume, releve, onFermer }: { costume: Ligne; releve: 
     : releve.statuts.length === 1 && releve.statuts[0] === 'à acheter' ? 'Encore à acheter' : 'Hors commande';
   return (
     <Feuille titre={`${releve.titre} — ${costume.nom}`} onFermer={onFermer} pied={<button class="bouton principal" onClick={onFermer}>Fermer</button>}>
-      <p class="petit-texte">Le détail : {releve.quoi}, avec la part des frais de port de chaque commande.</p>
+      <p class="petit-texte">Le détail : {releve.quoi}, avec la part des frais de chaque commande (port, taxe / douane, bon de réduction).</p>
       {!groupes.length && <p class="petit-texte">Rien pour l'instant.</p>}
       {groupes.map(g => (
         <section class="releve-groupe">
@@ -68,7 +68,9 @@ function FeuilleReleve({ costume, releve, onFermer }: { costume: Ligne; releve: 
                 </li>
               );
             })}
-            {g.port > 0 && <li class="releve-ligne port"><span>Frais de port<span class="petit-texte">· part de ce costume</span></span><span class="montant">{euros(g.port)}</span></li>}
+            {g.port > 0 && <li class="releve-ligne port"><span>Frais de port <span class="petit-texte">· part de ce costume</span></span><span class="montant">{euros(g.port)}</span></li>}
+            {g.douane > 0 && <li class="releve-ligne port"><span>Taxe / douane <span class="petit-texte">· part de ce costume</span></span><span class="montant">{euros(g.douane)}</span></li>}
+            {g.reduction > 0 && <li class="releve-ligne port"><span>Bon de réduction <span class="petit-texte">· part de ce costume</span></span><span class="montant">−{euros(g.reduction)}</span></li>}
           </ul>
         </section>
       ))}

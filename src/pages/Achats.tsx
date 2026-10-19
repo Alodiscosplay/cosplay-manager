@@ -1,12 +1,12 @@
-import { useState } from 'preact/hooks';
+import { useEffect, useState } from 'preact/hooks';
 import { donnees, jour, faire } from '../store/store';
 import { costumes, tous, ligne } from '../logique/acces';
-import { regrouperAchats, SANS_FOURNISSEUR, type GroupementAchats, regrouperParNom, lignesCommande, totalCommande, euros, montant, HORS_COSTUME, nomDestination } from '../logique/budget';
+import { regrouperAchats, SANS_FOURNISSEUR, type GroupementAchats, regrouperParNom, lignesCommande, totalCommande, euros, montant, HORS_COSTUME, nomDestination, repartirDouane, repartirReduction, lireJson } from '../logique/budget';
 import { jourCourt } from '../logique/dates';
-import { STATUTS_FOURNITURE, STATUTS_COMMANDE, type Ligne } from '../modele/schema';
-import { creerCommandes, changerStatutCommande, supprimer, purger, retirerDeCommande, nouvelId } from '../store/operations';
+import { STATUTS_FOURNITURE, STATUTS_COMMANDE, liste, txtListe, num, type Ligne } from '../modele/schema';
+import { creerCommandes, changerStatutCommande, supprimer, purger, retirerDeCommande, nouvelId, type FraisCommande } from '../store/operations';
 import { GroupeFourniture, EditeurFourniture } from '../composants/Fournitures';
-import { Feuille, Champ, Texte, Selection, Puce, Vide, Menu } from '../composants/base';
+import { Feuille, Champ, Texte, Selection, Puce, Vide, Menu, ChoixDate } from '../composants/base';
 import { Icone } from '../composants/Icone';
 import { IndicateurSync } from '../app';
 import { lienCostume } from '../routeur';
@@ -53,8 +53,8 @@ function ListeCourses() {
   const selectionnables = (g: Ligne[]) => g.filter(f => !f.commande_id || !ligne(d, 'Commandes', f.commande_id));
 
   const [preparer, setPreparer] = useState(false);
-  const commander = (ports: Record<string, string>) => {
-    const ch = creerCommandes(d, [...selection], jour.value, ports);
+  const commander = (frais: Record<string, FraisCommande>) => {
+    const ch = creerCommandes(d, [...selection], jour.value, frais);
     const n = ch.filter(c => c.table === 'Commandes').length;
     faire(ch, `${n} commande${n > 1 ? 's' : ''} passée${n > 1 ? 's' : ''}`);
     setSelection(new Set());
@@ -117,34 +117,53 @@ function ListeCourses() {
 }
 
 /**
- * Avant de créer : les frais de port de chaque commande (une par fournisseur). Ils seront partagés à
- * parts égales entre les fournitures de la commande, et comptés dans le budget de leurs costumes.
+ * Avant de créer : la date et les frais de chaque commande (une par fournisseur) — port et taxe / douane,
+ * partagés entre ses fournitures, et un bon de réduction (en € ou en %). Les mêmes options qu'après
+ * coup : la taxe / douane attribuée à des articles, le bon réservé à certains. Le tout compte dans le
+ * budget de leurs costumes.
  */
-function NouvelleCommande({ ids, onCreer, onFermer }: { ids: string[]; onCreer: (ports: Record<string, string>) => void; onFermer: () => void }) {
+function NouvelleCommande({ ids, onCreer, onFermer }: { ids: string[]; onCreer: (frais: Record<string, FraisCommande>) => void; onFermer: () => void }) {
   const d = donnees.value;
   const parFournisseur = new Map<string, Ligne[]>();
   for (const id of ids) {
     const f = ligne(d, 'Fournitures', id);
     if (f) parFournisseur.set(f.fournisseur_id || '', [...(parFournisseur.get(f.fournisseur_id || '') ?? []), f]);
   }
-  const [ports, setPorts] = useState<Record<string, string>>({});
+  const [frais, setFrais] = useState<Record<string, FraisCommande>>({});
+  const poser = (fid: string, x: Partial<FraisCommande>) => setFrais(avant => ({ ...avant, [fid]: { ...avant[fid], ...x } }));
   const plusieurs = parFournisseur.size > 1;
   return (
     <Feuille titre={plusieurs ? `Nouvelles commandes (${parFournisseur.size})` : 'Nouvelle commande'} onFermer={onFermer} pied={<>
       <button class="bouton" onClick={onFermer}>Annuler</button>
-      <button class="bouton principal" onClick={() => onCreer(ports)}>{plusieurs ? 'Créer les commandes' : 'Créer la commande'}</button>
+      <button class="bouton principal" onClick={() => onCreer(frais)}>{plusieurs ? 'Créer les commandes' : 'Créer la commande'}</button>
     </>}>
       {plusieurs && <p class="petit-texte">Une commande par fournisseur.</p>}
       {[...parFournisseur].sort(([a], [b]) => !a ? 1 : !b ? -1 : (ligne(d, 'Fournisseurs', a)?.nom ?? '').localeCompare(ligne(d, 'Fournisseurs', b)?.nom ?? '')).map(([fid, lignes]) => {
         const nom = ligne(d, 'Fournisseurs', fid)?.nom ?? 'Sans fournisseur';
         const articles = lignes.reduce((s, f) => s + (montant(f) ?? 0), 0);
+        const fr = frais[fid] ?? {};
         return (
           <div class="nouvelle-commande">
             <p><strong>{nom}</strong> · {lignes.length} fourniture{lignes.length > 1 ? 's' : ''}{articles > 0 ? ` · ${euros(articles)}` : ''}</p>
-            <Champ label="Frais de port (€)">
-              <input type="number" inputMode="decimal" min="0" step="0.01" value={ports[fid] ?? ''} aria-label={`Frais de port ${nom}`}
-                onInput={e => setPorts({ ...ports, [fid]: (e.target as HTMLInputElement).value })} />
+            <Champ label="Date de la commande">
+              <ChoixDate label={`date de la commande ${nom}`} valeur={fr.date || jour.value} onChange={x => poser(fid, { date: x || jour.value })} />
             </Champ>
+            <div class="trois-colonnes">
+              <Champ label="Frais de port (€)">
+                <input type="number" inputMode="decimal" min="0" step="0.01" value={fr.port ?? ''} aria-label={`Frais de port ${nom}`}
+                  onInput={e => poser(fid, { port: (e.target as HTMLInputElement).value })} />
+              </Champ>
+              <Champ label="Taxe / douane (€)">
+                <input type="number" inputMode="decimal" min="0" step="0.01" value={fr.douane ?? ''} aria-label={`Taxe / douane ${nom}`}
+                  onInput={e => poser(fid, { douane: (e.target as HTMLInputElement).value })} />
+              </Champ>
+              <Champ label="Bon de réduction">
+                <ChampReduction label={`Bon de réduction ${nom}`} valeur={fr.reduction ?? ''} onChange={v => poser(fid, { reduction: v })} />
+              </Champ>
+            </div>
+            <OptionsFrais lignes={lignes} douane={fr.douane ?? ''} repDouane={fr.douane_repartition ?? {}} reduction={fr.reduction ?? ''}
+              articlesBon={fr.reduction_articles ?? []}
+              onDouane={rep => poser(fid, { douane_repartition: rep })} onArticlesBon={a => poser(fid, { reduction_articles: a })} />
           </div>
         );
       })}
@@ -193,6 +212,8 @@ function Commandes() {
               </ul>
               <p class="total-commande">
                 {t.port > 0 && <span class="petit-texte">port {euros(t.port)} · </span>}
+                {t.douane > 0 && <span class="petit-texte">taxe / douane {euros(t.douane)} · </span>}
+                {t.reduction > 0 && <span class="petit-texte">bon −{euros(t.reduction)} · </span>}
                 <strong>{euros(t.total)}</strong>{t.sansPrix > 0 && <span class="petit-texte"> ({t.sansPrix} sans prix)</span>}
               </p>
               <div class="ligne-actions">
@@ -211,14 +232,26 @@ function Commandes() {
 function EditeurCommande({ id, onFermer }: { id: string; onFermer: () => void }) {
   const d = donnees.value;
   const c = d.Commandes[id];
+  const lignes = lignesCommande(d, id);
   const m = (champs: Record<string, string>) => faire([{ table: 'Commandes', id, champs }]);
   return (
     <Feuille titre="Commande" onFermer={onFermer} pied={<button class="bouton principal" onClick={onFermer}>Terminé</button>}>
       <Champ label="Fournisseur">
         <Selection label="Fournisseur" valeur={c.fournisseur_id ?? ''} options={[['', '—'], ...tous(d, 'Fournisseurs').map(f => [f.id, f.nom] as [string, string])]} onChange={v => m({ fournisseur_id: v })} />
       </Champ>
-      <Champ label="Statut"><Selection label="Statut" valeur={c.statut === 'reçue' ? 'reçue' : 'passée'} options={STATUTS_COMMANDE} onChange={v => faire(changerStatutCommande(d, id, v, jour.value))} /></Champ>
-      <Champ label="Frais de port (€)"><Texte type="number" valeur={c.frais_port ?? ''} onValider={v => m({ frais_port: v })} /></Champ>
+      <div class="deux-colonnes">
+        <Champ label="Date de la commande"><ChoixDate label="date de la commande" valeur={c.date ?? ''} onChange={v => v && m({ date: v })} /></Champ>
+        <Champ label="Statut"><Selection label="Statut" valeur={c.statut === 'reçue' ? 'reçue' : 'passée'} options={STATUTS_COMMANDE} onChange={v => faire(changerStatutCommande(d, id, v, jour.value))} /></Champ>
+      </div>
+      <div class="trois-colonnes">
+        <Champ label="Frais de port (€)"><Texte type="number" valeur={c.frais_port ?? ''} onValider={v => m({ frais_port: v })} /></Champ>
+        <Champ label="Taxe / douane (€)"><Texte type="number" valeur={c.frais_douane ?? ''} onValider={v => m({ frais_douane: v })} /></Champ>
+        <Champ label="Bon de réduction"><ChampReduction label="Bon de réduction" valeur={c.reduction ?? ''} onChange={v => m({ reduction: v })} /></Champ>
+      </div>
+      <OptionsFrais lignes={lignes} douane={c.frais_douane ?? ''} repDouane={lireJson(c.douane_repartition)} reduction={c.reduction ?? ''}
+        articlesBon={liste(c.reduction_articles)}
+        onDouane={rep => m({ douane_repartition: Object.keys(rep).length ? JSON.stringify(rep) : '' })}
+        onArticlesBon={a => m({ reduction_articles: a.length && a.length < lignes.length ? txtListe(a) : '' })} />
       <Champ label="Notes"><Texte multiligne valeur={c.notes ?? ''} onValider={v => m({ notes: v })} /></Champ>
     </Feuille>
   );
@@ -270,5 +303,97 @@ function EditeurFournisseur({ id, onFermer }: { id: string; onFermer: () => void
       <Champ label="Type"><Texte valeur={f.type ?? ''} onValider={v => m({ type: v })} /></Champ>
       <Champ label="Notes"><Texte multiligne valeur={f.notes ?? ''} onValider={v => m({ notes: v })} /></Champ>
     </Feuille>
+  );
+}
+
+/**
+ * Un bon de réduction : un nombre, et le choix € ou % à côté. Il s'enregistre « 5 » (euros) ou
+ * « 10 % » ; taper « % » dans la case passe aussi en pourcentage.
+ */
+function ChampReduction({ valeur, onChange, label }: { valeur: string; onChange: (v: string) => void; label: string }) {
+  const pct = valeur.trim().endsWith('%');
+  const nombre = valeur.replace('%', '').trim();
+  const [texte, setTexte] = useState(nombre);
+  const [enPct, setEnPct] = useState(pct);
+  useEffect(() => { setTexte(nombre); setEnPct(pct); }, [valeur]);
+  const valider = (t: string, p: boolean) => {
+    const n = t.replace('%', '').trim();
+    const v = n ? (p ? `${n} %` : n) : '';
+    if (v !== valeur) onChange(v);
+  };
+  return (
+    <div class="champ-reduction">
+      <input inputMode="decimal" value={texte} placeholder="—" aria-label={label}
+        onInput={e => {
+          const t = (e.target as HTMLInputElement).value;
+          setTexte(t.replace('%', ''));
+          if (t.includes('%')) { setEnPct(true); valider(t, true); }
+        }}
+        onChange={e => valider((e.target as HTMLInputElement).value, enPct)} />
+      <div class="segments petits" role="group" aria-label="Unité du bon">
+        <button type="button" class={enPct ? '' : 'actif'} aria-pressed={!enPct} onClick={() => { setEnPct(false); valider(texte, false); }}>€</button>
+        <button type="button" class={enPct ? 'actif' : ''} aria-pressed={enPct} onClick={() => { setEnPct(true); valider(texte, true); }}>%</button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Les options d'une commande, à la création comme après : attribuer la taxe / douane à des articles, et
+ * réserver le bon à certains. Avec un seul article, il n'y a rien à répartir : tout lui revient.
+ */
+function OptionsFrais({ lignes, douane, repDouane, reduction, articlesBon, onDouane, onArticlesBon }: {
+  lignes: Ligne[]; douane: string; repDouane: Record<string, string>; reduction: string; articlesBon: string[];
+  onDouane: (rep: Record<string, string>) => void; onArticlesBon: (ids: string[]) => void;
+}) {
+  const d = donnees.value;
+  const totalDouane = num(douane);
+  const aBon = reduction.trim() !== '';
+  if (!totalDouane && !aBon) return null;
+  if (lignes.length < 2) return <p class="petit-texte">Un seul article : la taxe / douane et le bon lui reviennent en entier.</p>;
+  const ids = lignes.map(l => l.id);
+  const parts = repartirDouane(totalDouane, ids, repDouane);
+  const bon = repartirReduction(reduction, lignes, articlesBon);
+  const coches = articlesBon.filter(x => ids.includes(x)).length ? articlesBon.filter(x => ids.includes(x)) : ids;
+  const poserDouane = (fid: string, v: string) => {
+    const n = { ...repDouane };
+    if (v.trim()) n[fid] = v.trim(); else delete n[fid];
+    onDouane(n);
+  };
+  const attribue = ids.filter(x => (repDouane[x] ?? '').trim()).reduce((s, x) => s + num(repDouane[x]), 0);
+  const reste = Math.round((totalDouane - attribue) * 100) / 100;
+  const vides = ids.filter(x => !(repDouane[x] ?? '').trim()).length;
+  return (
+    <>
+      {totalDouane > 0 && (
+        <details class="options-avancees" open={Object.keys(repDouane).length > 0}>
+          <summary>Attribuer la taxe / douane à des articles</summary>
+          <p class="petit-texte">Laisse vide : l'article reçoit une part égale de ce qui n'est pas attribué.</p>
+          {lignes.map(f => (
+            <div class="ligne-attribution">
+              <span>{f.libelle}<span class="petit-texte"> · {nomDestination(d, f)}</span></span>
+              <input inputMode="decimal" value={repDouane[f.id] ?? ''} placeholder={euros(parts[f.id] ?? 0)} aria-label={`Taxe / douane pour ${f.libelle}`}
+                onChange={e => poserDouane(f.id, (e.target as HTMLInputElement).value)} />
+            </div>
+          ))}
+          {reste < 0 ? <p class="petit-texte en-retard">Attribué en trop : {euros(-reste)}</p>
+            : !reste ? <p class="petit-texte">Tout est attribué.</p>
+            : vides ? <p class="petit-texte">{euros(reste)} {vides > 1 ? 'partagés entre les articles laissés vides' : 'attribués à l’article laissé vide'}.</p>
+            : <p class="petit-texte en-retard">{euros(reste)} ne sont attribués à aucun article.</p>}
+        </details>
+      )}
+      {aBon && (
+        <details class="options-avancees" open={coches.length < ids.length}>
+          <summary>Réserver le bon à certains articles</summary>
+          {lignes.map(f => (
+            <label class="case-ligne">
+              <input type="checkbox" checked={coches.includes(f.id)}
+                onChange={e => onArticlesBon((e.target as HTMLInputElement).checked ? [...coches, f.id] : coches.filter(x => x !== f.id))} />
+              <span>{f.libelle}<span class="petit-texte">{montant(f) !== null ? ` · ${euros(montant(f)!)}` : ''}{(bon[f.id] ?? 0) > 0 ? ` · bon −${euros(bon[f.id])}` : ''}</span></span>
+            </label>
+          ))}
+        </details>
+      )}
+    </>
   );
 }

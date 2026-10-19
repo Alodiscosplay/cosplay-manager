@@ -284,8 +284,17 @@ export function purger(table: NomTable, ligneActuelle: Ligne): Changement {
 // ---------- Achats ----------
 
 /** Crée une commande par fournisseur à partir d'une sélection de fournitures (qui peuvent venir de plusieurs costumes). */
-/** Une commande par fournisseur ; `ports` : frais de port saisis pour chacune (clé = id du fournisseur, '' si aucun). */
-export function creerCommandes(d: Donnees, fournitureIds: string[], jour: Jour, ports: Record<string, string> = {}): Changement[] {
+/** Les frais saisis à la création d'une commande. `reduction_articles` : vide = le bon vaut pour tous les articles. */
+export interface FraisCommande {
+  date?: string; port?: string; douane?: string; douane_repartition?: Record<string, string>;
+  reduction?: string; reduction_articles?: string[];
+}
+
+/**
+ * Une commande par fournisseur ; `frais` : pour chacune (clé = id du fournisseur, '' si aucun), ses
+ * frais de port — ou, en entier, port, douane et bon de réduction.
+ */
+export function creerCommandes(d: Donnees, fournitureIds: string[], jour: Jour, frais: Record<string, string | FraisCommande> = {}): Changement[] {
   const parFournisseur = new Map<string, string[]>();
   for (const id of fournitureIds) {
     const f = ligne(d, 'Fournitures', id);
@@ -296,16 +305,27 @@ export function creerCommandes(d: Donnees, fournitureIds: string[], jour: Jour, 
   const ch: Changement[] = [];
   for (const [fournisseurId, ids] of parFournisseur) {
     // Créée = passée : ses fournitures sont aussitôt « commandé ».
-    const cmd = creer('Commandes', { fournisseur_id: fournisseurId, statut: 'passée', date: jour, frais_port: ports[fournisseurId] ?? '' });
+    const x = frais[fournisseurId];
+    const fr: FraisCommande = typeof x === 'string' ? { port: x } : x ?? {};
+    const articles = (fr.reduction_articles ?? []).filter(a => ids.includes(a));
+    const repDouane = Object.fromEntries(Object.entries(fr.douane_repartition ?? {}).filter(([a, v]) => ids.includes(a) && v.trim()));
+    const cmd = creer('Commandes', {
+      fournisseur_id: fournisseurId, statut: 'passée', date: fr.date || jour, frais_port: fr.port ?? '', frais_douane: fr.douane ?? '',
+      douane_repartition: Object.keys(repDouane).length ? JSON.stringify(repDouane) : '',
+      reduction: fr.reduction ?? '', reduction_articles: articles.length < ids.length ? txtListe(articles) : '',
+    });
     ch.push(cmd);
     for (const id of ids) ch.push({ table: 'Fournitures', id, champs: { commande_id: cmd.id, statut: 'commandé' } });
   }
   return ch;
 }
 
-/** Passer une commande « passée » met ses lignes à « commandé », « reçue » à « reçu ». */
-export function changerStatutCommande(d: Donnees, commandeId: string, statut: string, jour: Jour): Changement[] {
-  const ch: Changement[] = [{ table: 'Commandes', id: commandeId, champs: { statut, ...(statut !== 'à passer' ? { date: jour } : {}) } }];
+/**
+ * Passer une commande « passée » met ses lignes à « commandé », « reçue » à « reçu ». La date de la
+ * commande (saisie à sa création, modifiable) n'est plus touchée : la réception ne la remplace pas.
+ */
+export function changerStatutCommande(d: Donnees, commandeId: string, statut: string, _jour: Jour): Changement[] {
+  const ch: Changement[] = [{ table: 'Commandes', id: commandeId, champs: { statut } }];
   const statutLigne = statut === 'reçue' ? 'reçu' : statut === 'passée' ? 'commandé' : 'à acheter';
   for (const f of tous(d, 'Fournitures').filter(f => f.commande_id === commandeId)) {
     if (f.statut !== 'déjà là' && f.statut !== statutLigne) ch.push({ table: 'Fournitures', id: f.id, champs: { statut: statutLigne } });
