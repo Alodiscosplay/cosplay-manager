@@ -3,7 +3,7 @@
 import { useState } from 'preact/hooks';
 import { donnees, faire } from '../store/store';
 import { costumes, piecesDe, piecesDeFourniture, tous, ligne } from '../logique/acces';
-import { montant, euros, texteQuantites, cleNom, lireRepartition, uniteRepartition, texteReste, disponibleTexte, type GroupeNom } from '../logique/budget';
+import { montant, euros, texteQuantites, cleNom, lireRepartition, uniteRepartition, texteReste, disponibleTexte, HORS_COSTUME, horsCostume, nomDestination, type GroupeNom } from '../logique/budget';
 import { STATUTS_FOURNITURE, liste, txtListe, type Ligne } from '../modele/schema';
 import { nouvelId, supprimer, retirerDeCommande } from '../store/operations';
 import { Feuille, Champ, Selection } from './base';
@@ -47,6 +47,7 @@ export function LigneFourniture({ f, afficherCostume, afficherFournisseur, selec
   const d = donnees.value;
   const m = montant(f);
   const c = ligne(d, 'Costumes', f.costume_id);
+  const destination = nomDestination(d, f);
   const four = afficherFournisseur ? ligne(d, 'Fournisseurs', f.fournisseur_id) : undefined;
   // « Chapeau 3 m, Robe 2 m »
   const rep = lireRepartition(f);
@@ -58,7 +59,7 @@ export function LigneFourniture({ f, afficherCostume, afficherFournisseur, selec
   const reste = texteReste(d, f);
   const statut = f.statut || 'à acheter';
   const quantite = [f.quantite, f.unite].filter(Boolean).join(' ');
-  const titre = detail ? [afficherCostume && c?.nom, pieces || 'Général'].filter(Boolean).join(' · ') : f.libelle;
+  const titre = detail ? [afficherCostume && destination, c ? pieces || 'Général' : ''].filter(Boolean).join(' · ') : f.libelle;
   return (
     <li class={`fourniture statut-${statut.replace(/\s/g, '-')}${detail ? ' detail' : ''}`}>
       {onSelection && (
@@ -69,7 +70,7 @@ export function LigneFourniture({ f, afficherCostume, afficherFournisseur, selec
         <span class="fourniture-libelle">{titre}</span>
         <span class="etape-meta">
           {quantite && <span>{quantite}</span>}
-          {!detail && afficherCostume && c && <span class="costume-nom">{c.nom}</span>}
+          {!detail && afficherCostume && destination && <span class="costume-nom">{destination}</span>}
           {!detail && pieces && <span>{pieces}</span>}
           {reste && <span class={reste.startsWith('il manque') ? 'en-retard' : ''}>{reste}</span>}
           {four && <span class="fournisseur-nom">{four.nom}</span>}
@@ -138,6 +139,8 @@ export function EditeurFourniture({ id, costumeId, pieceId, onFermer }: { id?: s
   const [v, setV] = useState<Record<string, string>>(() => ({
     libelle: '', quantite: '', unite: '', prix_unitaire: '', fournisseur_id: '', statut: 'à acheter', lien: '', piece_id: pieceId ?? '',
     costume_id: costumeId ?? costumes(d).find(c => c.statut === 'en cours')?.id ?? costumes(d)[0]?.id ?? '',
+    destination: '',
+    ...(costumeId?.startsWith('__') ? { costume_id: '', destination: costumeId.slice(2) } : {}),
     ...(existant ?? {}),
   }));
   const [nouveauFournisseur, setNouveauFournisseur] = useState('');
@@ -187,7 +190,9 @@ export function EditeurFourniture({ id, costumeId, pieceId, onFermer }: { id?: s
         </Champ>
         <div class="deux-colonnes">
           <Champ label="Pour le costume">
-            <Selection label="Costume" valeur={v.costume_id} options={listeCostumes.map(c => [c.id, c.nom] as [string, string])} onChange={x => setV({ ...v, costume_id: x, piece_id: '', repartition: '' })} />
+            <Selection label="Costume" valeur={v.costume_id || `__${horsCostume(v as unknown as Ligne)}`}
+              options={[...listeCostumes.map(c => [c.id, c.nom] as [string, string]), ['__stock', HORS_COSTUME.stock], ['__divers', HORS_COSTUME.divers]]}
+              onChange={x => setV({ ...v, ...(x.startsWith('__') ? { costume_id: '', destination: x.slice(2) } : { costume_id: x, destination: '' }), piece_id: '', repartition: '' })} />
           </Champ>
         </div>
         <div class="trois-colonnes">
@@ -198,7 +203,7 @@ export function EditeurFourniture({ id, costumeId, pieceId, onFermer }: { id?: s
           </Champ>
           <Champ label="Prix unitaire €"><input value={v.prix_unitaire} inputMode="decimal" placeholder="facultatif" onInput={change('prix_unitaire')} /></Champ>
         </div>
-        <ChoixPieces v={v} setV={setV} />
+        {v.costume_id && <ChoixPieces v={v} setV={setV} />}
         <Champ label="Fournisseur">
           <Selection label="Fournisseur" valeur={v.fournisseur_id} onChange={x => setV({ ...v, fournisseur_id: x })}
             options={[['', '—'], ...tous(d, 'Fournisseurs').map(f => [f.id, f.nom] as [string, string]), ['__nouveau', '+ Nouveau fournisseur…']]} />

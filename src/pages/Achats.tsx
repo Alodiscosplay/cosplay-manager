@@ -1,7 +1,7 @@
 import { useState } from 'preact/hooks';
 import { donnees, jour, faire } from '../store/store';
 import { costumes, tous, ligne } from '../logique/acces';
-import { regrouperAchats, SANS_FOURNISSEUR, type GroupementAchats, regrouperParNom, lignesCommande, totalCommande, euros, montant } from '../logique/budget';
+import { regrouperAchats, SANS_FOURNISSEUR, type GroupementAchats, regrouperParNom, lignesCommande, totalCommande, euros, montant, HORS_COSTUME, nomDestination } from '../logique/budget';
 import { jourCourt } from '../logique/dates';
 import { STATUTS_FOURNITURE, STATUTS_COMMANDE, type Ligne } from '../modele/schema';
 import { creerCommandes, changerStatutCommande, supprimer, purger, retirerDeCommande, nouvelId } from '../store/operations';
@@ -67,7 +67,7 @@ function ListeCourses() {
       <div class="barre-outils">
         <button class="bouton principal" onClick={() => setOuvert('nouveau')}><Icone nom="plus" />Fourniture</button>
         <Selection label="Tri" valeur={par} options={[['fournisseur', 'Tri par fournisseur'], ['costume', 'Tri par costume']]} onChange={v => setPar(v as GroupementAchats)} />
-        <Selection label="Costume" valeur={costume} options={[['', 'Tous les costumes'], ...costumes(d).filter(c => c.statut !== 'archivé').map(c => [c.id, c.nom] as [string, string])]} onChange={setCostume} />
+        <Selection label="Costume" valeur={costume} options={[['', 'Tous les costumes'], ...costumes(d).filter(c => c.statut !== 'archivé').map(c => [c.id, c.nom] as [string, string]), ['__stock', HORS_COSTUME.stock], ['__divers', HORS_COSTUME.divers]]} onChange={setCostume} />
         <Selection label="Fournisseur" valeur={fournisseur} options={[['', 'Tous les fournisseurs'], ...tous(d, 'Fournisseurs').filter(f => utilises.has(f.id)).sort((a, b) => a.nom.localeCompare(b.nom)).map(f => [f.id, f.nom] as [string, string]), [SANS_FOURNISSEUR, 'Sans fournisseur']]} onChange={setFournisseur} />
         <div class="filtre-statuts" role="group" aria-label="Filtrer par statut">
           {STATUTS_FOURNITURE.map(x => (
@@ -90,7 +90,7 @@ function ListeCourses() {
       {groupes.map(g => {
         const libres = selectionnables(g.lignes);
         const tout = libres.length > 0 && libres.every(f => selection.has(f.id));
-        const nomGroupe = par === 'costume' ? g.costume?.nom ?? 'Sans costume' : g.fournisseur?.nom ?? 'Sans fournisseur';
+        const nomGroupe = par === 'costume' ? g.costume?.nom ?? (g.hors ? HORS_COSTUME[g.hors] : 'Sans costume') : g.fournisseur?.nom ?? 'Sans fournisseur';
         return (
           <div class="groupe" key={g.cle}>
             <h2 class="groupe-titre">
@@ -169,7 +169,7 @@ function Commandes() {
           const four = ligne(d, 'Fournisseurs', c.fournisseur_id);
           const lignes = lignesCommande(d, c.id);
           const t = totalCommande(d, c.id);
-          const nomsCostumes = [...new Set(lignes.map(f => ligne(d, 'Costumes', f.costume_id)?.nom).filter(Boolean))];
+          const nomsCostumes = [...new Set(lignes.map(f => nomDestination(d, f)).filter(Boolean))];
           const recue = c.statut === 'reçue';
           const idx = recue ? 1 : 0; // une ancienne commande « à passer » se lit comme passée
           return (
@@ -188,7 +188,7 @@ function Commandes() {
               <ul class="lignes-commande">
                 {lignes.map(f => {
                   const m = montant(f);
-                  return <li><span>{f.libelle}{f.quantite ? ` · ${f.quantite}${f.unite ? ` ${f.unite}` : ''}` : ''}</span><span class="petit-texte">{ligne(d, 'Costumes', f.costume_id)?.nom}</span>{m !== null && <span class="montant">{euros(m)}</span>}</li>;
+                  return <li><span>{f.libelle}{f.quantite ? ` · ${f.quantite}${f.unite ? ` ${f.unite}` : ''}` : ''}</span><span class="petit-texte">{nomDestination(d, f)}</span>{m !== null && <span class="montant">{euros(m)}</span>}</li>;
                 })}
               </ul>
               <p class="total-commande">

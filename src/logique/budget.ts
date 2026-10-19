@@ -106,9 +106,28 @@ export function totalCommande(d: Donnees, commandeId: string): { articles: numbe
   return { articles, port, total: articles + port, sansPrix };
 }
 
+// ---------- Fournitures hors costume : stock et divers ----------
+// Une fourniture sans costume est achetée pour le stock (à réutiliser plus tard) ou « divers » (outils,
+// consommables…). Elle n'a pas de pièce et ne compte dans aucun budget de costume. Colonne
+// `destination` ; une ancienne fourniture sans costume se lit « divers ».
+
+export const HORS_COSTUME = { stock: 'Stock', divers: 'Divers' } as const;
+export type HorsCostume = keyof typeof HORS_COSTUME;
+
+export const horsCostume = (f: Ligne): HorsCostume | '' => (f.costume_id ? '' : f.destination === 'stock' ? 'stock' : 'divers');
+
+/** La clé de sa destination, telle que les filtres la manipulent : l'id du costume, « __stock » ou « __divers ». */
+export const cleDestination = (f: Ligne): string => f.costume_id || `__${horsCostume(f)}`;
+
+/** Le nom de sa destination : le costume, « Stock » ou « Divers ». */
+export function nomDestination(d: Donnees, f: Ligne): string {
+  const h = horsCostume(f);
+  return h ? HORS_COSTUME[h] : ligne(d, 'Costumes', f.costume_id)?.nom ?? '';
+}
+
 export const SANS_FOURNISSEUR = '__aucun';
 export type GroupementAchats = 'fournisseur' | 'costume';
-export interface GroupeAchats { cle: string; fournisseur: Ligne | null; costume: Ligne | null; lignes: Ligne[]; total: number }
+export interface GroupeAchats { cle: string; fournisseur: Ligne | null; costume: Ligne | null; hors?: HorsCostume; lignes: Ligne[]; total: number }
 
 /**
  * La liste de courses commune, groupée par fournisseur (« Sans fournisseur » en dernier) ou par costume
@@ -117,23 +136,28 @@ export interface GroupeAchats { cle: string; fournisseur: Ligne | null; costume:
 export function regrouperAchats(d: Donnees, filtre: { costumeId?: string; fournisseurId?: string; statuts?: string[] } = {}, par: GroupementAchats = 'fournisseur'): GroupeAchats[] {
   const groupes = new Map<string, GroupeAchats>();
   for (const f of tous(d, 'Fournitures')) {
-    if (filtre.costumeId && f.costume_id !== filtre.costumeId) continue;
+    if (filtre.costumeId && cleDestination(f) !== filtre.costumeId) continue;
     if (filtre.statuts && !filtre.statuts.includes(f.statut || 'à acheter')) continue;
     const c = ligne(d, 'Costumes', f.costume_id);
     if (c?.statut === 'archivé' || (f.costume_id && !c)) continue; // costume archivé ou supprimé
     const four = vivant(d.Fournisseurs[f.fournisseur_id]) ? d.Fournisseurs[f.fournisseur_id] : null;
     // fournisseurId : un id, ou SANS_FOURNISSEUR pour les lignes sans fournisseur
     if (filtre.fournisseurId && (four?.id ?? SANS_FOURNISSEUR) !== filtre.fournisseurId) continue;
-    const cle = (par === 'costume' ? c?.id : four?.id) ?? '';
-    if (!groupes.has(cle)) groupes.set(cle, { cle, fournisseur: par === 'fournisseur' ? four : null, costume: par === 'costume' ? c ?? null : null, lignes: [], total: 0 });
+    const cle = (par === 'costume' ? cleDestination(f) : four?.id) ?? '';
+    if (!groupes.has(cle)) groupes.set(cle, {
+      cle, fournisseur: par === 'fournisseur' ? four : null, costume: par === 'costume' ? c ?? null : null,
+      hors: par === 'costume' ? horsCostume(f) || undefined : undefined, lignes: [], total: 0,
+    });
     const g = groupes.get(cle)!;
     g.lignes.push(f);
     g.total += montant(f) ?? 0;
   }
   const liste = [...groupes.values()];
   if (par === 'costume') {
+    // Les costumes dans leur ordre, puis Stock, puis Divers.
     const rang = new Map(costumes(d).map((c, i) => [c.id, i]));
-    return liste.sort((a, b) => (a.costume ? rang.get(a.costume.id) ?? 0 : Infinity) - (b.costume ? rang.get(b.costume.id) ?? 0 : Infinity));
+    const r = (g: GroupeAchats) => (g.costume ? rang.get(g.costume.id) ?? 0 : g.hors === 'stock' ? 1e6 : 1e6 + 1);
+    return liste.sort((a, b) => r(a) - r(b));
   }
   return liste.sort((a, b) =>
     a.fournisseur && b.fournisseur ? a.fournisseur.nom.localeCompare(b.fournisseur.nom) : a.fournisseur ? -1 : 1);

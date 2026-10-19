@@ -18,7 +18,7 @@ export const TABLES = {
   Taches: ['titre', 'costume_id', 'date', 'fait', 'fait_le', 'ordre', 'urgent'],
   Fournisseurs: ['nom', 'url', 'type', 'notes'],
   Fournitures: ['costume_id', 'piece_id', 'libelle', 'quantite', 'unite', 'prix_unitaire', 'fournisseur_id',
-    'statut', 'commande_id', 'lien', 'repartition'],
+    'statut', 'commande_id', 'lien', 'repartition', 'destination'],
   Commandes: ['fournisseur_id', 'statut', 'date', 'frais_port', 'notes'],
   Photos: ['costume_id', 'piece_id', 'piste_id', 'etape_id', 'drive_id', 'legende', 'date', 'dans_wip', 'type'],
   Modeles: ['nom', 'contenu'],
