@@ -18,7 +18,6 @@ export function PageReglages() {
       <header class="page-tete"><h1>Réglages</h1><IndicateurSync /></header>
       <Compte />
       <Identite />
-      <Photos />
       <Modeles />
       <Sauvegarde />
       <section class="carte-reglage">
@@ -72,6 +71,7 @@ function Compte() {
           <button class="bouton" onClick={() => quitter()}>Quitter le mode démo</button>
         </div>
         {erreur && <p class="erreur" role="alert">{erreur}</p>}
+        <Photos />
         {quitterDemo && <Confirmer titre="Remettre la démo à zéro ?" texte="Les costumes d'exemple sont recréés, tes essais effacés." bouton="Remettre à zéro" danger
           onNon={() => setQuitterDemo(false)} onOui={async () => { await reinitialiserDemo(); setQuitterDemo(false); }} />}
       </section>
@@ -91,6 +91,7 @@ function Compte() {
         {s.etat === 'reconnexion' && <button class="bouton principal" onClick={async () => { await connecter(true); await synchroniser(); }}>Se reconnecter</button>}
       </div>
       <p class="petit-texte">Tes données sont rangées dans un espace caché de ton Google Drive, réservé à l'appli : tu ne les vois pas dans ton Drive, et aucune autre appli n'y a accès. Chaque appareil en garde aussi une copie complète.</p>
+      <Photos />
       <div class="ligne-actions">
         <button class="bouton" onClick={async () => {
           setPlace('calcul…');
@@ -112,7 +113,8 @@ function Compte() {
 
 /**
  * Les photos vivent sur l'appareil ; on peut en envoyer une copie sur son Drive, dans le dossier de
- * son choix (Drive plein, partage avec d'autres outils, ou simple préférence).
+ * son choix (Drive plein, partage avec d'autres outils, ou simple préférence). Rangé dans « Compte et
+ * synchronisation » : sans cette copie, les autres appareils ne voient pas les photos.
  */
 function Photos() {
   const d = donnees.value;
@@ -125,8 +127,8 @@ function Photos() {
   for (const p of Object.values(d.Photos)) if (p.supprime !== 'oui' && p.supprime !== 'purge' && p.drive_id?.startsWith('local:')) locales.add(p.drive_id);
   for (const c of Object.values(d.Costumes)) if (c.image_ref?.startsWith('local:')) locales.add(c.image_ref);
   return (
-    <section class="carte-reglage">
-      <h2>Photos</h2>
+    <div class="sous-reglage">
+      <h3 class="groupe-titre">Photos</h3>
       <p class="petit-texte">Tes photos sont réduites puis gardées <strong>sur cet appareil</strong>. Elles n’occupent pas de place sur ton Drive.</p>
       <label class="interrupteur">
         <input type="checkbox" checked={actif} onChange={e => void reglerPhotosDrive((e.target as HTMLInputElement).checked)} />
@@ -144,14 +146,14 @@ function Photos() {
           <p class="petit-texte">Tes autres appareils retrouvent alors les photos. Les photos déjà envoyées restent sur le Drive si tu décoches.</p>
         </>
       )}
-      {!actif && <p class="petit-texte">Sans copie, tes autres appareils ne verront pas les photos, et elles disparaîtraient si tu effaçais les données du navigateur. Archive tes costumes terminés pour les garder sur ton ordinateur.</p>}
+      {!actif && <p class="petit-texte">Sans copie, tes autres appareils ne verront pas les photos.</p>}
       {locales.size > 0 && actif && (
         <p class="petit-texte">{locales.size} photo{locales.size > 1 ? 's partiront' : ' partira'} sur le Drive à la prochaine synchro{mode.value !== 'google' ? ' (une fois connecté à Google)' : ''}.</p>
       )}
       {mode.value !== 'google' && <p class="petit-texte">En mode démo, rien n’est envoyé : le réglage prendra effet une fois connecté à Google.</p>}
       {erreur && <p class="erreur">{erreur}</p>}
       {renommer && <NommerDossier nom={dossier ?? ''} onFermer={() => setRenommer(false)} onErreur={setErreur} />}
-    </section>
+    </div>
   );
 }
 

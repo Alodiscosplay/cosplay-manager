@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import type { ComponentChildren } from 'preact';
 import { donnees } from '../../store/store';
 import { Icone } from '../../composants/Icone';
-import { budgetCostume, euros, releveBudget, type Budget } from '../../logique/budget';
+import { budgetCostume, euros, releveBudget, erreursDuCostume, type Budget } from '../../logique/budget';
 import { piecesDeFourniture } from '../../logique/acces';
 import { jourCourt } from '../../logique/dates';
 import { type Ligne } from '../../modele/schema';
@@ -22,7 +22,7 @@ export function OngletBudget({ costume }: { costume: Ligne }) {
           <span class="chiffre saisie-euros"><Texte type="number" class="chiffre-saisie" valeur={costume.budget_prevu ?? ''} placeholder="—" onValider={v => maj('Costumes', costume.id, { budget_prevu: v })} /> €</span>
         </TuileBudget>
         <TuileBudget nom="futur budget dépensé" aide="Les fournitures encore « à acheter »." chiffre={b.prevu} onDetail={() => setReleve(RELEVES.futur)} />
-        <TuileBudget nom="budget actuel dépensé" aide="Les fournitures « commandé » et « reçu »." chiffre={b.recu + b.commande} onDetail={() => setReleve(RELEVES.actuel)} />
+        <TuileBudget nom="budget actuel dépensé" aide="Les fournitures « commandé » et « reçu », et les erreurs de commande non remboursées." chiffre={b.recu + b.commande + b.erreurs} onDetail={() => setReleve(RELEVES.actuel)} />
         <TuileBudget nom="budget réel" aide="Futur budget dépensé + budget actuel dépensé : le coût de toutes les fournitures du costume. Ne sont pas comptées : les fournitures « déjà là » et celles sans prix." chiffre={b.total} onDetail={() => setReleve(RELEVES.reel)} />
         <TuileBudget nom="budget restant" aide="Budget visé − budget réel. Il passe en rouge quand le budget visé est dépassé." depasse={depasse}>
           <span class="chiffre">{b.cible !== null ? euros(b.cible - b.total) : '—'}</span>
@@ -38,7 +38,7 @@ export function OngletBudget({ costume }: { costume: Ligne }) {
 interface Releve { titre: string; quoi: string; statuts: string[] }
 const RELEVES = {
   futur: { titre: 'Futur budget dépensé', quoi: 'les fournitures encore « à acheter »', statuts: ['à acheter'] },
-  actuel: { titre: 'Budget actuel dépensé', quoi: 'les fournitures « commandé » et « reçu »', statuts: ['commandé', 'reçu'] },
+  actuel: { titre: 'Budget actuel dépensé', quoi: 'les fournitures « commandé » et « reçu », et les erreurs de commande', statuts: ['commandé', 'reçu'] },
   reel: { titre: 'Budget réel', quoi: 'toutes les fournitures, sauf « déjà là »', statuts: ['à acheter', 'commandé', 'reçu'] },
 } satisfies Record<string, Releve>;
 
@@ -46,14 +46,17 @@ const RELEVES = {
 function FeuilleReleve({ costume, releve, onFermer }: { costume: Ligne; releve: Releve; onFermer: () => void }) {
   const d = donnees.value;
   const groupes = releveBudget(d, costume.id, releve.statuts);
-  const total = groupes.reduce((t, g) => t + g.total, 0);
+  // Les erreurs de commande (article manquant ou pas le bon) : payées, donc dans l'actuel dépensé, à part.
+  const erreurs = releve.statuts.includes('reçu') ? erreursDuCostume(d, costume.id) : [];
+  const totalErreurs = erreurs.reduce((t, e) => t + (e.rembourse ? 0 : e.montant), 0);
+  const total = groupes.reduce((t, g) => t + g.total, 0) + totalErreurs;
   const titreGroupe = (g: (typeof groupes)[number]) => g.commande
     ? `Commande du ${g.date ? jourCourt(g.date) : '?'}${g.fournisseur ? ` · ${g.fournisseur.nom}` : ''}`
     : releve.statuts.length === 1 && releve.statuts[0] === 'à acheter' ? 'Encore à acheter' : 'Hors commande';
   return (
     <Feuille titre={`${releve.titre} — ${costume.nom}`} onFermer={onFermer} pied={<button class="bouton principal" onClick={onFermer}>Fermer</button>}>
       <p class="petit-texte">Le détail : {releve.quoi}, avec la part des frais de chaque commande (port, taxe / douane, bon de réduction).</p>
-      {!groupes.length && <p class="petit-texte">Rien pour l'instant.</p>}
+      {!groupes.length && !erreurs.length && <p class="petit-texte">Rien pour l'instant.</p>}
       {groupes.map(g => (
         <section class="releve-groupe">
           <h3 class="releve-ligne releve-tete"><span>{titreGroupe(g)}</span><span class="montant">{euros(g.total)}</span></h3>
@@ -74,7 +77,20 @@ function FeuilleReleve({ costume, releve, onFermer }: { costume: Ligne; releve: 
           </ul>
         </section>
       ))}
-      {groupes.length > 0 && <p class="releve-ligne releve-total"><span>Total</span><span class="montant">{euros(total)}</span></p>}
+      {erreurs.length > 0 && (
+        <section class="releve-groupe">
+          <h3 class="releve-ligne releve-tete"><span>Erreurs de commande</span><span class="montant">{euros(totalErreurs)}</span></h3>
+          <ul class="releve">
+            {erreurs.map(e => (
+              <li class="releve-ligne">
+                <span>{e.libelle}<span class="petit-texte"> · {e.type}{e.detail ? ` · ${e.detail}` : ''} · commande du {e.commande.date ? jourCourt(e.commande.date) : '?'}</span></span>
+                <span class="montant">{e.rembourse ? 'remboursé' : euros(e.montant)}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+      {(groupes.length > 0 || erreurs.length > 0) && <p class="releve-ligne releve-total"><span>Total</span><span class="montant">{euros(total)}</span></p>}
     </Feuille>
   );
 }
@@ -86,7 +102,7 @@ function FeuilleReleve({ costume, releve, onFermer }: { costume: Ligne; releve: 
 function BarreBudget({ b }: { b: Budget }) {
   const echelle = Math.max(b.total, b.cible ?? 0) || 1;
   const pct = (x: number) => `${(100 * x) / echelle}%`;
-  const depense = b.recu + b.commande;
+  const depense = b.recu + b.commande + b.erreurs;
   return (
     <div class="barre-budget">
       <div class="barre-budget-piste" role="img" aria-label={`actuel dépensé ${euros(depense)}, futur dépensé ${euros(b.prevu)}${b.cible !== null ? `, sur ${euros(b.cible)} visés` : ''}`}>

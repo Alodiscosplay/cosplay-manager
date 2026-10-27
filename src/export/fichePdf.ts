@@ -73,7 +73,7 @@ export async function fichePdf(d: Donnees, costumeId: string, image: ChargeurIma
     texte(`${p.nom}  -  ${formatPct(avancementPiece(d, p.id))}${p.patron ? `  -  ${p.patron}` : ''}`, 12, ENCRE, true);
     const pistes = pistesDe(d, p.id);
     for (const pi of pistes) {
-      if (pistes.length > 1 || pi.nom) texte(pi.nom || 'Étape principale', 10, DOUX, true);
+      if (pistes.length > 1 || pi.nom) texte(pi.nom || 'Étape 1', 10, DOUX, true);
       for (const e of etapesDePiste(d, pi.id)) {
         const fait = bool(e.fait);
         place(5);

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { vide, appliquer } from './aide';
 import { type Ligne } from '../src/modele/schema';
-import { creerCommandes, changerStatutCommande } from '../src/store/operations';
+import { creerCommandes, changerStatutCommande, annulerCommande } from '../src/store/operations';
 import { partDouane, partReduction, douaneNonAttribuee, totalCommande, budgetCostume, releveBudget, lireReduction } from '../src/logique/budget';
 
 const l = (id: string, champs: Record<string, string>): Ligne => ({ id, maj: '', supprime: '', ...champs });
@@ -50,6 +50,19 @@ describe('frais de douane et bon de réduction', () => {
     // seulement l’article a attribué : le reste (3 €) se partage entre b et c
     d.Commandes[cmd].douane_repartition = JSON.stringify({ a: '2' });
     expect(['a', 'b', 'c'].map(id => partDouane(d, d.Fournitures[id]))).toEqual([2, 1.5, 1.5]);
+  });
+
+  it('annuler une commande rend aux fournitures leur état d’avant, même après réception', () => {
+    let d = monde();
+    d.Fournitures.c.statut = 'déjà là';
+    const ch = creerCommandes(d, ['a', 'b', 'c'], '2026-10-19', { F: { port: '3', douane: '5', reduction: '10 %' } });
+    d = appliquer(d, ch);
+    const cmd = ch.find(x => x.table === 'Commandes')!.id;
+    d = appliquer(d, changerStatutCommande(d, cmd, 'reçue', '2026-10-25'));
+    expect(['a', 'b', 'c'].map(id => d.Fournitures[id].statut)).toEqual(['reçu', 'reçu', 'reçu']);
+    d = appliquer(d, annulerCommande(d, cmd));
+    expect(['a', 'b', 'c'].map(id => [d.Fournitures[id].statut, d.Fournitures[id].commande_id])).toEqual([['à acheter', ''], ['à acheter', ''], ['déjà là', '']]);
+    expect(d.Commandes[cmd].supprime).toBe('purge');
   });
 
   it('la taxe / douane peut être attribuée dès la création', () => {

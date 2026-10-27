@@ -93,6 +93,26 @@ export function lireJourSaisi(v: string): Jour {
   return versJour(d);
 }
 
+/**
+ * Mise en forme pendant la frappe, pour un clavier de téléphone sans « / » : après deux chiffres, la
+ * barre s'ajoute toute seule (« 03 » → « 03/ », « 0311 » → « 03/11/ », « 03112026 » → « 03/11/2026 »).
+ * En effaçant, elle ne se remet pas. Un « / » tapé après un seul chiffre complète par un 0 (« 3/ » →
+ * « 03/ »). Une saisie avec un autre séparateur (« 3-11-2026 », une date collée « 2026-11-03 ») est
+ * laissée telle quelle.
+ */
+export function masqueDate(nouveau: string, ancien = ''): string {
+  // En effaçant, ou avec un autre séparateur, la saisie reste telle quelle.
+  if (/[^\d/]/.test(nouveau) || nouveau.length < ancien.length) return nouveau;
+  const morceaux = nouveau.split('/');
+  for (let i = 0; i < Math.min(2, morceaux.length - 1); i++) if (morceaux[i].length === 1) morceaux[i] = `0${morceaux[i]}`;
+  const c = morceaux.join('').slice(0, 8);
+  let r = c.slice(0, 2);
+  if (c.length >= 2) r += '/';
+  r += c.slice(2, 4);
+  if (c.length >= 4) r += '/';
+  return r + c.slice(4);
+}
+
 /** « 03/11/2026 » pour l'affichage dans un champ. */
 export function jourSaisi(j: Jour): string {
   if (!j) return '';

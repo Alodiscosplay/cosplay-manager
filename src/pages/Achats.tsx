@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'preact/hooks';
 import { donnees, jour, faire } from '../store/store';
 import { costumes, tous, ligne } from '../logique/acces';
-import { regrouperAchats, SANS_FOURNISSEUR, type GroupementAchats, regrouperParNom, lignesCommande, totalCommande, euros, montant, HORS_COSTUME, nomDestination, repartirDouane, repartirReduction, lireJson } from '../logique/budget';
+import { regrouperAchats, SANS_FOURNISSEUR, type GroupementAchats, regrouperParNom, lignesCommande, totalCommande, euros, montant, HORS_COSTUME, nomDestination, repartirDouane, repartirReduction, lireJson, lireErreurs } from '../logique/budget';
 import { jourCourt } from '../logique/dates';
 import { STATUTS_FOURNITURE, STATUTS_COMMANDE, liste, txtListe, num, type Ligne } from '../modele/schema';
-import { creerCommandes, changerStatutCommande, supprimer, purger, retirerDeCommande, nouvelId, type FraisCommande } from '../store/operations';
+import { creerCommandes, changerStatutCommande, annulerCommande, receptionPartielle, rembourserErreur, supprimer, purger, nouvelId, type FraisCommande, type ChoixReception } from '../store/operations';
 import { GroupeFourniture, EditeurFourniture } from '../composants/Fournitures';
-import { Feuille, Champ, Texte, Selection, Puce, Vide, Menu, ChoixDate } from '../composants/base';
+import { Feuille, Champ, Texte, Selection, Puce, Vide, Menu, ChoixDate, Confirmer } from '../composants/base';
 import { Icone } from '../composants/Icone';
 import { IndicateurSync } from '../app';
 import { lienCostume } from '../routeur';
@@ -175,6 +175,8 @@ function Commandes() {
   const d = donnees.value;
   const [voirRecues, setVoirRecues] = useState(false);
   const [ouverte, setOuverte] = useState<string | null>(null);
+  const [annulee, setAnnulee] = useState<string | null>(null);
+  const [probleme, setProbleme] = useState<string | null>(null); // réception partielle ou problème signalé
   const toutes = tous(d, 'Commandes').sort((a, b) => (b.date || '').localeCompare(a.date || ''));
   const liste = toutes.filter(c => voirRecues || c.statut !== 'reçue');
   return (
@@ -197,7 +199,8 @@ function Commandes() {
                 <h3>{four?.nom ?? 'Sans fournisseur'}</h3>
                 <Menu label="Actions de la commande" actions={[
                   { texte: 'Modifier', icone: 'crayon', faire: () => setOuverte(c.id) },
-                  { texte: 'Supprimer la commande', icone: 'poubelle', danger: true, faire: () => faire([...supprimer(donnees.value, 'Commandes', c.id), ...lignes.flatMap(f => retirerDeCommande(f.id))], 'Commande supprimée') },
+                  recue && { texte: 'Signaler un problème', icone: 'alerte', faire: () => setProbleme(c.id) },
+                  { texte: 'Annuler la commande', icone: 'poubelle', danger: true, faire: () => setAnnulee(c.id) },
                 ]} />
               </header>
               <ol class="etapes-statut" aria-label="Statut">
@@ -210,21 +213,44 @@ function Commandes() {
                   return <li><span>{f.libelle}{f.quantite ? ` · ${f.quantite}${f.unite ? ` ${f.unite}` : ''}` : ''}</span><span class="petit-texte">{nomDestination(d, f)}</span>{m !== null && <span class="montant">{euros(m)}</span>}</li>;
                 })}
               </ul>
+              {lireErreurs(c).length > 0 && (
+                <ul class="erreurs-commande">
+                  {lireErreurs(c).map(e => (
+                    <li><Icone nom="alerte" taille={14} /><span>{e.libelle} · {e.type}{e.detail ? ` (${e.detail})` : ''}{e.montant > 0 ? ` · ${euros(e.montant)}${e.rembourse ? ' remboursé' : ''}` : ''}</span></li>
+                  ))}
+                </ul>
+              )}
               <p class="total-commande">
                 {t.port > 0 && <span class="petit-texte">port {euros(t.port)} · </span>}
                 {t.douane > 0 && <span class="petit-texte">taxe / douane {euros(t.douane)} · </span>}
                 {t.reduction > 0 && <span class="petit-texte">bon −{euros(t.reduction)} · </span>}
+                {t.erreurs > 0 && <span class="petit-texte">erreurs {euros(t.erreurs)} · </span>}
                 <strong>{euros(t.total)}</strong>{t.sansPrix > 0 && <span class="petit-texte"> ({t.sansPrix} sans prix)</span>}
               </p>
               <div class="ligne-actions">
                 {!recue && <button class="bouton principal" onClick={() => faire(changerStatutCommande(d, c.id, 'reçue', jour.value), 'Commande reçue')}>Confirmer la réception</button>}
+                {!recue && <button class="bouton" onClick={() => setProbleme(c.id)}>Réception partielle / problème</button>}
                 {recue && <Puce ton="vert">reçue</Puce>}
+                {!recue && lignes.some(f => f.statut === 'reçu') && <Puce ton="orange">en partie reçue</Puce>}
               </div>
             </article>
           );
         })}
       </div>
       {ouverte && <EditeurCommande id={ouverte} onFermer={() => setOuverte(null)} />}
+      {probleme && d.Commandes[probleme] && <FeuilleReception commandeId={probleme} onFermer={() => setProbleme(null)} />}
+      {annulee && d.Commandes[annulee] && (() => {
+        const n = lignesCommande(d, annulee).length;
+        const nom = ligne(d, 'Fournisseurs', d.Commandes[annulee].fournisseur_id)?.nom;
+        return (
+          <Confirmer titre={`Annuler la commande${nom ? ` ${nom}` : ''} ?`} bouton="Annuler la commande" boutonNon="Garder la commande" danger onNon={() => setAnnulee(null)}
+            onOui={() => { faire(annulerCommande(donnees.value, annulee), 'Commande annulée'); setAnnulee(null); }}
+            texte={<>
+              <p>{n > 1 ? `Ses ${n} fournitures retrouvent` : n === 1 ? 'Sa fourniture retrouve' : 'Ses fournitures retrouvent'} l'état d'avant la commande (« à acheter » en général) et reviennent dans la liste de courses.</p>
+              <p>La commande disparaît, avec ses frais de port, sa taxe / douane et son bon de réduction. Le bouton « Annuler », juste après, permet de revenir en arrière.</p>
+            </>} />
+        );
+      })()}
     </section>
   );
 }
@@ -252,6 +278,22 @@ function EditeurCommande({ id, onFermer }: { id: string; onFermer: () => void })
         articlesBon={liste(c.reduction_articles)}
         onDouane={rep => m({ douane_repartition: Object.keys(rep).length ? JSON.stringify(rep) : '' })}
         onArticlesBon={a => m({ reduction_articles: a.length && a.length < lignes.length ? txtListe(a) : '' })} />
+      {lireErreurs(c).length > 0 && (
+        <div class="sous-reglage">
+          <h3 class="groupe-titre">Problèmes signalés</h3>
+          {lireErreurs(c).map(e => (
+            <div class="ligne-attribution">
+              <span>{e.libelle} · {e.type}<span class="petit-texte">{e.detail ? ` · ${e.detail}` : ''}{e.montant > 0 ? ` · ${euros(e.montant)}` : ''}</span></span>
+              {e.montant > 0 && (
+                <label class="case-ligne">
+                  <input type="checkbox" checked={e.rembourse} onChange={x => faire(rembourserErreur(d, id, e.id, (x.target as HTMLInputElement).checked))} />
+                  <span>remboursé</span>
+                </label>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
       <Champ label="Notes"><Texte multiligne valeur={c.notes ?? ''} onValider={v => m({ notes: v })} /></Champ>
     </Feuille>
   );
@@ -397,3 +439,75 @@ function OptionsFrais({ lignes, douane, repDouane, reduction, articlesBon, onDou
     </>
   );
 }
+
+type EtatReception = 'recu' | 'manquant' | 'pas-le-bon' | 'quantite';
+interface SaisieReception { etat: EtatReception; suite: 'plus-tard' | 'racheter'; rembourse: boolean; recue: string }
+
+/**
+ * Réception partielle, ou problème signalé après coup : pour chaque article, reçu, manquant (il arrivera
+ * plus tard, ou il est à racheter), pas le bon article, ou une autre quantité. Ce qui a été payé pour rien
+ * reste au budget du costume, rangé dans les erreurs de commande, sauf s'il est remboursé.
+ */
+function FeuilleReception({ commandeId, onFermer }: { commandeId: string; onFermer: () => void }) {
+  const d = donnees.value;
+  const c = d.Commandes[commandeId];
+  const recue = c.statut === 'reçue';
+  // Après réception, seuls les articles reçus peuvent poser problème ; avant, tous ceux de la commande.
+  const lignes = lignesCommande(d, commandeId).filter(f => !recue || f.statut === 'reçu');
+  const [saisies, setSaisies] = useState<Record<string, SaisieReception>>(() =>
+    Object.fromEntries(lignes.map(f => [f.id, { etat: 'recu', suite: 'plus-tard', rembourse: false, recue: '' } as SaisieReception])));
+  const poser = (fid: string, x: Partial<SaisieReception>) => setSaisies(avant => ({ ...avant, [fid]: { ...avant[fid], ...x } }));
+  const valider = () => {
+    const choix: Record<string, ChoixReception> = {};
+    for (const [fid, s] of Object.entries(saisies)) {
+      if (s.etat === 'manquant') choix[fid] = { etat: 'manquant', suite: s.suite, rembourse: s.rembourse };
+      else if (s.etat === 'pas-le-bon') choix[fid] = { etat: 'pas-le-bon', rembourse: s.rembourse };
+      else if (s.etat === 'quantite' && s.recue.trim()) choix[fid] = { etat: 'quantite', recue: s.recue, suite: s.suite, rembourse: s.rembourse };
+    }
+    faire(receptionPartielle(donnees.value, commandeId, choix, jour.value), recue ? 'Problème signalé' : 'Réception enregistrée');
+    onFermer();
+  };
+  const four = ligne(d, 'Fournisseurs', c.fournisseur_id)?.nom;
+  return (
+    <Feuille titre={recue ? 'Signaler un problème' : 'Réception partielle / problème'} onFermer={onFermer} pied={<>
+      <button class="bouton" onClick={onFermer}>Annuler</button>
+      <button class="bouton principal" onClick={valider}>Valider</button>
+    </>}>
+      <p class="petit-texte">{four ? `Commande ${four}` : 'Commande'}{c.date ? ` du ${jourCourt(c.date)}` : ''}. Indique ce qui ne va pas ; le reste est reçu.</p>
+      {lignes.map(f => {
+        const s = saisies[f.id];
+        const qte = [f.quantite, f.unite].filter(Boolean).join(' ');
+        const manque = s.etat === 'quantite' && s.recue.trim() !== '' && Number(s.recue.replace(',', '.')) < Number((f.quantite || '1').replace(',', '.'));
+        return (
+          <div class="article-reception">
+            <p><strong>{f.libelle}</strong><span class="petit-texte">{qte ? ` · ${qte}` : ''} · {nomDestination(d, f)}</span></p>
+            <Selection label={`État de ${f.libelle}`} valeur={s.etat} onChange={v => poser(f.id, { etat: v as EtatReception })}
+              options={[['recu', 'Reçu'], ['manquant', 'Manquant'], ['pas-le-bon', 'Pas le bon article'], ['quantite', 'Quantité différente']]} />
+            {s.etat === 'quantite' && (
+              <Champ label={`Quantité reçue${f.unite ? ` (${f.unite})` : ''}`}>
+                <input inputMode="decimal" value={s.recue} placeholder={f.quantite || '1'} aria-label={`Quantité reçue de ${f.libelle}`}
+                  onInput={e => poser(f.id, { recue: (e.target as HTMLInputElement).value })} />
+              </Champ>
+            )}
+            {(s.etat === 'manquant' || manque) && (
+              <div class="choix-segments colonne">
+                <label><input type="radio" name={`suite-${f.id}`} checked={s.suite === 'plus-tard'} onChange={() => poser(f.id, { suite: 'plus-tard' })} />
+                  <span><strong>Arrivera plus tard</strong> — {s.etat === 'manquant' ? 'il reste commandé' : 'le manque reste commandé'}</span></label>
+                <label><input type="radio" name={`suite-${f.id}`} checked={s.suite === 'racheter'} onChange={() => poser(f.id, { suite: 'racheter' })} />
+                  <span><strong>À racheter</strong> — {s.etat === 'manquant' ? 'il revient' : 'le manque revient'} dans la liste de courses</span></label>
+              </div>
+            )}
+            {(s.etat === 'pas-le-bon' || ((s.etat === 'manquant' || manque) && s.suite === 'racheter')) && (
+              <label class="case-ligne">
+                <input type="checkbox" checked={s.rembourse} onChange={e => poser(f.id, { rembourse: (e.target as HTMLInputElement).checked })} />
+                <span>Remboursé <span class="petit-texte">— sinon, ce qui a été payé reste au budget du costume, dans les erreurs de commande</span></span>
+              </label>
+            )}
+            {s.etat === 'pas-le-bon' && <p class="petit-texte">L'article attendu revient dans la liste de courses, pour le racheter ou l'échanger.</p>}
+          </div>
+        );
+      })}
+    </Feuille>
+  );
+}
+

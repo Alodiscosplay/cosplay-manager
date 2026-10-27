@@ -661,4 +661,9 @@ dialog.feuille::backdrop { background: rgb(20 12 28 / 45%); }
 .champ-reduction { display: flex; align-items: center; gap: 6px; }
 .champ-reduction input { flex: 1; min-width: 0; }
 .segments.petits button { padding: 4px 10px; min-height: 0; }
+.sous-reglage { display: flex; flex-direction: column; gap: 10px; border-top: 1px solid var(--bord); padding-top: 12px; margin: 4px 0; }
+.erreurs-commande { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: .85rem; color: var(--orange); }
+.erreurs-commande li { display: flex; gap: 6px; align-items: flex-start; }
+.article-reception { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--bord); padding-top: 10px; }
+.article-reception p { margin: 0; }
 

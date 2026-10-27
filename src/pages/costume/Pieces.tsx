@@ -3,18 +3,18 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import Sortable from 'sortablejs';
 import { annulerDeplacementDom } from '../../composants/glisser';
 import { donnees, jour, faire } from '../../store/store';
-import { piecesDe, pistesDe, etapesDePiste, idsAttendus } from '../../logique/acces';
+import { piecesDe, pistesDe, etapesDePiste, etapesDePiece, idsAttendus } from '../../logique/acces';
 import { avancementPiece, avancementPiste, poids, poidsPiece } from '../../logique/avancement';
 import { statutPiece, statutStockePiece, champsStatutPiece, pisteEnPause, champsPausePiste, etatPiste, attentes, texteAttente } from '../../logique/disponibilite';
 import { jourCourt, relatif, lireJour } from '../../logique/dates';
 import { DUREES, NOMS_DUREES, bool, txtBool, type Duree, type Ligne } from '../../modele/schema';
-import { creerPiece, creerPiste, creerEtape, cocherEtape, deplacerEtape, reordonner, enchainerPistes } from '../../store/operations';
-import { Barre, Pct, Puce, Case, Menu, Vide } from '../../composants/base';
+import { creerPiece, creerPiste, creerEtape, cocherEtape, deplacerEtape, reordonner, enchainerPistes, supprimer } from '../../store/operations';
+import { Barre, Pct, Puce, Case, Menu, Vide, Confirmer } from '../../composants/base';
 import { Icone } from '../../composants/Icone';
 import { EditeurEtape, EditeurPiece, EditeurPiste, ChoixModele, RattacherFournitures, nbFournituresHorsPieces } from './editeurs';
 import { maj } from '../Costume';
 
-type Ouvert = { type: 'etape' | 'piece' | 'piste' | 'modele' | 'fournitures' | 'fournitures-creation'; id?: string } | null;
+type Ouvert = { type: 'etape' | 'piece' | 'piste' | 'modele' | 'fournitures' | 'fournitures-creation'; id?: string; nouveau?: boolean } | null;
 
 export function OngletPieces({ costume }: { costume: Ligne }) {
   const d = donnees.value;
@@ -68,7 +68,7 @@ export function OngletPieces({ costume }: { costume: Ligne }) {
 
       {ouvert?.type === 'etape' && <EditeurEtape id={ouvert.id!} onFermer={() => setOuvert(null)} />}
       {ouvert?.type === 'piece' && <EditeurPiece id={ouvert.id!} onFermer={() => setOuvert(null)} />}
-      {ouvert?.type === 'piste' && <EditeurPiste id={ouvert.id!} onFermer={() => setOuvert(null)} />}
+      {ouvert?.type === 'piste' && <EditeurPiste id={ouvert.id!} nouveau={ouvert.nouveau} onFermer={() => setOuvert(null)} />}
       {ouvert?.type === 'modele' && <ChoixModele pieceId={ouvert.id!} onFermer={() => setOuvert(null)} />}
       {(ouvert?.type === 'fournitures' || ouvert?.type === 'fournitures-creation') && (
         <RattacherFournitures pieceId={ouvert.id!} apresCreation={ouvert.type === 'fournitures-creation'} onFermer={() => setOuvert(null)} />
@@ -90,7 +90,7 @@ function CartePiece({ piece, ouvrir }: { piece: Ligne; ouvrir: (o: Ouvert) => vo
   const j = jour.value;
   const sp = statutPiece(piece, j);
   const [replie, setReplie] = useState(() => lireReplis()[piece.id] ?? (sp === 'terminée'));
-  const [nouvellePiste, setNouvellePiste] = useState('');
+  const [suppression, setSuppression] = useState(false);
   const conteneur = useRef<HTMLDivElement>(null);
   const a = avancementPiece(d, piece.id);
   const pesee = poidsPiece(d, piece);
@@ -120,15 +120,16 @@ function CartePiece({ piece, ouvrir }: { piece: Ligne; ouvrir: (o: Ouvert) => vo
     return () => s.destroy();
   }, [piece.id, replie, pistes.length]);
 
+  // « + Étape » : l'étape est créée avec un nom provisoire, et son formulaire s'ouvre aussitôt.
   const ajouterPiste = () => {
-    faire(creerPiste(d, piece.id, nouvellePiste.trim() || `Étape ${pistes.length + 1}`));
-    setNouvellePiste('');
+    const ch = creerPiste(d, piece.id, `Étape ${pistes.length + 1}`);
+    faire(ch);
+    ouvrir({ type: 'piste', id: ch[0].id, nouveau: true });
   };
 
   return (
     <article class={`carte-piece statut-${sp.replace(/\s/g, '-')}`} data-id={piece.id}>
       <header class="piece-tete">
-        <span class="poignee poignee-piece" aria-label="Déplacer la pièce" title="Glisser pour réordonner"><Icone nom="poignee" taille={18} /></span>
         <button class="piece-titre" onClick={basculer} aria-expanded={!replie}>
           <Icone nom={replie ? 'chevron' : 'bas'} taille={18} />
           <h3>{piece.nom}</h3>
@@ -144,6 +145,8 @@ function CartePiece({ piece, ouvrir }: { piece: Ligne; ouvrir: (o: Ouvert) => vo
               {sp === 'en cours' ? <><Icone nom="lecture" taille={14} />En cours</> : <Icone nom="pause" taille={16} />}
             </button>
           )}
+          {/* Comme pour les sous-étapes : la poignée qui réordonne les pièces, juste avant le menu « … ». */}
+          <span class="poignee poignee-piece" aria-label="Déplacer la pièce" title="Glisser pour réordonner"><Icone nom="poignee" taille={18} /></span>
           <Menu label={`Actions pour ${piece.nom}`} actions={[
             { texte: 'Modifier la pièce', icone: 'crayon', faire: () => ouvrir({ type: 'piece', id: piece.id }) },
             { texte: 'Fournitures de la pièce', icone: 'achats', faire: () => ouvrir({ type: 'fournitures', id: piece.id }) },
@@ -151,7 +154,19 @@ function CartePiece({ piece, ouvrir }: { piece: Ligne; ouvrir: (o: Ouvert) => vo
             ...(pistes.length > 1 ? [enchainees
               ? { texte: 'Rendre les étapes parallèles', icone: 'calques', faire: () => faire(enchainerPistes(d, piece.id, false), 'Étapes parallèles') }
               : { texte: 'Enchaîner les étapes', icone: 'vers', faire: () => faire(enchainerPistes(d, piece.id), 'Étapes enchaînées') }] : []),
+            { texte: 'Supprimer la pièce', icone: 'poubelle', danger: true, faire: () => setSuppression(true) },
           ]} />
+          {suppression && (() => {
+            const nbEtapes = etapesDePiece(d, piece.id).length;
+            return (
+              <Confirmer titre={`Supprimer « ${piece.nom} » ?`} bouton="Supprimer" danger onNon={() => setSuppression(false)}
+                onOui={() => { setSuppression(false); faire(supprimer(donnees.value, 'Pieces', piece.id), `Pièce « ${piece.nom} » supprimée`); }}
+                texte={<>
+                  <p>La pièce est supprimée avec {pistes.length > 1 ? `ses ${pistes.length} étapes` : 'ses étapes'}{nbEtapes ? ` et ${nbEtapes > 1 ? `ses ${nbEtapes} sous-étapes` : 'sa sous-étape'}` : ''}. Ses fournitures restent dans le costume.</p>
+                  <p>C'est définitif : seul le bouton « Annuler », juste après, permet de revenir en arrière.</p>
+                </>} />
+            );
+          })()}
         </div>
       </header>
       <div class="piece-resume">
@@ -180,11 +195,7 @@ function CartePiece({ piece, ouvrir }: { piece: Ligne; ouvrir: (o: Ouvert) => vo
             {pistes.map(p => <BlocPiste key={p.id} piste={p} piece={piece} ouvrir={ouvrir} />)}
           </div>
           <div class="ajout-piste">
-            <form class="ajout-etape" onSubmit={ev => { ev.preventDefault(); ajouterPiste(); }}>
-              <Icone nom="calques" taille={16} />
-              <input value={nouvellePiste} placeholder="Ajouter une étape" aria-label={`Ajouter une étape à ${piece.nom}`}
-                onInput={ev => setNouvellePiste((ev.target as HTMLInputElement).value)} />
-            </form>
+            <button class="bouton petit" onClick={ajouterPiste} aria-label={`Ajouter une étape à ${piece.nom}`}><Icone nom="plus" taille={14} />Étape</button>
             <button class="bouton petit" onClick={() => ouvrir({ type: 'modele', id: piece.id })}><Icone nom="plus" taille={14} />Depuis un modèle</button>
           </div>
         </div>
@@ -237,7 +248,7 @@ function BlocPiste({ piste, piece, ouvrir }: { piste: Ligne; piece: Ligne; ouvri
         <button class="bouton-icone petit" onClick={basculer} aria-expanded={!replie}
           aria-label={`${replie ? 'Déplier' : 'Replier'} l'étape ${piste.nom || 'principale'}`}><Icone nom={replie ? 'chevron' : 'bas'} taille={16} /></button>
         <span class="poignee poignee-piste" aria-label="Déplacer l'étape" title="Glisser pour réordonner les étapes"><Icone nom="poignee" taille={16} /></span>
-        <button class="piste-nom" onClick={() => ouvrir({ type: 'piste', id: piste.id })}>{piste.nom || 'Étape principale'}</button>
+        <button class="piste-nom" onClick={() => ouvrir({ type: 'piste', id: piste.id })}>{piste.nom || 'Étape 1'}</button>
         <span class="piste-compte">{a.nbFait}/{a.nb}</span>
         <button class={`bascule-ordre${libre ? ' libre' : ''}`} onClick={() => maj('Pistes', piste.id, { libre: txtBool(!libre) })}
           title={libre ? 'Libre : toutes les sous-étapes sont faisables en même temps. Cliquer pour imposer l\'ordre.' : 'Dans l\'ordre : chaque sous-étape attend la précédente. Cliquer pour rendre libre.'}>

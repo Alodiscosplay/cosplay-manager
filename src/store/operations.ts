@@ -1,6 +1,7 @@
 // Opérations métier PURES : elles lisent les données et renvoient la liste des lignes à écrire.
 // Le store (store.ts) les applique, les enregistre et les synchronise. Aucune ne modifie `d`.
-import { type Donnees, type Ligne, type NomTable, type Duree, DUREES, NOMS_TABLES, OUI, txtBool, entetes, bool, liste, txtListe } from '../modele/schema';
+import { type Donnees, type Ligne, type NomTable, type Duree, DUREES, NOMS_TABLES, OUI, txtBool, entetes, bool, liste, txtListe, num } from '../modele/schema';
+import { lireErreurs, montant, quantiteNombre, type ErreurCommande } from '../logique/budget';
 import { piecesDe, pistesDe, etapesDePiste, ordreSuivant, ligne, tous, costumes } from '../logique/acces';
 import { statutApresCoche } from '../logique/activation';
 import { etapeFinie, type Plan } from '../logique/planning';
@@ -312,6 +313,7 @@ export function creerCommandes(d: Donnees, fournitureIds: string[], jour: Jour, 
     const cmd = creer('Commandes', {
       fournisseur_id: fournisseurId, statut: 'passée', date: fr.date || jour, frais_port: fr.port ?? '', frais_douane: fr.douane ?? '',
       douane_repartition: Object.keys(repDouane).length ? JSON.stringify(repDouane) : '',
+      statuts_avant: JSON.stringify(Object.fromEntries(ids.map(id => [id, d.Fournitures[id]?.statut || 'à acheter']))),
       reduction: fr.reduction ?? '', reduction_articles: articles.length < ids.length ? txtListe(articles) : '',
     });
     ch.push(cmd);
@@ -331,6 +333,90 @@ export function changerStatutCommande(d: Donnees, commandeId: string, statut: st
     if (f.statut !== 'déjà là' && f.statut !== statutLigne) ch.push({ table: 'Fournitures', id: f.id, champs: { statut: statutLigne } });
   }
   return ch;
+}
+
+/**
+ * Annuler une commande : elle disparaît avec ses frais, et chaque fourniture retrouve l'état qu'elle avait
+ * avant (« à acheter » pour une commande créée avant que l'appli ne le retienne).
+ */
+export function annulerCommande(d: Donnees, commandeId: string): Changement[] {
+  const cmd = d.Commandes[commandeId];
+  if (!cmd) return [];
+  let avant: Record<string, string> = {};
+  try { avant = JSON.parse(cmd.statuts_avant || '{}'); } catch { /* ancienne commande */ }
+  const ch = supprimer(d, 'Commandes', commandeId);
+  for (const f of tous(d, 'Fournitures').filter(f => f.commande_id === commandeId)) {
+    ch.push({ table: 'Fournitures', id: f.id, champs: { commande_id: '', statut: avant[f.id] || 'à acheter' } });
+  }
+  return ch;
+}
+
+/**
+ * Ce qu'on constate pour un article à la réception. `suite` (manquant, ou quantité reçue inférieure) :
+ * « plus-tard » = il arrivera dans une autre livraison, il reste commandé ; « racheter » = il repasse dans
+ * la liste de courses. `rembourse` : ce qui a été payé pour rien est remboursé (sinon, il reste au budget).
+ */
+export type ChoixReception =
+  | { etat: 'recu' }
+  | { etat: 'manquant'; suite: 'plus-tard' | 'racheter'; rembourse?: boolean }
+  | { etat: 'pas-le-bon'; rembourse?: boolean }
+  | { etat: 'quantite'; recue: string; suite: 'plus-tard' | 'racheter'; rembourse?: boolean };
+
+/**
+ * Réception partielle, ou problème signalé après coup. Chaque article : reçu ; manquant (reste commandé,
+ * ou repasse à acheter) ; pas le bon (repasse à acheter) ; quantité différente (la part reçue est reçue,
+ * le manque reste commandé ou repasse à acheter). Ce qui a été payé pour rien devient une erreur de la
+ * commande, au budget du costume tant qu'elle n'est pas remboursée. La commande est « reçue » quand plus
+ * rien n'est attendu.
+ */
+export function receptionPartielle(d: Donnees, commandeId: string, choix: Record<string, ChoixReception>, jour: Jour): Changement[] {
+  const cmd = d.Commandes[commandeId];
+  if (!cmd) return [];
+  const ch: Changement[] = [];
+  const erreurs = lireErreurs(cmd);
+  let attendu = false;
+  const erreur = (f: Ligne, type: ErreurCommande['type'], detail: string, montant: number, rembourse?: boolean) =>
+    erreurs.push({ id: nouvelId(), fourniture_id: f.id, libelle: f.libelle, costume_id: f.costume_id, type, detail, montant: Math.round(montant * 100) / 100, rembourse: !!rembourse, date: jour });
+  const copie = (f: Ligne, quantite: string, enCommande: boolean) => creer('Fournitures', {
+    costume_id: f.costume_id, destination: f.destination ?? '', piece_id: f.piece_id ?? '', libelle: f.libelle, quantite, unite: f.unite ?? '',
+    prix_unitaire: f.prix_unitaire ?? '', fournisseur_id: f.fournisseur_id ?? '', lien: f.lien ?? '',
+    statut: enCommande ? 'commandé' : 'à acheter', commande_id: enCommande ? commandeId : '',
+  });
+  for (const f of tous(d, 'Fournitures').filter(x => x.commande_id === commandeId)) {
+    const c = choix[f.id] ?? { etat: 'recu' };
+    const prix = montant(f) ?? 0;
+    if (c.etat === 'recu') ch.push({ table: 'Fournitures', id: f.id, champs: { statut: 'reçu' } });
+    else if (c.etat === 'manquant' && c.suite === 'plus-tard') { ch.push({ table: 'Fournitures', id: f.id, champs: { statut: 'commandé' } }); attendu = true; }
+    else if (c.etat === 'manquant') {
+      ch.push({ table: 'Fournitures', id: f.id, champs: { statut: 'à acheter', commande_id: '' } });
+      erreur(f, 'manquant', 'jamais reçu, à racheter', prix, c.rembourse);
+    } else if (c.etat === 'pas-le-bon') {
+      ch.push({ table: 'Fournitures', id: f.id, champs: { statut: 'à acheter', commande_id: '' } });
+      erreur(f, 'pas le bon article', 'reçu un autre article, à racheter', prix, c.rembourse);
+    } else {
+      const q = quantiteNombre(f.quantite);
+      const r = num(c.recue, q);
+      const u = f.unite ? ` ${f.unite}` : '';
+      if (r >= q) {
+        ch.push({ table: 'Fournitures', id: f.id, champs: { statut: 'reçu' } });
+        if (r > q) erreur(f, 'quantité', `reçu ${r}${u} au lieu de ${q}${u}`, 0, true);
+      } else {
+        const manque = Math.round((q - r) * 1000) / 1000;
+        ch.push({ table: 'Fournitures', id: f.id, champs: { statut: 'reçu', quantite: String(r) } });
+        ch.push(copie(f, String(manque), c.suite === 'plus-tard'));
+        if (c.suite === 'plus-tard') attendu = true;
+        else erreur(f, 'quantité', `reçu ${r}${u} au lieu de ${q}${u}, ${manque}${u} à racheter`, manque * num(f.prix_unitaire), c.rembourse);
+      }
+    }
+  }
+  ch.push({ table: 'Commandes', id: commandeId, champs: { statut: attendu ? 'passée' : 'reçue', erreurs: erreurs.length ? JSON.stringify(erreurs) : '' } });
+  return ch;
+}
+
+/** Cocher ou décocher « remboursé » sur une erreur de commande. */
+export function rembourserErreur(d: Donnees, commandeId: string, erreurId: string, rembourse: boolean): Changement[] {
+  const erreurs = lireErreurs(d.Commandes[commandeId]).map(e => (e.id === erreurId ? { ...e, rembourse } : e));
+  return [{ table: 'Commandes', id: commandeId, champs: { erreurs: JSON.stringify(erreurs) } }];
 }
 
 /** Retirer une fourniture de sa commande. */

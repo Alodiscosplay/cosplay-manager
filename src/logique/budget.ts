@@ -23,12 +23,13 @@ export interface Budget {
   prevu: number;   // encore à acheter : ce qui reste à débourser
   commande: number; // commandées, pas encore reçues
   recu: number;
+  erreurs: number;  // payé pour un article manquant ou pas le bon, non remboursé (compte dans l'actuel dépensé)
   cible: number | null;
   sansPrix: number; // lignes sans prix (le total est donc incomplet)
 }
 
 export function budgetCostume(d: Donnees, costumeId: string): Budget {
-  const b: Budget = { total: 0, prevu: 0, commande: 0, recu: 0, cible: null, sansPrix: 0 };
+  const b: Budget = { total: 0, prevu: 0, commande: 0, recu: 0, erreurs: 0, cible: null, sansPrix: 0 };
   const c = ligne(d, 'Costumes', costumeId);
   if (c && (c.budget_prevu ?? '').trim()) b.cible = num(c.budget_prevu);
   for (const f of fournituresDe(d, costumeId)) {
@@ -43,7 +44,30 @@ export function budgetCostume(d: Donnees, costumeId: string): Budget {
     if (f.statut === 'commandé') b.commande += m;
     if (f.statut === 'reçu') b.recu += m;
   }
+  for (const e of erreursDuCostume(d, costumeId)) if (!e.rembourse) { b.erreurs += e.montant; b.total += e.montant; }
   return b;
+}
+
+// ---------- Erreurs de commande ----------
+
+/**
+ * Un problème signalé à la réception. L'article attendu, lui, repart dans la liste de courses (ou reste
+ * commandé s'il doit arriver plus tard) ; ce qui a été payé pour rien reste ici, dans le budget du costume,
+ * sauf s'il est remboursé.
+ */
+export interface ErreurCommande {
+  id: string; fourniture_id: string; libelle: string; costume_id: string;
+  type: 'manquant' | 'pas le bon article' | 'quantité'; detail: string;
+  montant: number; rembourse: boolean; date: string;
+}
+
+export function lireErreurs(cmd: Ligne | undefined): ErreurCommande[] {
+  try { const v = JSON.parse(cmd?.erreurs || '[]'); return Array.isArray(v) ? v : []; } catch { return []; }
+}
+
+/** Les erreurs de commande d'un costume, avec leur commande. */
+export function erreursDuCostume(d: Donnees, costumeId: string): (ErreurCommande & { commande: Ligne })[] {
+  return tous(d, 'Commandes').flatMap(c => lireErreurs(c).filter(e => e.costume_id === costumeId).map(e => ({ ...e, commande: c })));
 }
 
 // ---------- Relevé : le détail d'un chiffre du budget ----------
@@ -175,7 +199,7 @@ export function lignesCommande(d: Donnees, commandeId: string): Ligne[] {
   return tous(d, 'Fournitures').filter(f => f.commande_id === commandeId);
 }
 
-export function totalCommande(d: Donnees, commandeId: string): { articles: number; port: number; douane: number; reduction: number; total: number; sansPrix: number } {
+export function totalCommande(d: Donnees, commandeId: string): { articles: number; port: number; douane: number; reduction: number; erreurs: number; total: number; sansPrix: number } {
   let articles = 0, sansPrix = 0, reduction = 0;
   for (const f of lignesCommande(d, commandeId)) {
     const m = montant(f);
@@ -185,7 +209,9 @@ export function totalCommande(d: Donnees, commandeId: string): { articles: numbe
   const port = num(d.Commandes[commandeId]?.frais_port);
   const douane = num(d.Commandes[commandeId]?.frais_douane);
   reduction = Math.round(reduction * 100) / 100;
-  return { articles, port, douane, reduction, total: articles + port + douane - reduction, sansPrix };
+  // Payé pour un article manquant ou pas le bon, non remboursé : la commande l'a bien coûté.
+  const erreurs = lireErreurs(d.Commandes[commandeId]).reduce((t, e) => t + (e.rembourse ? 0 : e.montant), 0);
+  return { articles, port, douane, reduction, erreurs, total: articles + port + douane - reduction + erreurs, sansPrix };
 }
 
 // ---------- Fournitures hors costume : stock et divers ----------

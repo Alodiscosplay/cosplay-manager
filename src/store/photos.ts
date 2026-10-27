@@ -1,8 +1,8 @@
 // Photos : réduites dans le navigateur, gardées en local (IndexedDB), envoyées au Drive à la synchro.
 // Un id « local:… » désigne une photo pas encore envoyée ; sinon c'est l'id du fichier Drive.
-import { signal } from '@preact/signals';
+import { signal, effect } from '@preact/signals';
 import { lirePhoto, ecrirePhoto } from './idb';
-import { baseLocale, mode } from './store';
+import { baseLocale, mode, sync } from './store';
 import { telecharger } from '../sync/drive';
 import { jetonValide } from '../sync/google';
 
@@ -12,6 +12,20 @@ const enCours = new Map<string, Promise<string | null>>();
 export const photosChargees = signal(0);
 
 export function urlConnue(id: string): string | undefined { return urls.get(id); }
+
+/**
+ * Photos d'un autre appareil qu'on n'a pas pu télécharger (connexion Google expirée, réseau coupé, ou
+ * copie pas encore arrivée sur le Drive). Après chaque synchro réussie, on réessaie : sans ça, la photo
+ * restait une icône jusqu'au prochain rechargement de la page.
+ */
+const manquantes = new Set<string>();
+let derniereSync: string | undefined;
+effect(() => {
+  const s = sync.value;
+  if (s.etat !== 'ok' || s.derniere === derniereSync) return;
+  derniereSync = s.derniere;
+  if (manquantes.size) { manquantes.clear(); photosChargees.value++; }
+});
 
 export async function blobPhoto(id: string): Promise<Blob | null> {
   const base = baseLocale();
@@ -29,12 +43,12 @@ export function chargerPhoto(id: string): Promise<string | null> {
   if (!enCours.has(id)) {
     enCours.set(id, blobPhoto(id).then(b => {
       enCours.delete(id);
-      if (!b) return null;
+      if (!b) { manquantes.add(id); return null; }
       const u = URL.createObjectURL(b);
       urls.set(id, u);
       photosChargees.value++;
       return u;
-    }).catch(() => { enCours.delete(id); return null; }));
+    }).catch(() => { enCours.delete(id); manquantes.add(id); return null; }));
   }
   return enCours.get(id)!;
 }

@@ -53,7 +53,7 @@ export function EditeurEtape({ id, onFermer }: { id: string; onFermer: () => voi
       </div>
       {pistes.length > 1 && (
         <Champ label="Étape">
-          <Selection label="Étape" valeur={e.piste_id} options={pistes.map(p => [p.id, p.nom || 'Étape principale'] as [string, string])}
+          <Selection label="Étape" valeur={e.piste_id} options={pistes.map(p => [p.id, p.nom || 'Étape 1'] as [string, string])}
             onChange={v => faire(deplacerEtape(d, id, v, etapesDePiste(d, v).length))} />
         </Champ>
       )}
@@ -99,10 +99,7 @@ export function EditeurPiece({ id, onFermer }: { id: string; onFermer: () => voi
   const autres = piecesDe(d, p.costume_id).filter(x => x.id !== id).map(x => ({ id: x.id, nom: x.nom }));
   const dl = deadlinePiece(d, p);
   return (
-    <Feuille titre="Pièce" onFermer={onFermer} pied={<>
-      <button class="bouton danger" onClick={() => { faire(supprimer(donnees.value, 'Pieces', id), `Pièce « ${p.nom} » supprimée`); onFermer(); }}>Supprimer</button>
-      <button class="bouton principal" onClick={onFermer}>Terminé</button>
-    </>}>
+    <Feuille titre="Pièce" onFermer={onFermer} pied={<button class="bouton principal" onClick={onFermer}>Terminé</button>}>
       <Champ label="Nom"><Texte valeur={p.nom} onValider={v => v && m({ nom: v })} /></Champ>
       <Champ label="Statut" aide="Seules les pièces « en cours » alimentent « À faire ».">
         <Selection label="Statut" valeur={statutStockePiece(p)} options={STATUTS_PIECE} onChange={v => m(champsStatutPiece(p, v, jour.value))} />
@@ -129,7 +126,8 @@ export function EditeurPiece({ id, onFermer }: { id: string; onFermer: () => voi
 
 // ---------- Piste ----------
 
-export function EditeurPiste({ id, onFermer }: { id: string; onFermer: () => void }) {
+/** `nouveau` : l'étape vient d'être créée par « + Étape » ; Annuler la retire. */
+export function EditeurPiste({ id, nouveau, onFermer }: { id: string; nouveau?: boolean; onFermer: () => void }) {
   const d = donnees.value;
   const p = d.Pistes[id];
   const [modele, setModele] = useState(false);
@@ -137,13 +135,17 @@ export function EditeurPiste({ id, onFermer }: { id: string; onFermer: () => voi
   if (!p) return null;
   const piece = d.Pieces[p.piece_id];
   const m = (champs: Record<string, string>) => maj('Pistes', id, champs);
+  // Valide le champ en cours de saisie (les champs n'enregistrent qu'à la sortie) avant de fermer.
+  const fermer = () => { (document.activeElement as HTMLElement | null)?.blur(); onFermer(); };
   return (
-    <Feuille titre="Étape" onFermer={onFermer} pied={<>
-      <button class="bouton danger" onClick={() => { faire(supprimer(donnees.value, 'Pistes', id), 'Piste supprimée'); onFermer(); }}>Supprimer</button>
-      <button class="bouton principal" onClick={onFermer}>Terminé</button>
+    <Feuille titre={nouveau ? 'Nouvelle étape' : 'Étape'} onFermer={onFermer} pied={<>
+      {nouveau
+        ? <button class="bouton" onClick={() => { faire(supprimer(donnees.value, 'Pistes', id)); onFermer(); }}>Annuler</button>
+        : <button class="bouton danger" onClick={() => { faire(supprimer(donnees.value, 'Pistes', id), 'Étape supprimée'); onFermer(); }}>Supprimer</button>}
+      <button class="bouton principal" onClick={fermer}>{nouveau ? 'Créer' : 'Terminé'}</button>
     </>}>
       <p class="petit-texte">Les étapes d'une même pièce avancent en parallèle.</p>
-      <Champ label="Nom"><Texte valeur={p.nom ?? ''} onValider={v => m({ nom: v })} /></Champ>
+      <Champ label="Nom"><Texte valeur={p.nom ?? ''} autoFocus={nouveau} onValider={v => m({ nom: v })} /></Champ>
       <fieldset class="choix-segments colonne">
         <legend>Ordre des sous-étapes</legend>
         <label><input type="radio" name="ordre-piste" checked={!bool(p.libre)} onChange={() => m({ libre: '' })} /><span><strong>Dans l'ordre</strong> — chaque sous-étape attend la précédente</span></label>
@@ -170,7 +172,7 @@ export function EditeurPiste({ id, onFermer }: { id: string; onFermer: () => voi
  */
 function candidatsAttente(d: typeof donnees.value, piece: Ligne | undefined, sauf: string): { id: string; nom: string; groupe?: string }[] {
   if (!piece) return [];
-  return pistesDe(d, piece.id).filter(p => p.id !== sauf).map(p => ({ id: p.id, nom: p.nom || 'Étape principale', groupe: 'Étapes de cette pièce' }));
+  return pistesDe(d, piece.id).filter(p => p.id !== sauf).map(p => ({ id: p.id, nom: p.nom || 'Étape 1', groupe: 'Étapes de cette pièce' }));
 }
 
 export function ChoixAttentes({ table, l, candidats, aide }: { table: NomTable; l: Ligne; candidats: { id: string; nom: string; groupe?: string }[]; aide?: string }) {

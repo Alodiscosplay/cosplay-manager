@@ -89,7 +89,7 @@ export function OngletPlanning({ costume }: { costume: Ligne }) {
       du: du < au ? du : au, au,
       ton: sousEtapes.length && faites === sousEtapes.length ? 'faite' : au < j ? 'retard' : 'prevue',
       texte: `${faites}/${sousEtapes.length}`,
-      titre: `${piece.nom} › ${piste.nom || 'Étape principale'}`,
+      titre: `${piece.nom} › ${piste.nom || 'Étape 1'}`,
       ouvre: `e:${piste.id}`,
     };
   };
@@ -169,7 +169,7 @@ export function OngletPlanning({ costume }: { costume: Ligne }) {
                   </tr>
                   {depliee && pistesDe(d, p.id).map(pi => (
                     <tr class="ligne-piste">
-                      <th scope="row"><div class="tete-ligne"><span class="nom-piste">{pi.nom || 'Étape principale'}</span></div></th>
+                      <th scope="row"><div class="tete-ligne"><span class="nom-piste">{pi.nom || 'Étape 1'}</span></div></th>
                       {cases(barreEtape(pi, p))}
                     </tr>
                   ))}
@@ -197,7 +197,7 @@ function EtapeOuverte({ id, onFermer }: { id: string; onFermer: () => void }) {
   const limitePiece = piece ? deadlinePiece(d, piece) : '';
   const dater = (v: string) => faire([{ table: 'Pistes', id, champs: { deadline: v } }], 'Deadline modifiée');
   return (
-    <Feuille titre={piste.nom || 'Étape principale'} onFermer={onFermer} pied={<button class="bouton principal" onClick={onFermer}>Terminé</button>}>
+    <Feuille titre={piste.nom || 'Étape 1'} onFermer={onFermer} pied={<button class="bouton principal" onClick={onFermer}>Terminé</button>}>
       <p class="petit-texte">{piece?.nom}{du ? ` · commence le ${jourCourt(du)}` : ''}</p>
       <Champ label="Deadline de l'étape" aide={limitePiece ? `La pièce est attendue pour le ${jourCourt(limitePiece)}` : undefined}>
         <ChoixDate label={`deadline de ${piste.nom || 'étape'}`} valeur={piste.deadline ?? ''} min={du || undefined} onChange={dater} />
@@ -251,7 +251,7 @@ function PieceOuverte({ id, onFermer, onEtape }: { id: string; onFermer: () => v
           const finie = sousEtapes.length > 0 && faites === sousEtapes.length;
           return (
             <li key={pi.id}>
-              <button class="lien-bouton" onClick={() => onEtape(pi.id)}>{pi.nom || 'Étape principale'}</button>
+              <button class="lien-bouton" onClick={() => onEtape(pi.id)}>{pi.nom || 'Étape 1'}</button>
               <span class={`petit-texte${!finie && dl && dl < j ? ' en-retard' : ''}`}>{faites}/{sousEtapes.length}</span>
               <ChoixDate label={`deadline de ${pi.nom || 'étape'}`} valeur={pi.deadline ?? ''} onChange={v => dater(pi.id, v)} />
             </li>

@@ -21,7 +21,9 @@ export const TABLES = {
     'statut', 'commande_id', 'lien', 'repartition', 'destination'],
   // frais_douane : à parts égales, sauf ce que douane_repartition attribue ({ idFourniture: « 2 » }) ;
   // reduction : « 5 » (€) ou « 10 % », sur reduction_articles (liste d'ids ; vide = tous les articles).
-  Commandes: ['fournisseur_id', 'statut', 'date', 'frais_port', 'notes', 'frais_douane', 'douane_repartition', 'reduction', 'reduction_articles'],
+  // statuts_avant : l'état de chaque fourniture avant la commande ({ idFourniture: « à acheter » }), pour l'annuler.
+  // erreurs : les problèmes signalés à la réception (JSON, voir ErreurCommande dans logique/budget).
+  Commandes: ['fournisseur_id', 'statut', 'date', 'frais_port', 'notes', 'frais_douane', 'douane_repartition', 'reduction', 'reduction_articles', 'statuts_avant', 'erreurs'],
   Photos: ['costume_id', 'piece_id', 'piste_id', 'etape_id', 'drive_id', 'legende', 'date', 'dans_wip', 'type'],
   Modeles: ['nom', 'contenu'],
   // Les dates à suivre d'un événement. Nature : « periode » (debut → fin), « limite » ou « fixe » (fin seule).

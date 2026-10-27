@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import { Icone } from './Icone';
 import { type Avancement, formatPct } from '../logique/avancement';
 import { chargerPhoto, urlConnue, photosChargees } from '../store/photos';
-import { lireJourSaisi, jourSaisi } from '../logique/dates';
+import { lireJourSaisi, jourSaisi, masqueDate } from '../logique/dates';
 
 /** Case ronde au trait : un rond plein se lirait comme « déjà coché ». */
 export function Case({ coche, onChange, label, disabled }: { coche: boolean; onChange: (v: boolean) => void; label: string; disabled?: boolean }) {
@@ -142,7 +142,14 @@ export function ChoixDate({ valeur, onChange, label, min }: { valeur: string; on
     <div class="choix-date">
       <div class={`champ-date${erreur ? ' invalide' : ''}`}>
         <input type="text" inputMode="numeric" value={texte} placeholder="jj/mm/aaaa" aria-label={label} aria-invalid={!!erreur}
-          onInput={e => setTexte((e.target as HTMLInputElement).value)}
+          onInput={e => {
+            // Les « / » s'ajoutent seuls pendant la frappe (clavier numérique du téléphone), si on tape au bout.
+            const champ = e.target as HTMLInputElement;
+            const auBout = champ.selectionStart === champ.value.length;
+            const v = auBout ? masqueDate(champ.value, texte) : champ.value;
+            if (v !== champ.value) champ.value = v;
+            setTexte(v);
+          }}
           onBlur={e => valider((e.target as HTMLInputElement).value)}
           onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); valider((e.target as HTMLInputElement).value); } }} />
         {/* Hors de l'ordre de tabulation : Tab passe d'une date à la suivante (« Du » → « Au »). */}
@@ -213,10 +220,10 @@ export function Menu({ actions, label = 'Plus d\'actions' }: { actions: ({ texte
 }
 
 /** Demande de confirmation avant une action irréversible. */
-export function Confirmer({ titre, texte, bouton, danger, onOui, onNon }: { titre: string; texte: ComponentChildren; bouton: string; danger?: boolean; onOui: () => void; onNon: () => void }) {
+export function Confirmer({ titre, texte, bouton, boutonNon = 'Annuler', danger, onOui, onNon }: { titre: string; texte: ComponentChildren; bouton: string; boutonNon?: string; danger?: boolean; onOui: () => void; onNon: () => void }) {
   return (
     <Feuille titre={titre} onFermer={onNon} pied={<>
-      <button class="bouton" onClick={onNon}>Annuler</button>
+      <button class="bouton" onClick={onNon}>{boutonNon}</button>
       <button class={`bouton ${danger ? 'danger' : 'principal'}`} onClick={onOui}>{bouton}</button>
     </>}>
       <div class="texte-confirmation">{texte}</div>

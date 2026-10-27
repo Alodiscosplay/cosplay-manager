@@ -236,7 +236,7 @@ function ElementLigne({ e, contexte }: { e: ElementAFaire; contexte?: boolean })
         <span class="etape-meta">
           {contexte && <span class="costume-nom">{e.costume.nom}</span>}
           {contexte && <span>{e.piece.nom}</span>}
-          {e.plusieursPistes && <span class="piste-etiquette">{e.piste.nom || 'étape principale'}</span>}
+          {e.plusieursPistes && <span class="piste-etiquette">{e.piste.nom || 'étape 1'}</span>}
           {e.etape.duree && e.etape.duree !== 'normal' && <span>{e.etape.duree}</span>}
           {dl && <span class={dl < j ? 'en-retard' : ''}><Icone nom="drapeau" taille={12} />{jourCourt(dl)}</span>}
         </span>

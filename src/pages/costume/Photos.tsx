@@ -165,7 +165,7 @@ function EditeurPhoto({ id, costume, parcours, onAller, onFermer }: {
       {!reference && pistes.length > 0 && (
         <div class="deux-colonnes">
           <Champ label="Étape (facultatif)">
-            <Selection label="Étape" valeur={pisteId} options={[['', '—'], ...pistes.map(x => [x.id, x.nom || 'Étape principale'] as [string, string])]}
+            <Selection label="Étape" valeur={pisteId} options={[['', '—'], ...pistes.map(x => [x.id, x.nom || 'Étape 1'] as [string, string])]}
               onChange={v => m({ piste_id: v, etape_id: '' })} />
           </Champ>
           {pisteId && sousEtapes.length > 0 && (
@@ -220,7 +220,7 @@ function AjoutPhotos({ costume, pieceParDefaut, onFichiers, onFermer }: {
       {pistes.length > 0 && (
         <Champ label="Étape (facultatif)">
           <Selection label="Étape" valeur={pisteId} onChange={setPisteId}
-            options={[['', '—'], ...pistes.map(p => [p.id, p.nom || 'Étape principale'] as [string, string])]} />
+            options={[['', '—'], ...pistes.map(p => [p.id, p.nom || 'Étape 1'] as [string, string])]} />
         </Champ>
       )}
       {!pieceId && <p class="petit-texte">Les photos « divers » restent à trier : ouvre-les une par une pour leur donner une pièce.</p>}
