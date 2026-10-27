@@ -250,6 +250,8 @@ function BlocPiste({ piste, piece, ouvrir }: { piste: Ligne; piece: Ligne; ouvri
         <span class="poignee poignee-piste" aria-label="Déplacer l'étape" title="Glisser pour réordonner les étapes"><Icone nom="poignee" taille={16} /></span>
         <button class="piste-nom" onClick={() => ouvrir({ type: 'piste', id: piste.id })}>{piste.nom || 'Étape 1'}</button>
         <span class="piste-compte">{a.nbFait}/{a.nb}</span>
+        {/* Sur téléphone, ces trois commandes passent ensemble sur une deuxième ligne. */}
+        <span class="piste-actions">
         <button class={`bascule-ordre${libre ? ' libre' : ''}`} onClick={() => maj('Pistes', piste.id, { libre: txtBool(!libre) })}
           title={libre ? 'Libre : toutes les sous-étapes sont faisables en même temps. Cliquer pour imposer l\'ordre.' : 'Dans l\'ordre : chaque sous-étape attend la précédente. Cliquer pour rendre libre.'}>
           {libre ? '⇉ libre' : '→ dans l\'ordre'}
@@ -261,6 +263,7 @@ function BlocPiste({ piste, piece, ouvrir }: { piste: Ligne; piece: Ligne; ouvri
           {enPause ? <Icone nom="pause" taille={16} /> : <Icone nom="lecture" taille={14} />}
         </button>
         <button class="bouton-icone petit" aria-label={`Modifier l'étape ${piste.nom}`} onClick={() => ouvrir({ type: 'piste', id: piste.id })}><Icone nom="crayon" taille={16} /></button>
+        </span>
       </div>
       {enPause && <p class="piste-bloquee"><Icone nom="pause" taille={14} />en pause{lireJour(piste.debut) ? `, reprend le ${jourCourt(piste.debut)}` : ''}</p>}
       {e.bloqueePar.length > 0 && !e.terminee && <p class="piste-bloquee"><Icone nom="cadenas" taille={14} />{texteAttente(e.bloqueePar)}</p>}

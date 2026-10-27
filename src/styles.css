@@ -666,4 +666,9 @@ dialog.feuille::backdrop { background: rgb(20 12 28 / 45%); }
 .erreurs-commande li { display: flex; gap: 6px; align-items: flex-start; }
 .article-reception { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--bord); padding-top: 10px; }
 .article-reception p { margin: 0; }
+.piste-actions { display: inline-flex; align-items: center; gap: 8px; flex: none; }
+@media (max-width: 600px) {
+  /* Téléphone : nom et compteur sur la première ligne ; ordre, pause et modifier sur la deuxième, sous le nom. */
+  .piste-actions { flex-basis: 100%; padding-left: 52px; }
+}
 
