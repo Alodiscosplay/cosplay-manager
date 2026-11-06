@@ -8,7 +8,8 @@ import { dateEvenementCostume, evenementsDe, evenements, nomEvenement } from '..
 import { EditeurEvenement, lierCostume } from './Evenement';
 import { relatif, jourCourt } from '../logique/dates';
 import { STATUTS_COSTUME, bool, txtBool, type NomTable } from '../modele/schema';
-import { supprimer, purger } from '../store/operations';
+import { supprimer, purger, reordonner } from '../store/operations';
+import { FeuilleOrdre } from '../composants/OrdreListe';
 import { ajouterImage } from '../store/photos';
 import { aller, lienCostume } from '../routeur';
 import { Barre, Pct, Puce, Feuille, Champ, Texte, ChoixDate, Selection, Menu, Vide, Confirmer } from '../composants/base';
@@ -34,6 +35,7 @@ export function PageCostume({ id, onglet = 'pieces' }: { id: string; onglet?: st
   const [recadrer, setRecadrer] = useState(false);
   const [sauvegarde, setSauvegarde] = useState<'sauvegarde' | 'archive' | null>(null);
   const [suppression, setSuppression] = useState(false);
+  const [ordrePieces, setOrdrePieces] = useState(false);
   if (!c) return <div class="page"><Vide icone="boite" titre="Costume introuvable"><a href="#/">Retour aux costumes</a></Vide></div>;
   if (c.statut === 'archivé') aller('/archives');
 
@@ -91,6 +93,7 @@ export function PageCostume({ id, onglet = 'pieces' }: { id: string; onglet?: st
               aPreparer.length > 0 && { texte: 'Préparation terminée pour toutes les pièces', icone: 'afaire',
                 faire: () => faire(aPreparer.map(p => ({ table: 'Pieces' as const, id: p.id, champs: { preparation_finie: 'oui' } })),
                   `Préparation terminée pour ${aPreparer.length} pièce${aPreparer.length > 1 ? 's' : ''}`) },
+              piecesCostume.length > 1 && { texte: 'Modifier l’ordre des pièces', icone: 'poignee', faire: () => setOrdrePieces(true) },
               { texte: 'Réaliser une sauvegarde', icone: 'telecharger', faire: () => setSauvegarde('sauvegarde') },
               sc === 'terminé' && { texte: 'Archiver définitivement', icone: 'archive', faire: () => setSauvegarde('archive') },
               { texte: 'Supprimer le costume', icone: 'poubelle', danger: true, faire: () => setSuppression(true) },
@@ -129,6 +132,12 @@ export function PageCostume({ id, onglet = 'pieces' }: { id: string; onglet?: st
             <p>Le costume est supprimé avec ses pièces, ses étapes, ses fournitures et ses photos. C'est définitif : seul le bouton « Annuler », juste après, permet de revenir en arrière.</p>
             <p>Pour le garder, fais d'abord une sauvegarde (menu « … » › Réaliser une sauvegarde).</p>
           </>} />
+      )}
+      {ordrePieces && (
+        <FeuilleOrdre titre={`Ordre des pièces de « ${c.nom} »`} aide="Glisse les pièces, ou utilise les flèches."
+          elements={piecesCostume.map(p => ({ id: p.id, nom: p.nom }))}
+          onOrdre={ids => faire(reordonner('Pieces', ids.map(x => donnees.value.Pieces[x]).filter(Boolean)))}
+          onFermer={() => setOrdrePieces(false)} />
       )}
       {sauvegarde && <FeuilleSauvegarde costume={c} archive={sauvegarde === 'archive'} onFermer={() => setSauvegarde(null)} />}
       {menuImage && (

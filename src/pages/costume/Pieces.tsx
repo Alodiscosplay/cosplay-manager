@@ -12,31 +12,16 @@ import { creerPiece, creerPiste, creerEtape, cocherEtape, deplacerEtape, reordon
 import { Barre, Pct, Puce, Case, Menu, Vide, Confirmer } from '../../composants/base';
 import { Icone } from '../../composants/Icone';
 import { EditeurEtape, EditeurPiece, EditeurPiste, ChoixModele, RattacherFournitures, nbFournituresHorsPieces } from './editeurs';
+import { FeuilleOrdre } from '../../composants/OrdreListe';
 import { maj } from '../Costume';
 
-type Ouvert = { type: 'etape' | 'piece' | 'piste' | 'modele' | 'fournitures' | 'fournitures-creation'; id?: string; nouveau?: boolean } | null;
+type Ouvert = { type: 'etape' | 'piece' | 'piste' | 'modele' | 'fournitures' | 'fournitures-creation' | 'ordre-etapes'; id?: string; nouveau?: boolean } | null;
 
 export function OngletPieces({ costume }: { costume: Ligne }) {
   const d = donnees.value;
   const pieces = piecesDe(d, costume.id);
   const [ouvert, setOuvert] = useState<Ouvert>(null);
   const [nouvelle, setNouvelle] = useState('');
-  const liste = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!liste.current) return;
-    const s = Sortable.create(liste.current, {
-      handle: '.poignee-piece', draggable: '.carte-piece', animation: 150,
-      onEnd: evt => {
-        annulerDeplacementDom(evt);
-        const ordre = piecesDe(donnees.value, costume.id);
-        const [bouge] = ordre.splice(evt.oldIndex!, 1);
-        ordre.splice(evt.newIndex!, 0, bouge);
-        faire(reordonner('Pieces', ordre));
-      },
-    });
-    return () => s.destroy();
-  }, [costume.id, pieces.length]);
 
   const ajouterPiece = () => {
     if (!nouvelle.trim()) return;
@@ -62,7 +47,7 @@ export function OngletPieces({ costume }: { costume: Ligne }) {
         </Vide>
       )}
 
-      <div class="liste-pieces" ref={liste}>
+      <div class="liste-pieces">
         {pieces.map(p => <CartePiece key={p.id} piece={p} ouvrir={setOuvert} />)}
       </div>
 
@@ -70,6 +55,13 @@ export function OngletPieces({ costume }: { costume: Ligne }) {
       {ouvert?.type === 'piece' && <EditeurPiece id={ouvert.id!} onFermer={() => setOuvert(null)} />}
       {ouvert?.type === 'piste' && <EditeurPiste id={ouvert.id!} nouveau={ouvert.nouveau} onFermer={() => setOuvert(null)} />}
       {ouvert?.type === 'modele' && <ChoixModele pieceId={ouvert.id!} onFermer={() => setOuvert(null)} />}
+      {ouvert?.type === 'ordre-etapes' && (
+        <FeuilleOrdre titre={`Ordre des étapes de « ${d.Pieces[ouvert.id!]?.nom ?? ''} »`}
+          aide="Glisse les étapes, ou utilise les flèches. Les sous-étapes suivent leur étape."
+          elements={pistesDe(d, ouvert.id!).map(p => ({ id: p.id, nom: p.nom || 'Étape 1', detail: `${etapesDePiste(d, p.id).length} sous-étape${etapesDePiste(d, p.id).length > 1 ? 's' : ''}` }))}
+          onOrdre={ids => faire(reordonner('Pistes', ids.map(id => donnees.value.Pistes[id]).filter(Boolean)))}
+          onFermer={() => setOuvert(null)} />
+      )}
       {(ouvert?.type === 'fournitures' || ouvert?.type === 'fournitures-creation') && (
         <RattacherFournitures pieceId={ouvert.id!} apresCreation={ouvert.type === 'fournitures-creation'} onFermer={() => setOuvert(null)} />
       )}
@@ -91,7 +83,6 @@ function CartePiece({ piece, ouvrir }: { piece: Ligne; ouvrir: (o: Ouvert) => vo
   const sp = statutPiece(piece, j);
   const [replie, setReplie] = useState(() => lireReplis()[piece.id] ?? (sp === 'terminée'));
   const [suppression, setSuppression] = useState(false);
-  const conteneur = useRef<HTMLDivElement>(null);
   const a = avancementPiece(d, piece.id);
   const pesee = poidsPiece(d, piece);
   const pistes = pistesDe(d, piece.id);
@@ -102,23 +93,6 @@ function CartePiece({ piece, ouvrir }: { piece: Ligne; ouvrir: (o: Ouvert) => vo
   const enchainees = pistes.length > 1 && pistes.slice(1).every((p, i) => idsAttendus(p).includes(pistes[i].id));
   const basculer = () => { memoriserRepli(piece.id, !replie); setReplie(!replie); };
   const statut = (s: string) => maj('Pieces', piece.id, champsStatutPiece(piece, s, j));
-
-  // Réordonner les pistes de la pièce
-  useEffect(() => {
-    if (!conteneur.current) return;
-    const s = Sortable.create(conteneur.current, {
-      handle: '.poignee-piste', draggable: '.piste', animation: 150,
-      onEnd: evt => {
-        annulerDeplacementDom(evt);
-        if (evt.oldIndex === evt.newIndex) return;
-        const ordre = pistesDe(donnees.value, piece.id);
-        const [bouge] = ordre.splice(evt.oldIndex!, 1);
-        ordre.splice(evt.newIndex!, 0, bouge);
-        faire(reordonner('Pistes', ordre));
-      },
-    });
-    return () => s.destroy();
-  }, [piece.id, replie, pistes.length]);
 
   // « + Étape » : l'étape est créée avec un nom provisoire, et son formulaire s'ouvre aussitôt.
   const ajouterPiste = () => {
@@ -145,12 +119,11 @@ function CartePiece({ piece, ouvrir }: { piece: Ligne; ouvrir: (o: Ouvert) => vo
               {sp === 'en cours' ? <><Icone nom="lecture" taille={14} />En cours</> : <Icone nom="pause" taille={16} />}
             </button>
           )}
-          {/* Comme pour les sous-étapes : la poignée qui réordonne les pièces, juste avant le menu « … ». */}
-          <span class="poignee poignee-piece" aria-label="Déplacer la pièce" title="Glisser pour réordonner"><Icone nom="poignee" taille={18} /></span>
           <Menu label={`Actions pour ${piece.nom}`} actions={[
             { texte: 'Modifier la pièce', icone: 'crayon', faire: () => ouvrir({ type: 'piece', id: piece.id }) },
             { texte: 'Fournitures de la pièce', icone: 'achats', faire: () => ouvrir({ type: 'fournitures', id: piece.id }) },
             { texte: 'Ajouter une étape depuis un modèle', icone: 'calques', faire: () => ouvrir({ type: 'modele', id: piece.id }) },
+            pistes.length > 1 && { texte: 'Modifier l’ordre des étapes', icone: 'poignee', faire: () => ouvrir({ type: 'ordre-etapes', id: piece.id }) },
             ...(pistes.length > 1 ? [enchainees
               ? { texte: 'Rendre les étapes parallèles', icone: 'calques', faire: () => faire(enchainerPistes(d, piece.id, false), 'Étapes parallèles') }
               : { texte: 'Enchaîner les étapes', icone: 'vers', faire: () => faire(enchainerPistes(d, piece.id), 'Étapes enchaînées') }] : []),
@@ -191,7 +164,7 @@ function CartePiece({ piece, ouvrir }: { piece: Ligne; ouvrir: (o: Ouvert) => vo
       </div>
       {!replie && (
         <div class="piece-contenu">
-          <div class="pistes" ref={conteneur}>
+          <div class="pistes">
             {pistes.map(p => <BlocPiste key={p.id} piste={p} piece={piece} ouvrir={ouvrir} />)}
           </div>
           <div class="ajout-piste">
@@ -247,7 +220,6 @@ function BlocPiste({ piste, piece, ouvrir }: { piste: Ligne; piece: Ligne; ouvri
       <div class="piste-tete">
         <button class="bouton-icone petit" onClick={basculer} aria-expanded={!replie}
           aria-label={`${replie ? 'Déplier' : 'Replier'} l'étape ${piste.nom || 'principale'}`}><Icone nom={replie ? 'chevron' : 'bas'} taille={16} /></button>
-        <span class="poignee poignee-piste" aria-label="Déplacer l'étape" title="Glisser pour réordonner les étapes"><Icone nom="poignee" taille={16} /></span>
         <button class="piste-nom" onClick={() => ouvrir({ type: 'piste', id: piste.id })}>{piste.nom || 'Étape 1'}</button>
         <span class="piste-compte">{a.nbFait}/{a.nb}</span>
         {/* Sur téléphone, ces trois commandes passent ensemble sur une deuxième ligne. */}
